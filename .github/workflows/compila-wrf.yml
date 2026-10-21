@@ -1,0 +1,91 @@
+name: Compila WRF
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compila:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    env:
+      WRF_VERSION: v4.6.1
+      WPS_VERSION: v4.6.0
+      BUILD_DIR: /home/runner/wrf_build
+    steps:
+      - name: Installa i programmi necessari
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran gcc g++ make m4 perl tcsh flex bison \
+            mpich libmpich-dev libnetcdf-dev libnetcdff-dev netcdf-bin \
+            zlib1g-dev libpng-dev libjpeg-dev libtirpc-dev
+          sudo apt-get install -y libjasper-dev || echo "ATTENZIONE: libjasper-dev non disponibile"
+          gfortran --version | head -1
+          ls /usr/include/jasper | head -5 || true
+
+      - name: Scarica WRF e WPS
+        run: |
+          mkdir -p $BUILD_DIR
+          cd $BUILD_DIR
+          git clone --depth 1 --branch $WRF_VERSION --recurse-submodules --shallow-submodules https://github.com/wrf-model/WRF.git
+          git clone --depth 1 --branch $WPS_VERSION https://github.com/wrf-model/WPS.git
+
+      - name: Prepara i collegamenti a NetCDF
+        run: |
+          mkdir -p $BUILD_DIR/netcdf/include $BUILD_DIR/netcdf/lib
+          ln -sf /usr/include/netcdf* $BUILD_DIR/netcdf/include/
+          ln -sf /usr/lib/x86_64-linux-gnu/libnetcdf* $BUILD_DIR/netcdf/lib/
+          ls $BUILD_DIR/netcdf/include | head -20
+          ls $BUILD_DIR/netcdf/lib | head -20
+
+      - name: Configura WRF
+        run: |
+          cd $BUILD_DIR/WRF
+          export NETCDF=$BUILD_DIR/netcdf
+          export WRFIO_NCD_LARGE_FILE_SUPPORT=1
+          printf '34\n1\n' | ./configure 2>&1 | tee configure.out
+          grep -E '34\. *\(dmpar\)' configure.out | head -3
+          grep '^DM_FC' configure.wrf
+          grep -q 'DM_FC.*mpif90' configure.wrf || { echo "ERRORE: scelta di configurazione sbagliata"; exit 1; }
+
+      - name: Compila WRF (circa 30-60 minuti)
+        run: |
+          cd $BUILD_DIR/WRF
+          export NETCDF=$BUILD_DIR/netcdf
+          export WRFIO_NCD_LARGE_FILE_SUPPORT=1
+          ./compile -j 4 em_real > compile.log 2>&1 || ./compile em_real > compile2.log 2>&1 || { echo "ERRORE: ultime righe del log:"; tail -n 80 compile2.log; exit 1; }
+          ls -l main/*.exe
+
+      - name: Configura e compila WPS
+        run: |
+          cd $BUILD_DIR/WPS
+          export WRF_DIR=$BUILD_DIR/WRF
+          export NETCDF=$BUILD_DIR/netcdf
+          export JASPERLIB=/usr/lib/x86_64-linux-gnu
+          export JASPERINC=/usr/include
+          printf '1\n' | ./configure 2>&1 | tee configure.out
+          ./compile > compile.log 2>&1 || true
+          for f in geogrid.exe ungrib.exe metgrid.exe; do
+            test -e $f || { echo "ERRORE: manca $f. Ultime righe del log:"; tail -n 80 compile.log; exit 1; }
+          done
+          ls -l *.exe
+
+      - name: Impacchetta il programma compilato
+        run: |
+          mkdir -p /home/runner/pacchetto
+          tar -chzf /home/runner/pacchetto/wrf-run.tar.gz -C $BUILD_DIR/WRF run
+          tar -chzf /home/runner/pacchetto/wps.tar.gz --exclude='*.o' --exclude='*.mod' -C $BUILD_DIR WPS
+          ls -lh /home/runner/pacchetto
+
+      - name: Salva nella memoria di GitHub (cache)
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/pacchetto
+          key: wrf-compilato-${{ github.run_id }}
+
+      - name: Salva una copia scaricabile
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: wrf-compilato
+          path: /home/runner/pacchetto
+          retention-days: 30
