@@ -1,0 +1,20 @@
+name: Test macchina
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mostra processore
+        run: lscpu | head -20
+
+      - name: Mostra memoria
+        run: free -h
+
+      - name: Mostra spazio disco
+        run: df -h
+
+      - name: Controlla accesso ai dati ECMWF
+        run: curl -sI https://data.ecmwf.int/forecasts/ | head -5
