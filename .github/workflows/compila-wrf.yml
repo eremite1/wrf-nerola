@@ -15,13 +15,11 @@ jobs:
       - name: Installa i programmi necessari
         run: |
           sudo apt-get update
-          sudo apt-get install -y gfortran gcc g++ make m4 perl tcsh flex bison \
+          sudo apt-get install -y gfortran gcc g++ make m4 perl tcsh flex bison cmake \
             mpich libmpich-dev libnetcdf-dev libnetcdff-dev netcdf-bin \
             zlib1g-dev libpng-dev libjpeg-dev libtirpc-dev
-          sudo apt-get install -y libjasper-dev || echo "ATTENZIONE: libjasper-dev non disponibile"
           gfortran --version | head -1
-          mpif90 -show
-          ls /usr/include/jasper | head -5 || true
+          cmake --version | head -1
 
       - name: Recupera il lavoro già fatto (se esiste)
         uses: actions/cache/restore@v4
@@ -46,6 +44,10 @@ jobs:
       - name: Configura WRF
         run: |
           cd $BUILD_DIR/WRF
+          if [ -e main/wrf.exe ] && [ -e main/real.exe ]; then
+            echo "WRF già compilato: salto la configurazione"
+            exit 0
+          fi
           export NETCDF=$BUILD_DIR/netcdf
           export WRFIO_NCD_LARGE_FILE_SUPPORT=1
           printf '34\n1\n' | ./configure 2>&1 | tee configure.out
@@ -53,12 +55,17 @@ jobs:
           sed -i -E '/^DM_FC[[:space:]]*=/ s/$/ -fno-lto/; /^DM_CC[[:space:]]*=/ s/$/ -fno-lto/' configure.wrf
           grep -E '^(DM_FC|DM_CC)' configure.wrf
 
-      - name: Compila WRF (circa 30-50 minuti)
+      - name: Compila WRF (circa 30-50 minuti, salta se già fatto)
         run: |
           cd $BUILD_DIR/WRF
           export NETCDF=$BUILD_DIR/netcdf
           export WRFIO_NCD_LARGE_FILE_SUPPORT=1
           ok() { test -e main/wrf.exe && test -e main/real.exe; }
+          if ok; then
+            echo "WRF già compilato: salto la compilazione"
+            ls -l main/*.exe
+            exit 0
+          fi
           ./compile -j 4 em_real > compile1.log 2>&1 || true
           ok || { echo "Secondo tentativo, un pezzo alla volta"; ./compile em_real > compile2.log 2>&1 || true; }
           if ok; then
@@ -74,17 +81,40 @@ jobs:
             exit 1
           fi
 
+      - name: Compila Jasper (libreria per leggere i dati GRIB2)
+        run: |
+          cd $BUILD_DIR
+          if [ ! -e jasper/lib/libjasper.a ]; then
+            rm -rf jasper-src jasper-build
+            git clone --depth 1 --branch version-2.0.33 https://github.com/jasper-software/jasper.git jasper-src || git clone --depth 1 --branch version-2.0.14 https://github.com/jasper-software/jasper.git jasper-src
+            cmake -S jasper-src -B jasper-build \
+              -DCMAKE_INSTALL_PREFIX=$BUILD_DIR/jasper \
+              -DCMAKE_INSTALL_LIBDIR=lib \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DJAS_ENABLE_SHARED=OFF \
+              -DJAS_ENABLE_PROGRAMS=OFF \
+              -DJAS_ENABLE_DOC=OFF \
+              -DJAS_ENABLE_LIBJPEG=OFF \
+              -DJAS_ENABLE_OPENGL=OFF \
+              -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+            cmake --build jasper-build -j 4
+            cmake --install jasper-build
+          fi
+          ls $BUILD_DIR/jasper/lib
+          ls $BUILD_DIR/jasper/include/jasper | head -5
+
       - name: Configura e compila WPS
         run: |
           cd $BUILD_DIR/WPS
+          ./clean -a > /dev/null 2>&1 || true
           export WRF_DIR=$BUILD_DIR/WRF
           export NETCDF=$BUILD_DIR/netcdf
-          export JASPERLIB=/usr/lib/x86_64-linux-gnu
-          export JASPERINC=/usr/include
+          export JASPERLIB=$BUILD_DIR/jasper/lib
+          export JASPERINC=$BUILD_DIR/jasper/include
           printf '1\n' | ./configure 2>&1 | tee configure.out
           ./compile > compile.log 2>&1 || true
           for f in geogrid.exe ungrib.exe metgrid.exe; do
-            test -e $f || { echo "ERRORE: manca $f."; grep -n -E "undefined reference|Error [0-9]+|error:|Error:" compile.log | cut -c1-250 | head -40; tail -n 40 compile.log | cut -c1-250; exit 1; }
+            test -e $f || { echo "ERRORE: manca $f."; grep -n -E "undefined reference|fatal error|Error [0-9]+|error:|Error:" compile.log | cut -c1-250 | head -40; tail -n 40 compile.log | cut -c1-250; exit 1; }
           done
           ls -l *.exe
 
