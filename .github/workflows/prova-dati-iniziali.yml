@@ -58,15 +58,19 @@ jobs:
           done
           ls -lh
 
-      - name: Ritaglia i dati sull'Italia
+      - name: Ritaglia sull'Italia (latitudini da sud a nord)
         run: |
           cd /home/runner/dati
           for s in 0 3 6; do
             for t in sfc pl; do
-              cdo -s -f grb2 sellonlatbox,9.5,16,39.5,44.5 ${t}_$s.grib2 crop/${t}_$s.grib2 2>&1 | tail -3
+              cdo -s -f grb2 invertlat -sellonlatbox,9.5,16,39.5,44.5 ${t}_$s.grib2 crop/${t}_$s.grib2 2>&1 | tail -3
             done
           done
           ls -lh crop
+          echo "===== Orientazione della griglia: ORIGINALE ====="
+          grib_ls -p scanningMode,jScansPositively,latitudeOfFirstGridPointInDegrees,latitudeOfLastGridPointInDegrees,Ni,Nj -w shortName=2t sfc_0.grib2 2>&1 | head -8 || true
+          echo "===== Orientazione della griglia: RITAGLIATA ====="
+          grib_ls -p scanningMode,jScansPositively,latitudeOfFirstGridPointInDegrees,latitudeOfLastGridPointInDegrees,Ni,Nj -w shortName=2t crop/sfc_0.grib2 2>&1 | head -8 || true
 
       - name: Converti le etichette del suolo
         run: |
@@ -93,13 +97,6 @@ jobs:
             rm final/nosoil_$s.grib2 final/soil_$s.grib2
           done
           ls -lh final
-          echo "===== Suolo dopo la conversione (passo 0) ====="
-          grib_ls -w shortName=sot/vsw -p shortName,typeOfFirstFixedSurface,scaleFactorOfFirstFixedSurface,scaledValueOfFirstFixedSurface,scaledValueOfSecondFixedSurface final/sfc_0.grib2 2>&1 | head -20
-
-      - name: Controllo dei nomi del suolo in METGRID.TBL
-        run: |
-          cd /home/runner/WPS/metgrid
-          grep -n -E "^name=(ST|SM)[0-9]" METGRID.TBL | head -40
 
       - name: Scrivi la Vtable
         run: |
@@ -143,40 +140,44 @@ jobs:
           END=$(date -u -d @$((EPOCH+21600)) +%Y-%m-%d_%H:%M:%S)
           echo "Periodo: $START -> $END"
           sed -i "s/^ *start_date.*/ start_date = '$START','$START',/; s/^ *end_date.*/ end_date   = '$END','$END',/" namelist.wps
-          grep -E "start_date|end_date" namelist.wps
           rm -f GRIBFILE.* FILE:*
           ./link_grib.csh /home/runner/dati/final/*.grib2
           ./ungrib.exe > ungrib.log 2>&1 || true
-          echo "ESITO ungrib: $(grep -c 'Successful completion' ungrib.log) (1 = riuscito)"
-          tail -30 ungrib.log
-          ls -lh FILE:* 2>&1 | head
+          if ! grep -q "Successful completion" ungrib.log; then
+            echo "ERRORE: ungrib non è riuscito. Ultime righe:"
+            tail -n 30 ungrib.log
+            exit 1
+          fi
+          echo "ungrib riuscito"
+          ls -lh FILE:*
 
       - name: Elenca i campi trovati da ungrib
         run: |
           cd /home/runner/WPS
-          F=$(ls FILE:* 2>/dev/null | head -1)
-          test -n "$F" || { echo "Nessun file FILE creato"; exit 0; }
+          F=$(ls FILE:* | head -1)
           echo "File esaminato: $F"
           ./util/rd_intermediate.exe $F > rd.txt 2>&1 || true
-          wc -l rd.txt
-          grep -E "FIELD" rd.txt | sort | uniq -c | head -60
-          echo "----- prime righe -----"
-          head -30 rd.txt
+          grep -E "FIELD" rd.txt | sort | uniq -c | head -40
+          echo "===== PRIMO BLOCCO DI TEMPERATURA (controlla REF_LAT e DATA(1,1)) ====="
+          grep -A 12 -m 1 "FIELD = TT" rd.txt
 
       - name: Esegui metgrid
         run: |
           cd /home/runner/WPS
           ./metgrid.exe > metgrid.log 2>&1 || true
-          echo "ESITO metgrid: $(grep -c 'Successful completion' metgrid.log) (1 = riuscito)"
-          grep -i -E "error|warning|not found" metgrid.log | head -20
-          tail -25 metgrid.log
-          ls -lh met_em.d0* 2>&1 | head
+          grep -i -E "error|warning" metgrid.log | head -20
+          if ! grep -q "Successful completion" metgrid.log; then
+            echo "ERRORE: metgrid non è riuscito. Ultime righe:"
+            tail -n 30 metgrid.log
+            exit 1
+          fi
+          echo "metgrid riuscito"
+          ls -lh met_em.d0*
 
       - name: Controllo finale dei file met_em
         run: |
           cd /home/runner/WPS
-          F=$(ls met_em.d01.* 2>/dev/null | head -1)
-          test -n "$F" || { echo "Nessun file met_em creato"; exit 0; }
+          F=$(ls met_em.d01.* | head -1)
           echo "File: $F"
           ncdump -h $F | grep -E "num_metgrid_levels|num_st_layers|num_sm_layers|FLAG_" | head -60
 
