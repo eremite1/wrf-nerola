@@ -20,14 +20,15 @@ jobs:
             zlib1g-dev libpng-dev libjpeg-dev libtirpc-dev
           sudo apt-get install -y libjasper-dev || echo "ATTENZIONE: libjasper-dev non disponibile"
           gfortran --version | head -1
+          mpif90 -show
           ls /usr/include/jasper | head -5 || true
 
       - name: Recupera il lavoro già fatto (se esiste)
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/wrf_build
-          key: wrf-build-${{ github.run_id }}
-          restore-keys: wrf-build-
+          key: wrf-build-v2-${{ github.run_id }}
+          restore-keys: wrf-build-v2-
 
       - name: Scarica WRF e WPS
         run: |
@@ -48,29 +49,28 @@ jobs:
           export NETCDF=$BUILD_DIR/netcdf
           export WRFIO_NCD_LARGE_FILE_SUPPORT=1
           printf '34\n1\n' | ./configure 2>&1 | tee configure.out
-          grep '^DM_FC' configure.wrf
           grep -q 'DM_FC.*mpif90' configure.wrf || { echo "ERRORE: scelta di configurazione sbagliata"; exit 1; }
+          sed -i -E '/^DM_FC[[:space:]]*=/ s/$/ -fno-lto/; /^DM_CC[[:space:]]*=/ s/$/ -fno-lto/' configure.wrf
+          grep -E '^(DM_FC|DM_CC)' configure.wrf
 
-      - name: Compila WRF (circa 30-60 minuti)
+      - name: Compila WRF (circa 30-50 minuti)
         run: |
           cd $BUILD_DIR/WRF
           export NETCDF=$BUILD_DIR/netcdf
           export WRFIO_NCD_LARGE_FILE_SUPPORT=1
           ok() { test -e main/wrf.exe && test -e main/real.exe; }
-          for n in 1 2; do
-            ok && break
-            echo "Tentativo $n di compilazione in parallelo"
-            ./compile -j 4 em_real > compile$n.log 2>&1 || true
-          done
-          ok || { echo "Tentativo 3: compilazione lenta, un pezzo alla volta"; ./compile em_real > compile3.log 2>&1 || true; }
+          ./compile -j 4 em_real > compile1.log 2>&1 || true
+          ok || { echo "Secondo tentativo, un pezzo alla volta"; ./compile em_real > compile2.log 2>&1 || true; }
           if ok; then
             ls -l main/*.exe
           else
             echo "ERRORE: WRF non è stato creato."
+            LOG=compile2.log
+            test -e $LOG || LOG=compile1.log
             echo "---- RIGHE CON ERRORI ----"
-            grep -n -i -E "error|undefined reference|\*\*\*" compile3.log | head -40
+            grep -n -E "undefined reference|Error [0-9]+|error:|Error:" $LOG | grep -v INTERNAL_BUILD_ERROR | cut -c1-250 | head -40 || true
             echo "---- ULTIME RIGHE ----"
-            tail -n 60 compile3.log
+            tail -n 40 $LOG | cut -c1-250
             exit 1
           fi
 
@@ -84,7 +84,7 @@ jobs:
           printf '1\n' | ./configure 2>&1 | tee configure.out
           ./compile > compile.log 2>&1 || true
           for f in geogrid.exe ungrib.exe metgrid.exe; do
-            test -e $f || { echo "ERRORE: manca $f."; grep -n -i -E "error|undefined reference" compile.log | head -40; tail -n 60 compile.log; exit 1; }
+            test -e $f || { echo "ERRORE: manca $f."; grep -n -E "undefined reference|Error [0-9]+|error:|Error:" compile.log | cut -c1-250 | head -40; tail -n 40 compile.log | cut -c1-250; exit 1; }
           done
           ls -l *.exe
 
@@ -126,4 +126,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /home/runner/wrf_build
-          key: wrf-build-${{ github.run_id }}
+          key: wrf-build-v2-${{ github.run_id }}
