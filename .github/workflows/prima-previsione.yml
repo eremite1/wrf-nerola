@@ -1,0 +1,376 @@
+name: Prima previsione
+
+on:
+  workflow_dispatch:
+
+jobs:
+  previsione:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      RUN_HOURS: 1
+    steps:
+      - name: Installa strumenti
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tcsh cdo libeccodes-tools netcdf-bin libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev mpich python3-numpy python3-matplotlib python3-netcdf4
+          nproc
+          free -h | head -2
+
+      - name: Recupera WPS e WRF compilati
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/pacchetto
+          key: wrf-compilato-cerca
+          restore-keys: wrf-compilato-
+
+      - name: Recupera i file del dominio
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/geo_em
+          key: geo-em-cerca
+          restore-keys: geo-em-
+
+      - name: Prepara WPS e WRF
+        run: |
+          tar -xzf /home/runner/pacchetto/wps.tar.gz -C /home/runner
+          tar -xzf /home/runner/pacchetto/wrf-run.tar.gz -C /home/runner
+          cp /home/runner/geo_em/geo_em.d0*.nc /home/runner/WPS/
+          cp /home/runner/geo_em/namelist.wps /home/runner/WPS/namelist.wps
+          ls -l /home/runner/run/wrf.exe /home/runner/run/real.exe /home/runner/WPS/ungrib.exe
+
+      - name: Scarica l'ultima corsa a 0.1 gradi (passi 0, 3, 6 ore)
+        run: |
+          mkdir -p /home/runner/dati/crop
+          DAY=""; HH=""
+          for d in 0 1; do
+            D=$(date -u -d "-$d day" +%Y%m%d)
+            for H in 18 12 06 00; do
+              U=https://data.ecmwf.int/forecasts/$D/${H}z/ifs/0p1/oper/${D}${H}0000-6h-oper-fc-pl.index
+              C=$(curl -s -o /dev/null -w '%{http_code}' $U)
+              echo "$D ${H}z passo 6h: $C"
+              if [ "$C" = "200" ] && [ -z "$DAY" ]; then DAY=$D; HH=$H; fi
+            done
+          done
+          echo "CORSA SCELTA: $DAY ${HH}z"
+          test -n "$DAY" || { echo "ERRORE: nessuna corsa completa trovata"; exit 1; }
+          echo "$DAY $HH" > /home/runner/dati/corsa.txt
+          cd /home/runner/dati
+          for s in 0 3 6; do
+            for t in sfc pl; do
+              curl -s -f -o ${t}_$s.grib2 https://data.ecmwf.int/forecasts/$DAY/${HH}z/ifs/0p1/oper/${DAY}${HH}0000-${s}h-oper-fc-$t.grib2
+            done
+          done
+          ls -lh
+
+      - name: Ritaglia sull'Italia (latitudini da sud a nord)
+        run: |
+          cd /home/runner/dati
+          for s in 0 3 6; do
+            for t in sfc pl; do
+              cdo -s -f grb2 invertlat -sellonlatbox,9.5,16,39.5,44.5 ${t}_$s.grib2 crop/${t}_$s.grib2 2>&1 | tail -3
+            done
+          done
+          ls -lh crop
+
+      - name: Converti le etichette del suolo
+        run: |
+          cd /home/runner/dati
+          mkdir -p final
+          for s in 0 3 6; do
+            cp crop/pl_$s.grib2 final/pl_$s.grib2
+            grib_copy -w shortName!=sot,shortName!=vsw crop/sfc_$s.grib2 final/nosoil_$s.grib2
+            rm -f final/soil_$s.grib2
+            for k in 1 2 3 4; do
+              case $k in
+                1) D1=0;   D2=7;;
+                2) D1=7;   D2=28;;
+                3) D1=28;  D2=100;;
+                4) D1=100; D2=289;;
+              esac
+              for p in sot vsw; do
+                grib_copy -w shortName=$p,level=$k crop/sfc_$s.grib2 tmp.grib2
+                grib_set -s typeOfFirstFixedSurface=106,scaleFactorOfFirstFixedSurface=2,scaledValueOfFirstFixedSurface=$D1,typeOfSecondFixedSurface=106,scaleFactorOfSecondFixedSurface=2,scaledValueOfSecondFixedSurface=$D2 tmp.grib2 tmp2.grib2
+                cat tmp2.grib2 >> final/soil_$s.grib2
+              done
+            done
+            cat final/nosoil_$s.grib2 final/soil_$s.grib2 > final/sfc_$s.grib2
+            rm final/nosoil_$s.grib2 final/soil_$s.grib2
+          done
+          ls -lh final
+
+      - name: Scrivi la Vtable
+        run: |
+          cd /home/runner/WPS
+          cat > Vtable <<'EOF'
+          GRIB1| Level| From |  To  | metgrid  | metgrid | metgrid                                  |GRIB2|GRIB2|GRIB2|GRIB2|
+          Param| Type |Level1|Level2| Name     | Units   | Description                              |Discp|Catgy|Param|Level|
+          -----+------+------+------+----------+---------+------------------------------------------+-----+-----+-----+-----+
+           11  | 100  |   *  |      | TT       | K       | Temperature                              |  0  |  0  |  0  | 100 |
+           33  | 100  |   *  |      | UU       | m s-1   | U                                        |  0  |  2  |  2  | 100 |
+           34  | 100  |   *  |      | VV       | m s-1   | V                                        |  0  |  2  |  3  | 100 |
+           52  | 100  |   *  |      | RH       | %       | Relative Humidity                        |  0  |  1  |  1  | 100 |
+            7  | 100  |   *  |      | HGT      | m       | Height                                   |  0  |  3  |  5  | 100 |
+           11  | 105  |   2  |      | TT       | K       | Temperature       at 2 m                 |  0  |  0  |  0  | 103 |
+           17  | 105  |   2  |      | DEWPT    | K       | Dewpoint          at 2 m                 |  0  |  0  |  6  | 103 |
+           33  | 105  |  10  |      | UU       | m s-1   | U                 at 10 m                |  0  |  2  |  2  | 103 |
+           34  | 105  |  10  |      | VV       | m s-1   | V                 at 10 m                |  0  |  2  |  3  | 103 |
+           81  |   1  |   0  |      | LANDSEA  | 0/1 Flag| Land/Sea flag                            |  2  |  0  |  0  |  1  |
+            2  | 102  |   0  |      | PMSL     | Pa      | Sea-level Pressure                       |  0  |  3  |  0  | 101 |
+            1  |   1  |   0  |      | PSFC     | Pa      | Surface Pressure                         |  0  |  3  |  0  |  1  |
+           11  |   1  |   0  |      | SKINTEMP | K       | Skin temperature (can use for SST also)  |  0  |  0  | 17  |  1  |
+          129  |   1  |   0  |      | SOILGEO  | m2 s-2  | Surface geopotential                     |  0  |  3  |  4  |  1  |
+          139  | 112  |   0  |   7  | ST000007 | K       | Soil temperature 0-7 cm                  |  2  |  3  | 18  | 106 |
+          170  | 112  |   7  |  28  | ST007028 | K       | Soil temperature 7-28 cm                 |  2  |  3  | 18  | 106 |
+          183  | 112  |  28  | 100  | ST028100 | K       | Soil temperature 28-100 cm               |  2  |  3  | 18  | 106 |
+          236  | 112  | 100  | 289  | ST100289 | K       | Soil temperature 100-289 cm              |  2  |  3  | 18  | 106 |
+           39  | 112  |   0  |   7  | SM000007 | m3 m-3  | Soil moisture 0-7 cm                     |  2  |  0  | 25  | 106 |
+           40  | 112  |   7  |  28  | SM007028 | m3 m-3  | Soil moisture 7-28 cm                    |  2  |  0  | 25  | 106 |
+           41  | 112  |  28  | 100  | SM028100 | m3 m-3  | Soil moisture 28-100 cm                  |  2  |  0  | 25  | 106 |
+           42  | 112  | 100  | 289  | SM100289 | m3 m-3  | Soil moisture 100-289 cm                 |  2  |  0  | 25  | 106 |
+          -----+------+------+------+----------+---------+------------------------------------------+-----+-----+-----+-----+
+          EOF
+          wc -l Vtable
+
+      - name: Esegui ungrib
+        run: |
+          cd /home/runner/WPS
+          read DAY HH < /home/runner/dati/corsa.txt
+          EPOCH=$(date -u -d "${DAY:0:4}-${DAY:4:2}-${DAY:6:2} ${HH}:00:00" +%s)
+          START=$(date -u -d @$EPOCH +%Y-%m-%d_%H:%M:%S)
+          END=$(date -u -d @$((EPOCH+21600)) +%Y-%m-%d_%H:%M:%S)
+          echo "Periodo: $START -> $END"
+          sed -i "s/^ *start_date.*/ start_date = '$START','$START',/; s/^ *end_date.*/ end_date   = '$END','$END',/" namelist.wps
+          rm -f GRIBFILE.* FILE:*
+          ./link_grib.csh /home/runner/dati/final/*.grib2
+          ./ungrib.exe > ungrib.log 2>&1 || true
+          if ! grep -q "Successful completion" ungrib.log; then
+            echo "ERRORE: ungrib non è riuscito. Ultime righe:"
+            tail -n 30 ungrib.log
+            exit 1
+          fi
+          echo "ungrib riuscito"
+          ls -lh FILE:*
+
+      - name: Esegui metgrid
+        run: |
+          cd /home/runner/WPS
+          ./metgrid.exe > metgrid.log 2>&1 || true
+          if ! grep -q "Successful completion" metgrid.log; then
+            echo "ERRORE: metgrid non è riuscito. Ultime righe:"
+            tail -n 30 metgrid.log
+            exit 1
+          fi
+          echo "metgrid riuscito"
+          ls -lh met_em.d0*
+
+      - name: Scrivi il modello di namelist.input
+        run: |
+          cd /home/runner/run
+          cat > namelist.template <<'EOF'
+          &time_control
+           run_days = 0,
+           run_hours = @RUNH@,
+           run_minutes = 0,
+           run_seconds = 0,
+           start_year = @SY@, @SY@,
+           start_month = @SMO@, @SMO@,
+           start_day = @SD@, @SD@,
+           start_hour = @SH@, @SH@,
+           start_minute = 00, 00,
+           start_second = 00, 00,
+           end_year = @EY@, @EY@,
+           end_month = @EMO@, @EMO@,
+           end_day = @ED@, @ED@,
+           end_hour = @EH@, @EH@,
+           end_minute = 00, 00,
+           end_second = 00, 00,
+           interval_seconds = 10800,
+           input_from_file = .true., .true.,
+           history_interval = 60, 60,
+           frames_per_outfile = 1, 1,
+           restart = .false.,
+           restart_interval = 1440,
+           io_form_history = 2,
+           io_form_restart = 2,
+           io_form_input = 2,
+           io_form_boundary = 2,
+           debug_level = 0,
+          /
+          &domains
+           time_step = 15,
+           time_step_fract_num = 0,
+           time_step_fract_den = 1,
+           max_dom = 2,
+           e_we = 81, 73,
+           e_sn = 81, 73,
+           e_vert = 45, 45,
+           p_top_requested = 5000,
+           num_metgrid_levels = 15,
+           num_metgrid_soil_levels = 4,
+           dx = 3000, 1000,
+           dy = 3000, 1000,
+           grid_id = 1, 2,
+           parent_id = 0, 1,
+           i_parent_start = 1, 29,
+           j_parent_start = 1, 29,
+           parent_grid_ratio = 1, 3,
+           parent_time_step_ratio = 1, 3,
+           feedback = 1,
+           smooth_option = 0,
+          /
+          &physics
+           mp_physics = 6, 6,
+           ra_lw_physics = 4, 4,
+           ra_sw_physics = 4, 4,
+           radt = 3, 3,
+           sf_sfclay_physics = 5, 5,
+           sf_surface_physics = 2, 2,
+           bl_pbl_physics = 5, 5,
+           bldt = 0, 0,
+           cu_physics = 0, 0,
+           cudt = 0, 0,
+           num_soil_layers = 4,
+           num_land_cat = 21,
+           surface_input_source = 1,
+           sf_urban_physics = 0, 0,
+           icloud = 1,
+           isfflx = 1,
+           ifsnow = 1,
+           slope_rad = 1, 1,
+           topo_shading = 1, 1,
+          /
+          &dynamics
+           hybrid_opt = 2,
+           w_damping = 1,
+           diff_opt = 2, 2,
+           km_opt = 4, 4,
+           diff_6th_opt = 0, 0,
+           diff_6th_factor = 0.12, 0.12,
+           base_temp = 290.,
+           damp_opt = 3,
+           zdamp = 5000., 5000.,
+           dampcoef = 0.2, 0.2,
+           khdif = 0, 0,
+           kvdif = 0, 0,
+           non_hydrostatic = .true., .true.,
+           moist_adv_opt = 1, 1,
+           scalar_adv_opt = 1, 1,
+           gwd_opt = 0, 0,
+          /
+          &bdy_control
+           spec_bdy_width = 5,
+           specified = .true., .false.,
+           nested = .false., .true.,
+          /
+          &namelist_quilt
+           nio_tasks_per_group = 0,
+           nio_groups = 1,
+          /
+          EOF
+          wc -l namelist.template
+
+      - name: Esegui real.exe
+        run: |
+          cd /home/runner/run
+          cp /home/runner/WPS/met_em.d0* .
+          read DAY HH < /home/runner/dati/corsa.txt
+          EPOCH=$(date -u -d "${DAY:0:4}-${DAY:4:2}-${DAY:6:2} ${HH}:00:00" +%s)
+          SY=${DAY:0:4}; SMO=${DAY:4:2}; SD=${DAY:6:2}; SH=$HH
+          RUNH=3
+          EE=$((EPOCH + RUNH*3600))
+          EY=$(date -u -d @$EE +%Y); EMO=$(date -u -d @$EE +%m); ED=$(date -u -d @$EE +%d); EH=$(date -u -d @$EE +%H)
+          sed -e "s/@RUNH@/$RUNH/g" -e "s/@SY@/$SY/g" -e "s/@SMO@/$SMO/g" -e "s/@SD@/$SD/g" -e "s/@SH@/$SH/g" -e "s/@EY@/$EY/g" -e "s/@EMO@/$EMO/g" -e "s/@ED@/$ED/g" -e "s/@EH@/$EH/g" namelist.template > namelist.input
+          grep -E "start_|end_|run_hours" namelist.input | head -12
+          ulimit -s unlimited || true
+          export OMP_NUM_THREADS=1
+          rm -f rsl.*
+          mpirun -np 1 ./real.exe > real_stdout.log 2>&1 || true
+          if ! grep -q "SUCCESS COMPLETE REAL_EM" rsl.error.0000 rsl.out.0000 2>/dev/null; then
+            echo "ERRORE: real.exe non è riuscito."
+            grep -n -i -E "fatal|error|missing|not found" rsl.error.0000 | head -20 || true
+            echo "---- ultime righe ----"
+            tail -n 30 rsl.error.0000
+            tail -n 15 real_stdout.log
+            exit 1
+          fi
+          echo "real.exe riuscito"
+          ls -lh wrfinput_d0* wrfbdy_d01
+
+      - name: Calcola la previsione con wrf.exe (misura del tempo)
+        run: |
+          cd /home/runner/run
+          read DAY HH < /home/runner/dati/corsa.txt
+          EPOCH=$(date -u -d "${DAY:0:4}-${DAY:4:2}-${DAY:6:2} ${HH}:00:00" +%s)
+          SY=${DAY:0:4}; SMO=${DAY:4:2}; SD=${DAY:6:2}; SH=$HH
+          RUNH=$RUN_HOURS
+          EE=$((EPOCH + RUNH*3600))
+          EY=$(date -u -d @$EE +%Y); EMO=$(date -u -d @$EE +%m); ED=$(date -u -d @$EE +%d); EH=$(date -u -d @$EE +%H)
+          sed -e "s/@RUNH@/$RUNH/g" -e "s/@SY@/$SY/g" -e "s/@SMO@/$SMO/g" -e "s/@SD@/$SD/g" -e "s/@SH@/$SH/g" -e "s/@EY@/$EY/g" -e "s/@EMO@/$EMO/g" -e "s/@ED@/$ED/g" -e "s/@EH@/$EH/g" namelist.template > namelist.input
+          grep -E "start_|end_|run_hours" namelist.input | head -12
+          ulimit -s unlimited || true
+          export OMP_NUM_THREADS=1
+          rm -f rsl.*
+          T0=$(date +%s)
+          mpirun -np 4 ./wrf.exe > wrf_stdout.log 2>&1 || true
+          T1=$(date +%s)
+          echo "=============================================="
+          echo "TEMPO DI CALCOLO: $((T1-T0)) secondi per $RUN_HOURS ora/e di previsione"
+          echo "=============================================="
+          grep "Timing for main" rsl.error.0000 | tail -4
+          if ! grep -q "SUCCESS COMPLETE WRF" rsl.error.0000 2>/dev/null; then
+            echo "ERRORE: wrf.exe non è riuscito."
+            grep -n -i -E "fatal|error|cfl|segmentation|forrtl|nan" rsl.error.* | head -20 || true
+            echo "---- ultime righe ----"
+            tail -n 30 rsl.error.0000
+            tail -n 15 wrf_stdout.log
+            exit 1
+          fi
+          echo "wrf.exe riuscito"
+          ls -lh wrfout_d0*
+
+      - name: Disegna la mappa del risultato
+        run: |
+          cd /home/runner/run
+          python3 - <<'EOF'
+          import glob, netCDF4, numpy as np
+          import matplotlib
+          matplotlib.use("Agg")
+          import matplotlib.pyplot as plt
+          files = sorted(glob.glob("wrfout_d02_*"))
+          print("File d02:", files)
+          nc = netCDF4.Dataset(files[-1])
+          lon = nc["XLONG"][0]
+          lat = nc["XLAT"][0]
+          t2 = nc["T2"][0] - 273.15
+          ws = np.hypot(nc["U10"][0], nc["V10"][0])
+          print("T2 min/max (C):", float(t2.min()), float(t2.max()))
+          print("Vento 10 m max (m/s):", float(ws.max()))
+          fig, ax = plt.subplots(1, 2, figsize=(13, 5.5))
+          m0 = ax[0].pcolormesh(lon, lat, t2, cmap="coolwarm", shading="auto")
+          fig.colorbar(m0, ax=ax[0], label="Temperatura a 2 m (C)")
+          m1 = ax[1].pcolormesh(lon, lat, ws, cmap="viridis", shading="auto")
+          fig.colorbar(m1, ax=ax[1], label="Vento a 10 m (m/s)")
+          for a in ax:
+              a.plot([12.77], [42.13], "k*", markersize=12)
+              a.set_aspect(1.0 / np.cos(np.radians(42.1)))
+              a.set_xlabel("Longitudine")
+              a.set_ylabel("Latitudine")
+          fig.suptitle("Dominio 1 km, file: " + files[-1])
+          fig.savefig("mappa_previsione.png", dpi=110, bbox_inches="tight")
+          EOF
+
+      - name: Salva i risultati
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: prima-previsione
+          path: |
+            /home/runner/run/mappa_previsione.png
+            /home/runner/run/namelist.input
+            /home/runner/run/rsl.error.0000
+            /home/runner/run/wrf_stdout.log
+            /home/runner/run/wrfout_d02_*
+          retention-days: 14
+          if-no-files-found: ignore
