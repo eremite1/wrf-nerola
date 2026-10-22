@@ -1,0 +1,157 @@
+name: Prova dati iniziali
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prova:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Installa strumenti
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tcsh cdo libeccodes-tools netcdf-bin libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev
+
+      - name: Recupera WPS compilato
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/pacchetto
+          key: wrf-compilato-cerca
+          restore-keys: wrf-compilato-
+
+      - name: Recupera i file del dominio
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/geo_em
+          key: geo-em-cerca
+          restore-keys: geo-em-
+
+      - name: Prepara WPS
+        run: |
+          tar -xzf /home/runner/pacchetto/wps.tar.gz -C /home/runner
+          cp /home/runner/geo_em/geo_em.d0*.nc /home/runner/WPS/
+          cp /home/runner/geo_em/namelist.wps /home/runner/WPS/namelist.wps
+          ls -l /home/runner/WPS/*.exe /home/runner/WPS/geo_em*
+
+      - name: Scarica l'ultima corsa a 0.1 gradi (passi 0, 3, 6 ore)
+        run: |
+          mkdir -p /home/runner/dati/crop
+          DAY=""; HH=""
+          for d in 0 1; do
+            D=$(date -u -d "-$d day" +%Y%m%d)
+            for H in 18 12 06 00; do
+              U=https://data.ecmwf.int/forecasts/$D/${H}z/ifs/0p1/oper/${D}${H}0000-6h-oper-fc-pl.index
+              C=$(curl -s -o /dev/null -w '%{http_code}' $U)
+              echo "$D ${H}z passo 6h: $C"
+              if [ "$C" = "200" ] && [ -z "$DAY" ]; then DAY=$D; HH=$H; fi
+            done
+          done
+          echo "CORSA SCELTA: $DAY ${HH}z"
+          test -n "$DAY" || { echo "ERRORE: nessuna corsa completa trovata"; exit 1; }
+          echo "$DAY $HH" > /home/runner/dati/corsa.txt
+          cd /home/runner/dati
+          for s in 0 3 6; do
+            for t in sfc pl; do
+              curl -s -f -o ${t}_$s.grib2 https://data.ecmwf.int/forecasts/$DAY/${HH}z/ifs/0p1/oper/${DAY}${HH}0000-${s}h-oper-fc-$t.grib2
+            done
+          done
+          ls -lh
+
+      - name: Ritaglia i dati sull'Italia
+        run: |
+          cd /home/runner/dati
+          for s in 0 3 6; do
+            for t in sfc pl; do
+              cdo -s -f grb2 sellonlatbox,9.5,16,39.5,44.5 ${t}_$s.grib2 crop/${t}_$s.grib2 2>&1 | tail -3
+            done
+          done
+          ls -lh crop
+
+      - name: Chiavi GRIB dopo il ritaglio
+        run: |
+          cd /home/runner/dati
+          echo "===== SUPERFICIE (ritagliata, passo 0) ====="
+          grib_ls -p shortName,paramId,discipline,parameterCategory,parameterNumber,typeOfFirstFixedSurface,level crop/sfc_0.grib2 2>&1 | sort -u | head -80
+          echo "===== IN QUOTA (ritagliata, passo 0), temperatura ====="
+          grib_ls -w shortName=t -p shortName,paramId,discipline,parameterCategory,parameterNumber,typeOfFirstFixedSurface,level crop/pl_0.grib2 2>&1 | head -8
+          echo "===== SUOLO (file originale): dettagli degli strati ====="
+          grib_ls -w shortName=sot/vsw -p shortName,typeOfFirstFixedSurface,scaleFactorOfFirstFixedSurface,scaledValueOfFirstFixedSurface,typeOfSecondFixedSurface,scaleFactorOfSecondFixedSurface,scaledValueOfSecondFixedSurface,level sfc_0.grib2 2>&1 | head -20
+
+      - name: Esempi di Vtable (soprattutto suolo)
+        run: |
+          cd /home/runner/WPS/ungrib/Variable_Tables
+          ls
+          echo "===== Vtable.GFS: righe con suolo ====="
+          grep -n -E "ST0|SM0|106|112" Vtable.GFS | head -20
+
+      - name: Scrivi la Vtable (bozza, senza suolo)
+        run: |
+          cd /home/runner/WPS
+          cat > Vtable <<'EOF'
+          GRIB1| Level| From |  To  | metgrid  | metgrid | metgrid                                  |GRIB2|GRIB2|GRIB2|GRIB2|
+          Param| Type |Level1|Level2| Name     | Units   | Description                              |Discp|Catgy|Param|Level|
+          -----+------+------+------+----------+---------+------------------------------------------+-----+-----+-----+-----+
+           11  | 100  |   *  |      | TT       | K       | Temperature                              |  0  |  0  |  0  | 100 |
+           33  | 100  |   *  |      | UU       | m s-1   | U                                        |  0  |  2  |  2  | 100 |
+           34  | 100  |   *  |      | VV       | m s-1   | V                                        |  0  |  2  |  3  | 100 |
+           52  | 100  |   *  |      | RH       | %       | Relative Humidity                        |  0  |  1  |  1  | 100 |
+            7  | 100  |   *  |      | HGT      | m       | Height                                   |  0  |  3  |  5  | 100 |
+           11  | 105  |   2  |      | TT       | K       | Temperature       at 2 m                 |  0  |  0  |  0  | 103 |
+           17  | 105  |   2  |      | DEWPT    | K       | Dewpoint          at 2 m                 |  0  |  0  |  6  | 103 |
+           33  | 105  |  10  |      | UU       | m s-1   | U                 at 10 m                |  0  |  2  |  2  | 103 |
+           34  | 105  |  10  |      | VV       | m s-1   | V                 at 10 m                |  0  |  2  |  3  | 103 |
+               |   1  |   0  |      | LANDSEA  | 0/1 Flag| Land/Sea flag                            |  2  |  0  |  0  |  1  |
+            2  | 102  |   0  |      | PMSL     | Pa      | Sea-level Pressure                       |  3  |  0  |  1  | 101 |
+            1  |   1  |   0  |      | PSFC     | Pa      | Surface Pressure                         |  3  |  0  |  0  |  1  |
+           11  |   1  |   0  |      | SKINTEMP | K       | Skin temperature (can use for SST also)  |  0  |  0  | 17  |  1  |
+          129  |   1  |   0  |      | SOILGEO  | m2 s-2  | Surface geopotential                     |  0  |  3  |  4  |  1  |
+          -----+------+------+------+----------+---------+------------------------------------------+-----+-----+-----+-----+
+          EOF
+          cat Vtable | head -5
+
+      - name: Esegui ungrib
+        run: |
+          cd /home/runner/WPS
+          read DAY HH < /home/runner/dati/corsa.txt
+          START="${DAY:0:4}-${DAY:4:2}-${DAY:6:2}_${HH}:00:00"
+          END=$(date -u -d "$DAY $HH:00 +6 hours" +%Y-%m-%d_%H:%M:%S)
+          echo "Periodo: $START -> $END"
+          sed -i "s/^ *start_date.*/ start_date = '$START','$START',/; s/^ *end_date.*/ end_date   = '$END','$END',/" namelist.wps
+          grep -E "start_date|end_date" namelist.wps
+          rm -f GRIBFILE.* FILE:*
+          ./link_grib.csh /home/runner/dati/crop/*.grib2
+          ./ungrib.exe > ungrib.log 2>&1 || true
+          echo "ESITO ungrib: $(grep -c 'Successful completion' ungrib.log) (1 = riuscito)"
+          tail -25 ungrib.log
+          ls -lh FILE:* 2>&1 | head
+
+      - name: Esegui metgrid
+        run: |
+          cd /home/runner/WPS
+          ./metgrid.exe > metgrid.log 2>&1 || true
+          echo "ESITO metgrid: $(grep -c 'Successful completion' metgrid.log) (1 = riuscito)"
+          tail -25 metgrid.log
+          ls -lh met_em.d0* 2>&1 | head
+
+      - name: Controllo finale dei file met_em
+        run: |
+          cd /home/runner/WPS
+          F=$(ls met_em.d01.* 2>/dev/null | head -1)
+          test -n "$F" || { echo "Nessun file met_em creato"; exit 0; }
+          echo "File: $F"
+          ncdump -h $F | grep -E "num_metgrid_levels|FLAG" | head -60
+
+      - name: Salva i risultati per controllo
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: prova-dati-iniziali
+          path: |
+            /home/runner/WPS/ungrib.log
+            /home/runner/WPS/metgrid.log
+            /home/runner/WPS/Vtable
+            /home/runner/dati/crop
+          retention-days: 14
+          if-no-files-found: ignore
