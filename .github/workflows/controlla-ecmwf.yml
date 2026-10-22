@@ -1,0 +1,62 @@
+name: Controlla dati ECMWF 0.1
+
+on:
+  workflow_dispatch:
+
+jobs:
+  controlla:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Cerca l'ultima corsa disponibile a 0.1 gradi
+        run: |
+          BASE=""
+          for d in 0 1 2; do
+            DAY=$(date -u -d "-$d day" +%Y%m%d)
+            for H in 18 12 06 00; do
+              URL=https://data.ecmwf.int/forecasts/$DAY/${H}z/ifs/0p1/oper/${DAY}${H}0000-0h-oper-fc
+              CODE=$(curl -s -o /dev/null -w '%{http_code}' ${URL}-sfc.index)
+              echo "$DAY ${H}z -> risposta: $CODE"
+              if [ "$CODE" = "200" ] && [ -z "$BASE" ]; then BASE=$URL; fi
+            done
+          done
+          echo "CORSA SCELTA: $BASE"
+          echo "$BASE" > /tmp/base.txt
+
+      - name: Elenca i campi di superficie
+        run: |
+          BASE=$(cat /tmp/base.txt)
+          test -n "$BASE" || { echo "Nessuna corsa trovata"; exit 0; }
+          curl -s ${BASE}-sfc.index | python3 -c '
+          import json,sys
+          p={}
+          for l in sys.stdin:
+              l=l.strip()
+              if not l: continue
+              r=json.loads(l)
+              p.setdefault(r.get("param"),set()).add(str(r.get("levelist","-")))
+          for k in sorted(p): print(k, sorted(p[k]))
+          print("TOTALE PARAMETRI:", len(p))
+          '
+
+      - name: Elenca i campi in quota
+        run: |
+          BASE=$(cat /tmp/base.txt)
+          test -n "$BASE" || { echo "Nessuna corsa trovata"; exit 0; }
+          curl -s ${BASE}-pl.index | python3 -c '
+          import json,sys
+          p={}
+          for l in sys.stdin:
+              l=l.strip()
+              if not l: continue
+              r=json.loads(l)
+              p.setdefault(r.get("param"),set()).add(str(r.get("levelist","-")))
+          for k in sorted(p): print(k, sorted(p[k]))
+          print("TOTALE PARAMETRI:", len(p))
+          '
+
+      - name: Dimensione dei file
+        run: |
+          BASE=$(cat /tmp/base.txt)
+          test -n "$BASE" || { echo "Nessuna corsa trovata"; exit 0; }
+          curl -sI ${BASE}-sfc.grib2 | grep -i -E "^HTTP|content-length"
+          curl -sI ${BASE}-pl.grib2 | grep -i -E "^HTTP|content-length"
