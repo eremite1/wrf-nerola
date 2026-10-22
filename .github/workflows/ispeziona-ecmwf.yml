@@ -1,0 +1,66 @@
+name: Ispeziona dati ECMWF
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ispeziona:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Installa strumenti per leggere i dati meteo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes-tools cdo
+          grib_ls -V || true
+          cdo --version 2>&1 | head -3 || true
+
+      - name: Scarica l'ultima corsa a 0.1 gradi (solo passo 0 h)
+        run: |
+          mkdir -p /home/runner/dati
+          BASE=""
+          for d in 0 1; do
+            DAY=$(date -u -d "-$d day" +%Y%m%d)
+            for H in 18 12 06 00; do
+              URL=https://data.ecmwf.int/forecasts/$DAY/${H}z/ifs/0p1/oper/${DAY}${H}0000-0h-oper-fc
+              CODE=$(curl -s -o /dev/null -w '%{http_code}' ${URL}-pl.index)
+              if [ "$CODE" = "200" ] && [ -z "$BASE" ]; then BASE=$URL; fi
+            done
+          done
+          echo "CORSA SCELTA: $BASE"
+          test -n "$BASE" || { echo "ERRORE: nessuna corsa trovata"; exit 1; }
+          cd /home/runner/dati
+          curl -s -f -o sfc.grib2 ${BASE}-sfc.grib2
+          curl -s -f -o pl.grib2 ${BASE}-pl.grib2
+          ls -lh
+
+      - name: Elenco dei campi di superficie
+        run: |
+          cd /home/runner/dati
+          echo "Sigle presenti (ordine alfabetico):"
+          grib_get -p shortName sfc.grib2 2>&1 | sort -u | tr '\n' ' '
+          echo
+          echo "Tipo di compressione (packing):"
+          grib_get -p packingType sfc.grib2 2>&1 | sort | uniq -c
+          echo "Campi di suolo, neve e superficie:"
+          grib_ls -p shortName,paramId,discipline,parameterCategory,parameterNumber,typeOfLevel,level,packingType -w shortName=sot/sd/skt/lsm/rsn/asn sfc.grib2 2>&1 | head -40
+
+      - name: Elenco dei campi in quota
+        run: |
+          cd /home/runner/dati
+          echo "Tipo di compressione (packing):"
+          grib_get -p packingType pl.grib2 2>&1 | sort | uniq -c
+          echo "Esempio: temperatura a 850 hPa"
+          grib_ls -p shortName,paramId,discipline,parameterCategory,parameterNumber,typeOfLevel,level -w shortName=t,level=850 pl.grib2 2>&1 | head -10
+
+      - name: Prova di ritaglio sull'Italia
+        run: |
+          cd /home/runner/dati
+          for f in sfc pl; do
+            echo "== Ritaglio $f =="
+            cdo -f grb2 sellonlatbox,9.5,16,39.5,44.5 $f.grib2 ${f}_ritaglio.grib2 2>&1 | tail -15
+          done
+          ls -lh
+          for f in sfc pl; do
+            echo "== $f ritagliato: compressione e dimensione griglia =="
+            grib_get -p packingType,Ni,Nj ${f}_ritaglio.grib2 2>&1 | sort | uniq -c | head
+          done
