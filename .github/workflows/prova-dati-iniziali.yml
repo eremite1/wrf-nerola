@@ -68,24 +68,40 @@ jobs:
           done
           ls -lh crop
 
-      - name: Chiavi GRIB dopo il ritaglio
+      - name: Converti le etichette del suolo
         run: |
           cd /home/runner/dati
-          echo "===== SUPERFICIE (ritagliata, passo 0) ====="
-          grib_ls -p shortName,paramId,discipline,parameterCategory,parameterNumber,typeOfFirstFixedSurface,level crop/sfc_0.grib2 2>&1 | sort -u | head -80
-          echo "===== IN QUOTA (ritagliata, passo 0), temperatura ====="
-          grib_ls -w shortName=t -p shortName,paramId,discipline,parameterCategory,parameterNumber,typeOfFirstFixedSurface,level crop/pl_0.grib2 2>&1 | head -8
-          echo "===== SUOLO (file originale): dettagli degli strati ====="
-          grib_ls -w shortName=sot/vsw -p shortName,typeOfFirstFixedSurface,scaleFactorOfFirstFixedSurface,scaledValueOfFirstFixedSurface,typeOfSecondFixedSurface,scaleFactorOfSecondFixedSurface,scaledValueOfSecondFixedSurface,level sfc_0.grib2 2>&1 | head -20
+          mkdir -p final
+          for s in 0 3 6; do
+            cp crop/pl_$s.grib2 final/pl_$s.grib2
+            grib_copy -w shortName!=sot,shortName!=vsw crop/sfc_$s.grib2 final/nosoil_$s.grib2
+            rm -f final/soil_$s.grib2
+            for k in 1 2 3 4; do
+              case $k in
+                1) D1=0;   D2=7;;
+                2) D1=7;   D2=28;;
+                3) D1=28;  D2=100;;
+                4) D1=100; D2=289;;
+              esac
+              for p in sot vsw; do
+                grib_copy -w shortName=$p,level=$k crop/sfc_$s.grib2 tmp.grib2
+                grib_set -s typeOfFirstFixedSurface=106,scaleFactorOfFirstFixedSurface=2,scaledValueOfFirstFixedSurface=$D1,typeOfSecondFixedSurface=106,scaleFactorOfSecondFixedSurface=2,scaledValueOfSecondFixedSurface=$D2 tmp.grib2 tmp2.grib2
+                cat tmp2.grib2 >> final/soil_$s.grib2
+              done
+            done
+            cat final/nosoil_$s.grib2 final/soil_$s.grib2 > final/sfc_$s.grib2
+            rm final/nosoil_$s.grib2 final/soil_$s.grib2
+          done
+          ls -lh final
+          echo "===== Suolo dopo la conversione (passo 0) ====="
+          grib_ls -w shortName=sot/vsw -p shortName,typeOfFirstFixedSurface,scaleFactorOfFirstFixedSurface,scaledValueOfFirstFixedSurface,scaledValueOfSecondFixedSurface final/sfc_0.grib2 2>&1 | head -20
 
-      - name: Esempi di Vtable (soprattutto suolo)
+      - name: Controllo dei nomi del suolo in METGRID.TBL
         run: |
-          cd /home/runner/WPS/ungrib/Variable_Tables
-          ls
-          echo "===== Vtable.GFS: righe con suolo ====="
-          grep -n -E "ST0|SM0|106|112" Vtable.GFS | head -20
+          cd /home/runner/WPS/metgrid
+          grep -n -E "^name=(ST|SM)[0-9]" METGRID.TBL | head -40
 
-      - name: Scrivi la Vtable (bozza, senza suolo)
+      - name: Scrivi la Vtable
         run: |
           cd /home/runner/WPS
           cat > Vtable <<'EOF'
@@ -101,36 +117,58 @@ jobs:
            17  | 105  |   2  |      | DEWPT    | K       | Dewpoint          at 2 m                 |  0  |  0  |  6  | 103 |
            33  | 105  |  10  |      | UU       | m s-1   | U                 at 10 m                |  0  |  2  |  2  | 103 |
            34  | 105  |  10  |      | VV       | m s-1   | V                 at 10 m                |  0  |  2  |  3  | 103 |
-               |   1  |   0  |      | LANDSEA  | 0/1 Flag| Land/Sea flag                            |  2  |  0  |  0  |  1  |
-            2  | 102  |   0  |      | PMSL     | Pa      | Sea-level Pressure                       |  3  |  0  |  1  | 101 |
-            1  |   1  |   0  |      | PSFC     | Pa      | Surface Pressure                         |  3  |  0  |  0  |  1  |
+           81  |   1  |   0  |      | LANDSEA  | 0/1 Flag| Land/Sea flag                            |  2  |  0  |  0  |  1  |
+            2  | 102  |   0  |      | PMSL     | Pa      | Sea-level Pressure                       |  0  |  3  |  0  | 101 |
+            1  |   1  |   0  |      | PSFC     | Pa      | Surface Pressure                         |  0  |  3  |  0  |  1  |
            11  |   1  |   0  |      | SKINTEMP | K       | Skin temperature (can use for SST also)  |  0  |  0  | 17  |  1  |
           129  |   1  |   0  |      | SOILGEO  | m2 s-2  | Surface geopotential                     |  0  |  3  |  4  |  1  |
+          139  | 112  |   0  |   7  | ST000007 | K       | Soil temperature 0-7 cm                  |  2  |  3  | 18  | 106 |
+          170  | 112  |   7  |  28  | ST007028 | K       | Soil temperature 7-28 cm                 |  2  |  3  | 18  | 106 |
+          183  | 112  |  28  | 100  | ST028100 | K       | Soil temperature 28-100 cm               |  2  |  3  | 18  | 106 |
+          236  | 112  | 100  | 289  | ST100289 | K       | Soil temperature 100-289 cm              |  2  |  3  | 18  | 106 |
+           39  | 112  |   0  |   7  | SM000007 | m3 m-3  | Soil moisture 0-7 cm                     |  2  |  0  | 25  | 106 |
+           40  | 112  |   7  |  28  | SM007028 | m3 m-3  | Soil moisture 7-28 cm                    |  2  |  0  | 25  | 106 |
+           41  | 112  |  28  | 100  | SM028100 | m3 m-3  | Soil moisture 28-100 cm                  |  2  |  0  | 25  | 106 |
+           42  | 112  | 100  | 289  | SM100289 | m3 m-3  | Soil moisture 100-289 cm                 |  2  |  0  | 25  | 106 |
           -----+------+------+------+----------+---------+------------------------------------------+-----+-----+-----+-----+
           EOF
-          cat Vtable | head -5
+          wc -l Vtable
 
       - name: Esegui ungrib
         run: |
           cd /home/runner/WPS
           read DAY HH < /home/runner/dati/corsa.txt
-          START="${DAY:0:4}-${DAY:4:2}-${DAY:6:2}_${HH}:00:00"
-          END=$(date -u -d "$DAY $HH:00 +6 hours" +%Y-%m-%d_%H:%M:%S)
+          EPOCH=$(date -u -d "${DAY:0:4}-${DAY:4:2}-${DAY:6:2} ${HH}:00:00" +%s)
+          START=$(date -u -d @$EPOCH +%Y-%m-%d_%H:%M:%S)
+          END=$(date -u -d @$((EPOCH+21600)) +%Y-%m-%d_%H:%M:%S)
           echo "Periodo: $START -> $END"
           sed -i "s/^ *start_date.*/ start_date = '$START','$START',/; s/^ *end_date.*/ end_date   = '$END','$END',/" namelist.wps
           grep -E "start_date|end_date" namelist.wps
           rm -f GRIBFILE.* FILE:*
-          ./link_grib.csh /home/runner/dati/crop/*.grib2
+          ./link_grib.csh /home/runner/dati/final/*.grib2
           ./ungrib.exe > ungrib.log 2>&1 || true
           echo "ESITO ungrib: $(grep -c 'Successful completion' ungrib.log) (1 = riuscito)"
-          tail -25 ungrib.log
+          tail -30 ungrib.log
           ls -lh FILE:* 2>&1 | head
+
+      - name: Elenca i campi trovati da ungrib
+        run: |
+          cd /home/runner/WPS
+          F=$(ls FILE:* 2>/dev/null | head -1)
+          test -n "$F" || { echo "Nessun file FILE creato"; exit 0; }
+          echo "File esaminato: $F"
+          ./util/rd_intermediate.exe $F > rd.txt 2>&1 || true
+          wc -l rd.txt
+          grep -E "FIELD" rd.txt | sort | uniq -c | head -60
+          echo "----- prime righe -----"
+          head -30 rd.txt
 
       - name: Esegui metgrid
         run: |
           cd /home/runner/WPS
           ./metgrid.exe > metgrid.log 2>&1 || true
           echo "ESITO metgrid: $(grep -c 'Successful completion' metgrid.log) (1 = riuscito)"
+          grep -i -E "error|warning|not found" metgrid.log | head -20
           tail -25 metgrid.log
           ls -lh met_em.d0* 2>&1 | head
 
@@ -140,7 +178,7 @@ jobs:
           F=$(ls met_em.d01.* 2>/dev/null | head -1)
           test -n "$F" || { echo "Nessun file met_em creato"; exit 0; }
           echo "File: $F"
-          ncdump -h $F | grep -E "num_metgrid_levels|FLAG" | head -60
+          ncdump -h $F | grep -E "num_metgrid_levels|num_st_layers|num_sm_layers|FLAG_" | head -60
 
       - name: Salva i risultati per controllo
         if: always()
@@ -151,7 +189,7 @@ jobs:
           path: |
             /home/runner/WPS/ungrib.log
             /home/runner/WPS/metgrid.log
+            /home/runner/WPS/rd.txt
             /home/runner/WPS/Vtable
-            /home/runner/dati/crop
           retention-days: 14
           if-no-files-found: ignore
