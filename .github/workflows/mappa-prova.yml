@@ -1,0 +1,297 @@
+name: Mappa di prova
+
+on:
+  workflow_dispatch:
+    inputs:
+      minuti:
+        description: "Minuti di previsione (da 10 a 60, oppure multipli di 60). Attesa indicativa: circa 4 minuti ogni 15 di previsione, più 3-4 minuti di preparazione"
+        type: string
+        default: "30"
+
+jobs:
+  mappa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      MINUTI: ${{ inputs.minuti }}
+    steps:
+      - name: Controlla i minuti richiesti
+        run: |
+          case "$MINUTI" in
+            ''|*[!0-9]*) echo "ERRORE: scrivi un numero intero di minuti"; exit 1;;
+          esac
+          if [ "$MINUTI" -lt 10 ] || [ "$MINUTI" -gt 360 ]; then echo "ERRORE: scegli tra 10 e 360 minuti"; exit 1; fi
+          if [ "$MINUTI" -gt 60 ] && [ $((MINUTI % 60)) -ne 0 ]; then echo "ERRORE: sopra 60 usa multipli di 60"; exit 1; fi
+          echo "Minuti di previsione: $MINUTI"
+
+      - name: Installa strumenti
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y netcdf-bin libnetcdf-dev libnetcdff-dev mpich python3-numpy python3-matplotlib python3-netcdf4
+
+      - name: Recupera WRF compilato
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/pacchetto
+          key: wrf-compilato-cerca
+          restore-keys: wrf-compilato-
+
+      - name: Recupera i dati pronti
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/metcache
+          key: met-em-cerca
+          restore-keys: met-em-
+
+      - name: Prepara WRF
+        run: |
+          test -e /home/runner/metcache/corsa.txt || { echo "ERRORE: dati pronti non trovati. Lancia prima il flusso 'Prima previsione' senza spuntare la casella."; exit 1; }
+          tar -xzf /home/runner/pacchetto/wrf-run.tar.gz -C /home/runner
+          cp /home/runner/metcache/met_em.d0* /home/runner/run/
+          cat /home/runner/metcache/corsa.txt
+          ls -l /home/runner/run/wrf.exe /home/runner/run/real.exe
+
+      - name: Scrivi la configurazione
+        run: |
+          cd /home/runner/run
+          cat > namelist.template <<'EOF'
+          &time_control
+           run_days = 0,
+           run_hours = @RUNH@,
+           run_minutes = @RUNM@,
+           run_seconds = 0,
+           start_year = @SY@, @SY@,
+           start_month = @SMO@, @SMO@,
+           start_day = @SD@, @SD@,
+           start_hour = @SH@, @SH@,
+           start_minute = 00, 00,
+           start_second = 00, 00,
+           end_year = @EY@, @EY@,
+           end_month = @EMO@, @EMO@,
+           end_day = @ED@, @ED@,
+           end_hour = @EH@, @EH@,
+           end_minute = @EMI@, @EMI@,
+           end_second = 00, 00,
+           interval_seconds = 10800,
+           input_from_file = .true., .true.,
+           history_interval = @HIST@, @HIST@,
+           frames_per_outfile = 1, 1,
+           restart = .false.,
+           restart_interval = 1440,
+           io_form_history = 2,
+           io_form_restart = 2,
+           io_form_input = 2,
+           io_form_boundary = 2,
+           debug_level = 0,
+          /
+          &domains
+           time_step = 15,
+           time_step_fract_num = 0,
+           time_step_fract_den = 1,
+           max_dom = 2,
+           e_we = 81, 73,
+           e_sn = 81, 73,
+           e_vert = 45, 45,
+           p_top_requested = 5000,
+           num_metgrid_levels = 15,
+           num_metgrid_soil_levels = 4,
+           dx = 3000, 1000,
+           dy = 3000, 1000,
+           grid_id = 1, 2,
+           parent_id = 0, 1,
+           i_parent_start = 1, 29,
+           j_parent_start = 1, 29,
+           parent_grid_ratio = 1, 3,
+           parent_time_step_ratio = 1, 3,
+           feedback = 1,
+           smooth_option = 0,
+          /
+          &physics
+           mp_physics = 6, 6,
+           ra_lw_physics = 4, 4,
+           ra_sw_physics = 4, 4,
+           radt = 3, 3,
+           sf_sfclay_physics = 5, 5,
+           sf_surface_physics = 2, 2,
+           bl_pbl_physics = 5, 5,
+           bldt = 0, 0,
+           cu_physics = 0, 0,
+           cudt = 0, 0,
+           num_soil_layers = 4,
+           num_land_cat = 21,
+           surface_input_source = 1,
+           sf_urban_physics = 0, 0,
+           icloud = 1,
+           isfflx = 1,
+           ifsnow = 1,
+           slope_rad = 1, 1,
+           topo_shading = 1, 1,
+          /
+          &dynamics
+           hybrid_opt = 2,
+           w_damping = 1,
+           diff_opt = 2, 2,
+           km_opt = 4, 4,
+           diff_6th_opt = 0, 0,
+           diff_6th_factor = 0.12, 0.12,
+           base_temp = 290.,
+           damp_opt = 3,
+           zdamp = 5000., 5000.,
+           dampcoef = 0.2, 0.2,
+           khdif = 0, 0,
+           kvdif = 0, 0,
+           non_hydrostatic = .true., .true.,
+           moist_adv_opt = 1, 1,
+           scalar_adv_opt = 1, 1,
+           gwd_opt = 0, 0,
+          /
+          &bdy_control
+           spec_bdy_width = 5,
+           specified = .true., .false.,
+           nested = .false., .true.,
+          /
+          &namelist_quilt
+           nio_tasks_per_group = 0,
+           nio_groups = 1,
+          /
+          EOF
+          cat > mk.sh <<'EOF'
+          read DAY HH < /home/runner/metcache/corsa.txt
+          EPOCH=$(date -u -d "${DAY:0:4}-${DAY:4:2}-${DAY:6:2} ${HH}:00:00" +%s)
+          SY=${DAY:0:4}; SMO=${DAY:4:2}; SD=${DAY:6:2}; SH=$HH
+          mk() {
+            RUNH=$1; RUNM=$2; HIST=$3
+            EE=$((EPOCH + RUNH*3600 + RUNM*60))
+            EY=$(date -u -d @$EE +%Y); EMO=$(date -u -d @$EE +%m); ED=$(date -u -d @$EE +%d)
+            EH=$(date -u -d @$EE +%H); EMI=$(date -u -d @$EE +%M)
+            sed -e "s/@RUNH@/$RUNH/g" -e "s/@RUNM@/$RUNM/g" -e "s/@HIST@/$HIST/g" \
+                -e "s/@SY@/$SY/g" -e "s/@SMO@/$SMO/g" -e "s/@SD@/$SD/g" -e "s/@SH@/$SH/g" \
+                -e "s/@EY@/$EY/g" -e "s/@EMO@/$EMO/g" -e "s/@ED@/$ED/g" -e "s/@EH@/$EH/g" -e "s/@EMI@/$EMI/g" \
+                namelist.template > namelist.input
+          }
+          EOF
+          wc -l namelist.template mk.sh
+
+      - name: Esegui real.exe
+        run: |
+          cd /home/runner/run
+          source ./mk.sh
+          mk 3 0 60
+          grep -E "start_|end_|run_" namelist.input | head -14
+          ulimit -s unlimited || true
+          export OMP_NUM_THREADS=1
+          rm -f rsl.*
+          set +e
+          mpirun -np 1 ./real.exe > real_stdout.log 2>&1
+          echo "codice di uscita di real.exe: $?"
+          set -e
+          if ! grep -q "SUCCESS COMPLETE REAL_EM" rsl.error.0000 2>/dev/null; then
+            echo "ERRORE: real.exe non è riuscito."
+            tail -n 30 rsl.error.0000 || true
+            tail -n 15 real_stdout.log || true
+            exit 1
+          fi
+          echo "real.exe riuscito"
+          ls -lh wrfinput_d0* wrfbdy_d01
+
+      - name: Calcola la previsione con wrf.exe
+        run: |
+          cd /home/runner/run
+          source ./mk.sh
+          M=$MINUTI
+          RH=$((M/60)); RM=$((M%60))
+          HIST=$M
+          if [ "$M" -gt 60 ]; then HIST=60; fi
+          mk $RH $RM $HIST
+          grep -E "start_|end_|run_|history_interval" namelist.input | head -16
+          ulimit -s unlimited || true
+          export OMP_NUM_THREADS=1
+          rm -f rsl.* wrfout_d0*
+          T0=$(date +%s)
+          set +e
+          mpirun -np 4 ./wrf.exe > wrf_stdout.log 2>&1
+          echo "codice di uscita di wrf.exe: $?"
+          set -e
+          T1=$(date +%s)
+          WALL=$((T1-T0))
+          EST=$(awk -v w=$WALL -v m=$M 'BEGIN{printf "%.1f", (w/m*1440)/3600}')
+          mkdir -p /home/runner/out
+          {
+            echo "Previsione di $M minuti, 4 processi, passo 15 s"
+            echo "Tempo di calcolo: $WALL secondi (include l'avvio di WRF)"
+            echo "Stima grossolana per 24 ore: $EST ore (sopra-stima, perche' include l'avvio)"
+          } | tee /home/runner/out/info.txt
+          grep "Timing for main" rsl.error.0000 2>/dev/null | tail -4 || true
+          if ! grep -q "SUCCESS COMPLETE WRF" rsl.error.0000 2>/dev/null; then
+            echo "ERRORE: wrf.exe non è riuscito."
+            grep -n -i -E "fatal|error|cfl|segmentation|forrtl|nan" rsl.error.* 2>/dev/null | head -20 || true
+            for f in rsl.error.0000 rsl.out.0000; do
+              if [ -e $f ]; then echo "---- $f (ultime 30 righe) ----"; tail -n 30 $f; fi
+            done
+            tail -n 30 wrf_stdout.log || true
+            exit 1
+          fi
+          echo "wrf.exe riuscito"
+          ls -lh wrfout_d0*
+
+      - name: Disegna le mappe
+        run: |
+          cd /home/runner/run
+          python3 - <<'EOF'
+          import glob, netCDF4, numpy as np
+          import matplotlib
+          matplotlib.use("Agg")
+          import matplotlib.pyplot as plt
+          citta = {"Nerola": (42.13, 12.77), "Roma": (41.90, 12.50), "Tivoli": (41.96, 12.80),
+                   "Monterotondo": (42.05, 12.62), "Rieti": (42.40, 12.86)}
+          info = open("/home/runner/out/info.txt", "a")
+          for dom, etichetta, passo in (("d02", "1 km", 3), ("d01", "3 km", 4)):
+              files = sorted(glob.glob("wrfout_" + dom + "_*"))
+              nc = netCDF4.Dataset(files[-1])
+              lon = nc["XLONG"][0]; lat = nc["XLAT"][0]
+              t2 = nc["T2"][0] - 273.15
+              u = nc["U10"][0]; v = nc["V10"][0]
+              ws = np.hypot(u, v)
+              hgt = nc["HGT"][0]
+              riga = dom + " (" + etichetta + ") " + files[-1] + " | T2 min/max: %.1f / %.1f C | vento max: %.1f m/s | quota max: %.0f m" % (float(t2.min()), float(t2.max()), float(ws.max()), float(hgt.max()))
+              print(riga)
+              info.write(riga + "\n")
+              fig, ax = plt.subplots(1, 3, figsize=(19, 6))
+              m0 = ax[0].pcolormesh(lon, lat, t2, cmap="coolwarm", shading="auto")
+              ax[0].contour(lon, lat, hgt, levels=np.arange(200, 3000, 200), colors="k", linewidths=0.4, alpha=0.6)
+              fig.colorbar(m0, ax=ax[0], label="Temperatura a 2 m (C)", shrink=0.8)
+              ax[0].set_title("Temperatura a 2 m")
+              m1 = ax[1].pcolormesh(lon, lat, ws, cmap="viridis", shading="auto")
+              s = passo
+              ax[1].quiver(lon[::s, ::s], lat[::s, ::s], u[::s, ::s], v[::s, ::s], color="w", scale=120, width=0.003)
+              fig.colorbar(m1, ax=ax[1], label="Vento a 10 m (m/s)", shrink=0.8)
+              ax[1].set_title("Vento a 10 m")
+              m2 = ax[2].pcolormesh(lon, lat, hgt, cmap="terrain", vmin=0, shading="auto")
+              fig.colorbar(m2, ax=ax[2], label="Quota del terreno (m)", shrink=0.8)
+              ax[2].set_title("Rilievo del modello")
+              for a in ax:
+                  a.set_aspect(1.0 / np.cos(np.radians(42.1)))
+                  a.set_xlabel("Longitudine")
+                  a.set_ylabel("Latitudine")
+                  for nome, (la, lo) in citta.items():
+                      if lat.min() < la < lat.max() and lon.min() < lo < lon.max():
+                          a.plot([lo], [la], "k*" if nome == "Nerola" else "ko", markersize=10 if nome == "Nerola" else 4)
+                          a.annotate(nome, (lo, la), textcoords="offset points", xytext=(4, 4), fontsize=8)
+              fig.suptitle("Dominio " + etichetta + "  -  " + files[-1].replace("wrfout_", ""))
+              fig.savefig("/home/runner/out/mappa_" + dom + ".png", dpi=100, bbox_inches="tight")
+          info.close()
+          EOF
+          ls -lh /home/runner/out
+
+      - name: Salva i risultati
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: mappa-prova
+          path: |
+            /home/runner/out/mappa_d02.png
+            /home/runner/out/mappa_d01.png
+            /home/runner/out/info.txt
+          retention-days: 14
+          if-no-files-found: ignore
