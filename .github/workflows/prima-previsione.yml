@@ -2,6 +2,11 @@ name: Prima previsione
 
 on:
   workflow_dispatch:
+    inputs:
+      usa_dati_salvati:
+        description: "Salta scarico e preparazione dati, usa quelli salvati dall'ultimo tentativo riuscito"
+        type: boolean
+        default: false
 
 jobs:
   previsione:
@@ -25,21 +30,28 @@ jobs:
           restore-keys: wrf-compilato-
 
       - name: Recupera i file del dominio
+        if: ${{ inputs.usa_dati_salvati != true }}
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/geo_em
           key: geo-em-cerca
           restore-keys: geo-em-
 
-      - name: Prepara WPS e WRF
+      - name: Prepara WRF
+        run: |
+          tar -xzf /home/runner/pacchetto/wrf-run.tar.gz -C /home/runner
+          ls -l /home/runner/run/wrf.exe /home/runner/run/real.exe
+
+      - name: Prepara WPS
+        if: ${{ inputs.usa_dati_salvati != true }}
         run: |
           tar -xzf /home/runner/pacchetto/wps.tar.gz -C /home/runner
-          tar -xzf /home/runner/pacchetto/wrf-run.tar.gz -C /home/runner
           cp /home/runner/geo_em/geo_em.d0*.nc /home/runner/WPS/
           cp /home/runner/geo_em/namelist.wps /home/runner/WPS/namelist.wps
-          ls -l /home/runner/run/wrf.exe /home/runner/run/real.exe /home/runner/WPS/ungrib.exe
+          ls -l /home/runner/WPS/ungrib.exe
 
       - name: Scarica l'ultima corsa a 0.1 gradi (passi 0, 3, 6 ore)
+        if: ${{ inputs.usa_dati_salvati != true }}
         run: |
           mkdir -p /home/runner/dati/crop
           DAY=""; HH=""
@@ -64,6 +76,7 @@ jobs:
           ls -lh
 
       - name: Ritaglia sull'Italia (latitudini da sud a nord)
+        if: ${{ inputs.usa_dati_salvati != true }}
         run: |
           cd /home/runner/dati
           for s in 0 3 6; do
@@ -74,6 +87,7 @@ jobs:
           ls -lh crop
 
       - name: Converti le etichette del suolo
+        if: ${{ inputs.usa_dati_salvati != true }}
         run: |
           cd /home/runner/dati
           mkdir -p final
@@ -100,6 +114,7 @@ jobs:
           ls -lh final
 
       - name: Scrivi la Vtable
+        if: ${{ inputs.usa_dati_salvati != true }}
         run: |
           cd /home/runner/WPS
           cat > Vtable <<'EOF'
@@ -133,6 +148,7 @@ jobs:
           wc -l Vtable
 
       - name: Esegui ungrib
+        if: ${{ inputs.usa_dati_salvati != true }}
         run: |
           cd /home/runner/WPS
           read DAY HH < /home/runner/dati/corsa.txt
@@ -153,6 +169,7 @@ jobs:
           ls -lh FILE:*
 
       - name: Esegui metgrid
+        if: ${{ inputs.usa_dati_salvati != true }}
         run: |
           cd /home/runner/WPS
           ./metgrid.exe > metgrid.log 2>&1 || true
@@ -164,8 +181,32 @@ jobs:
           echo "metgrid riuscito"
           ls -lh met_em.d0*
 
+      - name: Prepara i dati da salvare per i prossimi tentativi
+        if: ${{ inputs.usa_dati_salvati != true }}
+        run: |
+          mkdir -p /home/runner/metcache
+          cp /home/runner/WPS/met_em.d0* /home/runner/metcache/
+          cp /home/runner/dati/corsa.txt /home/runner/metcache/
+          ls -lh /home/runner/metcache
+
+      - name: Salva i dati pronti (cache)
+        if: ${{ inputs.usa_dati_salvati != true }}
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/metcache
+          key: met-em-${{ github.run_id }}
+
+      - name: Recupera i dati pronti salvati
+        if: ${{ inputs.usa_dati_salvati == true }}
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/metcache
+          key: met-em-cerca
+          restore-keys: met-em-
+
       - name: Scrivi il modello di namelist.input
         run: |
+          test -e /home/runner/metcache/corsa.txt || { echo "ERRORE: nessun dato salvato. Lancia prima il flusso senza spuntare la casella."; exit 1; }
           cd /home/runner/run
           cat > namelist.template <<'EOF'
           &time_control
@@ -273,8 +314,8 @@ jobs:
       - name: Esegui real.exe
         run: |
           cd /home/runner/run
-          cp /home/runner/WPS/met_em.d0* .
-          read DAY HH < /home/runner/dati/corsa.txt
+          cp /home/runner/metcache/met_em.d0* .
+          read DAY HH < /home/runner/metcache/corsa.txt
           EPOCH=$(date -u -d "${DAY:0:4}-${DAY:4:2}-${DAY:6:2} ${HH}:00:00" +%s)
           SY=${DAY:0:4}; SMO=${DAY:4:2}; SD=${DAY:6:2}; SH=$HH
           RUNH=3
@@ -282,16 +323,28 @@ jobs:
           EY=$(date -u -d @$EE +%Y); EMO=$(date -u -d @$EE +%m); ED=$(date -u -d @$EE +%d); EH=$(date -u -d @$EE +%H)
           sed -e "s/@RUNH@/$RUNH/g" -e "s/@SY@/$SY/g" -e "s/@SMO@/$SMO/g" -e "s/@SD@/$SD/g" -e "s/@SH@/$SH/g" -e "s/@EY@/$EY/g" -e "s/@EMO@/$EMO/g" -e "s/@ED@/$ED/g" -e "s/@EH@/$EH/g" namelist.template > namelist.input
           grep -E "start_|end_|run_hours" namelist.input | head -12
+          echo "===== Controlli prima di lanciare real.exe ====="
+          ls -l real.exe wrf.exe
+          ldd ./real.exe | grep -i "not found" || echo "librerie: tutte trovate"
+          which mpirun mpiexec || true
+          mpirun --version 2>&1 | head -3 || true
           ulimit -s unlimited || true
           export OMP_NUM_THREADS=1
           rm -f rsl.*
-          mpirun -np 1 ./real.exe > real_stdout.log 2>&1 || true
+          set +e
+          mpirun -np 1 ./real.exe > real_stdout.log 2>&1
+          echo "codice di uscita di real.exe: $?"
+          set -e
+          echo "===== real_stdout.log (prime 30 righe) ====="
+          head -n 30 real_stdout.log || true
+          ls rsl.* 2>/dev/null | head || true
           if ! grep -q "SUCCESS COMPLETE REAL_EM" rsl.error.0000 rsl.out.0000 2>/dev/null; then
             echo "ERRORE: real.exe non è riuscito."
-            grep -n -i -E "fatal|error|missing|not found" rsl.error.0000 | head -20 || true
-            echo "---- ultime righe ----"
-            tail -n 30 rsl.error.0000
-            tail -n 15 real_stdout.log
+            for f in rsl.error.0000 rsl.out.0000; do
+              if [ -e $f ]; then echo "---- $f (ultime 30 righe) ----"; tail -n 30 $f; fi
+            done
+            echo "---- real_stdout.log (ultime 30 righe) ----"
+            tail -n 30 real_stdout.log || true
             exit 1
           fi
           echo "real.exe riuscito"
@@ -300,7 +353,7 @@ jobs:
       - name: Calcola la previsione con wrf.exe (misura del tempo)
         run: |
           cd /home/runner/run
-          read DAY HH < /home/runner/dati/corsa.txt
+          read DAY HH < /home/runner/metcache/corsa.txt
           EPOCH=$(date -u -d "${DAY:0:4}-${DAY:4:2}-${DAY:6:2} ${HH}:00:00" +%s)
           SY=${DAY:0:4}; SMO=${DAY:4:2}; SD=${DAY:6:2}; SH=$HH
           RUNH=$RUN_HOURS
@@ -312,18 +365,25 @@ jobs:
           export OMP_NUM_THREADS=1
           rm -f rsl.*
           T0=$(date +%s)
-          mpirun -np 4 ./wrf.exe > wrf_stdout.log 2>&1 || true
+          set +e
+          mpirun -np 4 ./wrf.exe > wrf_stdout.log 2>&1
+          echo "codice di uscita di wrf.exe: $?"
+          set -e
           T1=$(date +%s)
           echo "=============================================="
           echo "TEMPO DI CALCOLO: $((T1-T0)) secondi per $RUN_HOURS ora/e di previsione"
           echo "=============================================="
-          grep "Timing for main" rsl.error.0000 | tail -4
+          grep "Timing for main" rsl.error.0000 2>/dev/null | tail -4 || true
+          echo "===== wrf_stdout.log (prime 20 righe) ====="
+          head -n 20 wrf_stdout.log || true
           if ! grep -q "SUCCESS COMPLETE WRF" rsl.error.0000 2>/dev/null; then
             echo "ERRORE: wrf.exe non è riuscito."
-            grep -n -i -E "fatal|error|cfl|segmentation|forrtl|nan" rsl.error.* | head -20 || true
-            echo "---- ultime righe ----"
-            tail -n 30 rsl.error.0000
-            tail -n 15 wrf_stdout.log
+            grep -n -i -E "fatal|error|cfl|segmentation|forrtl|nan" rsl.error.* 2>/dev/null | head -20 || true
+            for f in rsl.error.0000 rsl.out.0000; do
+              if [ -e $f ]; then echo "---- $f (ultime 30 righe) ----"; tail -n 30 $f; fi
+            done
+            echo "---- wrf_stdout.log (ultime 30 righe) ----"
+            tail -n 30 wrf_stdout.log || true
             exit 1
           fi
           echo "wrf.exe riuscito"
@@ -369,7 +429,9 @@ jobs:
           path: |
             /home/runner/run/mappa_previsione.png
             /home/runner/run/namelist.input
+            /home/runner/run/real_stdout.log
             /home/runner/run/rsl.error.0000
+            /home/runner/run/rsl.out.0000
             /home/runner/run/wrf_stdout.log
             /home/runner/run/wrfout_d02_*
           retention-days: 14
