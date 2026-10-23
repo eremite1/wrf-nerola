@@ -1,0 +1,132 @@
+name: "Compila WRF su ARM"
+run-name: "Compilazione WRF e WPS su ARM"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compila:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 340
+    env:
+      WRF_TAG: v4.7.0
+      WPS_TAG: v4.7.0
+      SRC: /home/runner/wrf-src
+      INSTALL: /home/runner/wrf-install
+      JAS: /home/runner/jasper
+      NC: /home/runner/netcdf-combinato
+    steps:
+      - name: Programmi di sistema
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            gfortran gcc g++ make m4 csh perl file \
+            mpich libmpich-dev \
+            libnetcdf-dev libnetcdff-dev netcdf-bin \
+            libpng-dev zlib1g-dev cmake git
+
+      - name: JasPer (lettore del formato GRIB2)
+        run: |
+          mkdir -p "$SRC"; cd "$SRC"
+          git clone -q --depth 1 --branch version-2.0.33 https://github.com/jasper-software/jasper.git jasper
+          cmake -S jasper -B jasper-build -DCMAKE_INSTALL_PREFIX="$JAS" -DJAS_ENABLE_SHARED=OFF \
+            -DJAS_ENABLE_PROGRAMS=OFF -DJAS_ENABLE_DOC=OFF -DJAS_ENABLE_LIBJPEG=OFF \
+            -DJAS_ENABLE_OPENGL=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON > jasper-cmake.log 2>&1 \
+            || { tail -n 40 jasper-cmake.log; exit 1; }
+          cmake --build jasper-build -j 4 > jasper-build.log 2>&1 || { tail -n 40 jasper-build.log; exit 1; }
+          cmake --install jasper-build > jasper-install.log 2>&1 || { tail -n 40 jasper-install.log; exit 1; }
+          find "$JAS" -name 'libjasper.a' | head -n1
+
+      - name: Scarico i sorgenti di WRF e WPS
+        run: |
+          cd "$SRC"
+          git clone -q --depth 1 --branch "$WRF_TAG" https://github.com/wrf-model/WRF.git WRF
+          git clone -q --depth 1 --branch "$WPS_TAG" https://github.com/wrf-model/WPS.git WPS
+
+      - name: Cartella netCDF unita (percorso giusto per ARM)
+        run: |
+          MULTI=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
+          echo "cartella librerie di sistema: /usr/lib/$MULTI"
+          mkdir -p "$NC/include" "$NC/lib"
+          ln -sf /usr/include/netcdf* "$NC/include/"
+          ln -sf /usr/lib/$MULTI/libnetcdf* "$NC/lib/"
+          ls "$NC/lib" | head -n 5
+          test -n "$(ls "$NC/lib" | head -n1)" || { echo "librerie netCDF non trovate"; exit 1; }
+
+      - name: WRF configure
+        run: |
+          export NETCDF="$NC" NETCDF_classic=1 WRFIO_NCD_LARGE_FILE_SUPPORT=1
+          cd "$SRC/WRF"
+          OPT=$(timeout 60 ./configure < /dev/null 2>/dev/null | grep -E 'GNU \(gfortran/gcc\)' | grep -oP '\d+(?=\.\s+\(dmpar\))' | head -n1 || true)
+          echo "opzione trovata: '${OPT}'"
+          if [ -z "$OPT" ]; then
+            echo "== menu di configure per capire:"
+            timeout 60 ./configure < /dev/null 2>/dev/null | head -n 60 || true
+            OPT=34
+          fi
+          echo "uso l'opzione $OPT"
+          printf "%s\n1\n" "$OPT" | ./configure > configure.log 2>&1 || { tail -n 40 configure.log; exit 1; }
+          sed -i -E 's/^(DM_FC[[:space:]]*=[[:space:]]*mpif90)/\1 -fno-lto/; s/^(DM_CC[[:space:]]*=[[:space:]]*mpicc)/\1 -fno-lto/' configure.wrf
+          grep -E '^(DM_FC|DM_CC)' configure.wrf
+          test "$(grep -c -E '^DM_(FC|CC).*-fno-lto' configure.wrf)" = 2 || { echo "non riesco ad aggiungere -fno-lto"; exit 1; }
+          grep -E '^(SFC|SCC|FCOPTIM|ARCH_LOCAL)' configure.wrf | head
+
+      - name: WRF compile (la parte lunga)
+        run: |
+          export NETCDF="$NC" NETCDF_classic=1 WRFIO_NCD_LARGE_FILE_SUPPORT=1
+          cd "$SRC/WRF"
+          for T in 1 2; do
+            ./compile -j 4 em_real > compile.log 2>&1 || true
+            if [ -s main/wrf.exe ] && [ -s main/real.exe ]; then break; fi
+            echo "tentativo $T: mancano wrf.exe o real.exe, ultime righe:"; tail -n 40 compile.log
+          done
+          ls -la main/wrf.exe main/real.exe || { echo "COMPILAZIONE DI WRF FALLITA"; grep -n -m 10 -iE "error|undefined reference" compile.log; exit 1; }
+
+      - name: WPS configure e compile
+        run: |
+          export NETCDF="$NC" NETCDF_classic=1
+          export JASPERLIB=$(dirname "$(find "$JAS" -name libjasper.a | head -n1)") JASPERINC="$JAS/include"
+          export WRF_DIR="$SRC/WRF"
+          cd "$SRC/WPS"
+          OPT=$(timeout 60 ./configure < /dev/null 2>/dev/null | grep -E 'gfortran +\(serial\)' | grep -v NO_GRIB2 | grep -oP '^\s*\K\d+' | head -n1 || true)
+          echo "opzione WPS: '${OPT}'"
+          if [ -z "$OPT" ]; then timeout 60 ./configure < /dev/null 2>/dev/null | head -n 40 || true; OPT=1; fi
+          echo "$OPT" | ./configure > configure.log 2>&1 || { tail -n 40 configure.log; exit 1; }
+          ./compile > compile.log 2>&1 || true
+          for E in geogrid.exe ungrib.exe metgrid.exe; do
+            test -s "$E" || { echo "WPS: manca $E"; tail -n 60 compile.log; exit 1; }
+          done
+          echo "WPS compilato"
+
+      - name: Impacchetto quello che serve
+        run: |
+          rm -rf "$INSTALL"
+          mkdir -p "$INSTALL/WRF/run" "$INSTALL/WPS/geogrid" "$INSTALL/WPS/metgrid" "$INSTALL/WPS/ungrib/Variable_Tables"
+          cp -L "$SRC/WRF/main/wrf.exe" "$SRC/WRF/main/real.exe" "$INSTALL/WRF/"
+          cp -aL "$SRC/WRF/run/." "$INSTALL/WRF/run/"
+          rm -f "$INSTALL"/WRF/run/*.exe "$INSTALL"/WRF/run/namelist.input
+          cp -L "$SRC"/WPS/{geogrid,ungrib,metgrid}.exe "$SRC/WPS/link_grib.csh" "$INSTALL/WPS/"
+          cp -L "$SRC/WPS/geogrid/GEOGRID.TBL.ARW" "$INSTALL/WPS/geogrid/GEOGRID.TBL"
+          cp -L "$SRC/WPS/metgrid/METGRID.TBL.ARW" "$INSTALL/WPS/metgrid/METGRID.TBL"
+          cp -L "$SRC/WPS/ungrib/Variable_Tables/Vtable.GFS" "$INSTALL/WPS/ungrib/Variable_Tables/"
+          du -sh "$INSTALL"
+          echo "ESITO: wrf.exe, real.exe, geogrid, ungrib, metgrid tutti presenti"
+
+      - name: Salvo il WRF compilato per ARM
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/wrf-install
+          key: wrf-arm-v1-${{ github.run_id }}
+
+      - name: Log (solo se qualcosa va storto)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-compilazione-arm
+          path: |
+            /home/runner/wrf-src/WRF/compile.log
+            /home/runner/wrf-src/WRF/configure.log
+            /home/runner/wrf-src/WPS/compile.log
+            /home/runner/wrf-src/WPS/configure.log
+          if-no-files-found: ignore
+          retention-days: 7
