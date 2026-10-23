@@ -25,9 +25,20 @@ jobs:
             libnetcdf-dev libnetcdff-dev netcdf-bin \
             libpng-dev zlib1g-dev cmake git
 
+      - name: Recupero il sorgente già compilato (se c'è)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /home/runner/wrf-src
+            /home/runner/jasper
+          key: wrf-src-arm-v1-nessuna
+          restore-keys: wrf-src-arm-v1-
+
       - name: JasPer (lettore del formato GRIB2)
         run: |
           mkdir -p "$SRC"; cd "$SRC"
+          if [ -f "$JAS/.fatto" ]; then echo "JasPer già pronto"; exit 0; fi
+          rm -rf jasper jasper-build
           git clone -q --depth 1 --branch version-2.0.33 https://github.com/jasper-software/jasper.git jasper
           cmake -S jasper -B jasper-build -DCMAKE_INSTALL_PREFIX="$JAS" -DJAS_ENABLE_SHARED=OFF \
             -DJAS_ENABLE_PROGRAMS=OFF -DJAS_ENABLE_DOC=OFF -DJAS_ENABLE_LIBJPEG=OFF \
@@ -35,13 +46,15 @@ jobs:
             || { tail -n 40 jasper-cmake.log; exit 1; }
           cmake --build jasper-build -j 4 > jasper-build.log 2>&1 || { tail -n 40 jasper-build.log; exit 1; }
           cmake --install jasper-build > jasper-install.log 2>&1 || { tail -n 40 jasper-install.log; exit 1; }
+          touch "$JAS/.fatto"
           find "$JAS" -name 'libjasper.a' | head -n1
 
       - name: Scarico i sorgenti di WRF e WPS
         run: |
           cd "$SRC"
-          git clone -q --depth 1 --branch "$WRF_TAG" https://github.com/wrf-model/WRF.git WRF
-          git clone -q --depth 1 --branch "$WPS_TAG" https://github.com/wrf-model/WPS.git WPS
+          [ -d WRF ] || git clone -q --depth 1 --branch "$WRF_TAG" https://github.com/wrf-model/WRF.git WRF
+          [ -d WPS ] || git clone -q --depth 1 --branch "$WPS_TAG" https://github.com/wrf-model/WPS.git WPS
+          ls
 
       - name: Cartella netCDF unita (percorso giusto per ARM)
         run: |
@@ -50,37 +63,39 @@ jobs:
           mkdir -p "$NC/include" "$NC/lib"
           ln -sf /usr/include/netcdf* "$NC/include/"
           ln -sf /usr/lib/$MULTI/libnetcdf* "$NC/lib/"
-          ls "$NC/lib" | head -n 5
           test -n "$(ls "$NC/lib" | head -n1)" || { echo "librerie netCDF non trovate"; exit 1; }
 
       - name: WRF configure
         run: |
           export NETCDF="$NC" NETCDF_classic=1 WRFIO_NCD_LARGE_FILE_SUPPORT=1
           cd "$SRC/WRF"
+          if [ -s main/wrf.exe ] && [ -s main/real.exe ]; then echo "WRF già compilato: salto"; exit 0; fi
           OPT=$(timeout 60 ./configure < /dev/null 2>/dev/null | grep -E 'GNU \(gfortran/gcc\)' | grep -oP '\d+(?=\.\s+\(dmpar\))' | head -n1 || true)
           echo "opzione trovata: '${OPT}'"
-          if [ -z "$OPT" ]; then
-            echo "== menu di configure per capire:"
-            timeout 60 ./configure < /dev/null 2>/dev/null | head -n 60 || true
-            OPT=34
-          fi
+          if [ -z "$OPT" ]; then OPT=34; fi
           echo "uso l'opzione $OPT"
-          printf "%s\n1\n" "$OPT" | ./configure > configure.log 2>&1 || { tail -n 40 configure.log; exit 1; }
+          printf "%s\n1\n" "$OPT" | timeout 300 ./configure > configure.log 2>&1 || { tail -n 40 configure.log; exit 1; }
           sed -i -E 's/^(DM_FC[[:space:]]*=[[:space:]]*mpif90)/\1 -fno-lto/; s/^(DM_CC[[:space:]]*=[[:space:]]*mpicc)/\1 -fno-lto/' configure.wrf
           grep -E '^(DM_FC|DM_CC)' configure.wrf
           test "$(grep -c -E '^DM_(FC|CC).*-fno-lto' configure.wrf)" = 2 || { echo "non riesco ad aggiungere -fno-lto"; exit 1; }
-          grep -E '^(SFC|SCC|FCOPTIM|ARCH_LOCAL)' configure.wrf | head
 
-      - name: WRF compile (la parte lunga)
+      - name: WRF compile (la parte lunga, circa 25 minuti)
         run: |
           export NETCDF="$NC" NETCDF_classic=1 WRFIO_NCD_LARGE_FILE_SUPPORT=1
           cd "$SRC/WRF"
           for T in 1 2; do
-            ./compile -j 4 em_real > compile.log 2>&1 || true
             if [ -s main/wrf.exe ] && [ -s main/real.exe ]; then break; fi
-            echo "tentativo $T: mancano wrf.exe o real.exe, ultime righe:"; tail -n 40 compile.log
+            timeout 10000 ./compile -j 4 em_real > compile.log 2>&1 || true
           done
-          ls -la main/wrf.exe main/real.exe || { echo "COMPILAZIONE DI WRF FALLITA"; grep -n -m 10 -iE "error|undefined reference" compile.log; exit 1; }
+          ls -la main/wrf.exe main/real.exe || { echo "COMPILAZIONE DI WRF FALLITA"; tail -n 40 compile.log; grep -n -m 10 -iE "error|undefined reference" compile.log; exit 1; }
+
+      - name: Salvo subito il sorgente compilato (così non si rifà)
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            /home/runner/wrf-src
+            /home/runner/jasper
+          key: wrf-src-arm-v1-${{ github.run_id }}
 
       - name: WPS configure e compile
         run: |
@@ -88,11 +103,16 @@ jobs:
           export JASPERLIB=$(dirname "$(find "$JAS" -name libjasper.a | head -n1)") JASPERINC="$JAS/include"
           export WRF_DIR="$SRC/WRF"
           cd "$SRC/WPS"
-          OPT=$(timeout 60 ./configure < /dev/null 2>/dev/null | grep -E 'gfortran +\(serial\)' | grep -v NO_GRIB2 | grep -oP '^\s*\K\d+' | head -n1 || true)
+          if [ -s geogrid.exe ] && [ -s ungrib.exe ] && [ -s metgrid.exe ]; then echo "WPS già compilato"; exit 0; fi
+          # WPS non conosce ARM: aggiungo "aarch64" alla riga di descrizione di gfortran
+          sed -i 's/^#ARCH    Linux x86_64, gfortran /#ARCH    Linux x86_64 aarch64, gfortran /' arch/configure.defaults
+          grep -n "aarch64" arch/configure.defaults || { echo "modifica a configure.defaults non riuscita"; exit 1; }
+          timeout 60 ./configure < /dev/null 2>/dev/null | head -n 30 || true
+          OPT=$(timeout 60 ./configure < /dev/null 2>/dev/null | grep -E 'gfortran +\(serial\)' | grep -oP '^\s*\K\d+' | head -n1 || true)
           echo "opzione WPS: '${OPT}'"
-          if [ -z "$OPT" ]; then timeout 60 ./configure < /dev/null 2>/dev/null | head -n 40 || true; OPT=1; fi
-          echo "$OPT" | ./configure > configure.log 2>&1 || { tail -n 40 configure.log; exit 1; }
-          ./compile > compile.log 2>&1 || true
+          [ -n "$OPT" ] || { echo "nessuna opzione trovata per WPS"; exit 1; }
+          echo "$OPT" | timeout 120 ./configure > configure.log 2>&1 || { tail -n 40 configure.log; exit 1; }
+          timeout 3000 ./compile > compile.log 2>&1 || true
           for E in geogrid.exe ungrib.exe metgrid.exe; do
             test -s "$E" || { echo "WPS: manca $E"; tail -n 60 compile.log; exit 1; }
           done
