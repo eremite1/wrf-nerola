@@ -1,0 +1,18 @@
+name: "Test ARM"
+run-name: "Test del server ARM"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  arm:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Informazioni sul server ARM
+        run: |
+          echo "== architettura"; uname -m
+          echo "== processore"; lscpu | head -n 20
+          echo "== numero di processori"; nproc
+          echo "== memoria"; free -h
+          echo "== disco"; df -h /
