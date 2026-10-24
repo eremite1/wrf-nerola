@@ -68,9 +68,9 @@ jobs:
             *) echo "ERRORE: la corsa va scritta AAAAMMGGHH, per esempio 2026102400"; exit 1;;
           esac
           if [ -n "$CORSA_IN" ]; then
-            C=$(python3 wrf/scarica_ecmwf.py --trova --ore "$ORE" --corsa "$CORSA_IN")
+            C=$(python3 scarica_ecmwf.py --trova --ore "$ORE" --corsa "$CORSA_IN")
           else
-            C=$(python3 wrf/scarica_ecmwf.py --trova --ore "$ORE")
+            C=$(python3 scarica_ecmwf.py --trova --ore "$ORE")
           fi
           echo "CORSA SCELTA: $C (previsione di $ORE ore)"
           echo "corsa=$C" >> "$GITHUB_OUTPUT"
@@ -78,12 +78,12 @@ jobs:
 
       - name: Scarico i dati ECMWF (solo i campi che servono)
         run: |
-          python3 wrf/scarica_ecmwf.py --corsa "$CORSA" --ore "$ORE" --out /home/runner/grezzi
+          python3 scarica_ecmwf.py --corsa "$CORSA" --ore "$ORE" --out /home/runner/grezzi
           du -sh /home/runner/grezzi
 
       - name: Ritaglio sull'Italia centrale e correzione del suolo
         run: |
-          bash wrf/prepara_grib.sh /home/runner/grezzi /home/runner/finali "$ORE"
+          bash prepara_grib.sh /home/runner/grezzi /home/runner/finali "$ORE"
           rm -rf /home/runner/grezzi
           du -sh /home/runner/finali
 
@@ -93,7 +93,7 @@ jobs:
           cp -a /home/runner/wrf-install/WPS/. /home/runner/WPS/
           cp /home/runner/geo_em/geo_em.d0*.nc /home/runner/WPS/
           cp /home/runner/geo_em/namelist.wps /home/runner/WPS/namelist.wps
-          cp wrf/Vtable.ECMWF01 /home/runner/WPS/Vtable
+          cp Vtable.ECMWF01 /home/runner/WPS/Vtable
           cd /home/runner/WPS
           EPOCH=$(date -u -d "${CORSA:0:8} ${CORSA:8:2}:00 UTC" +%s)
           START=$(date -u -d @$EPOCH +%Y-%m-%d_%H:%M:%S)
@@ -128,7 +128,7 @@ jobs:
           echo "livelli di metgrid: $NLEV, livelli di suolo: $NSOIL"
           test "$NSOIL" -ge 1 || { echo "ERRORE: metgrid non ha trovato il suolo"; exit 1; }
           echo "$CORSA $NLEV $NSOIL" > corsa.txt
-          python3 "$GITHUB_WORKSPACE/wrf/namelist.py" --corsa "$CORSA" --da 0 --a "$ORE" --nlev "$NLEV" --nsoil "$NSOIL" > namelist.input
+          python3 "$GITHUB_WORKSPACE/namelist.py" --corsa "$CORSA" --da 0 --a "$ORE" --nlev "$NLEV" --nsoil "$NSOIL" > namelist.input
           grep -E "run_hours|start_|end_" namelist.input | head -12
           ulimit -s unlimited || true
           export OMP_NUM_THREADS=1
@@ -233,7 +233,7 @@ jobs:
         run: |
           ls -lh /home/runner/uscite
           set +e
-          python3 wrf/controllo.py --uscite /home/runner/uscite --ore "$ORE" --rapporto /home/runner/controllo.txt
+          python3 controllo.py --uscite /home/runner/uscite --ore "$ORE" --rapporto /home/runner/controllo.txt
           RC=$?
           set -e
           {
@@ -248,7 +248,7 @@ jobs:
 
       - name: Mappe e meteogramma
         run: |
-          python3 wrf/mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico
+          python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico
           cp /home/runner/controllo.txt /home/runner/pubblico/
           cp /home/runner/uscite/tempi_b*.txt /home/runner/pubblico/
           cat > /home/runner/pubblico/LEGGIMI.md <<EOT

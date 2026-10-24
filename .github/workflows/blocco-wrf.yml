@@ -71,7 +71,7 @@ jobs:
         run: |
           cd /home/runner/run
           read C NLEV NSOIL < corsa.txt
-          python3 "$GITHUB_WORKSPACE/wrf/namelist.py" --corsa "$C" --da "$DA" --a "$A" --nlev "$NLEV" --nsoil "$NSOIL" > namelist.input
+          python3 "$GITHUB_WORKSPACE/namelist.py" --corsa "$C" --da "$DA" --a "$A" --nlev "$NLEV" --nsoil "$NSOIL" > namelist.input
           grep -E "run_hours|start_|end_|restart" namelist.input | head -24
           ulimit -s unlimited || true
           export OMP_NUM_THREADS=1
@@ -112,7 +112,7 @@ jobs:
 
       - name: Tengo solo i campi che servono (file piccoli)
         run: |
-          python3 wrf/postprocess.py --run /home/runner/run --blocco "$BLOCCO" --out /home/runner/uscite
+          python3 postprocess.py --run /home/runner/run --blocco "$BLOCCO" --out /home/runner/uscite
           ls -lh /home/runner/uscite
 
       - name: Salvo lo stato per il blocco dopo
