@@ -1,0 +1,144 @@
+name: "Blocco WRF"
+run-name: "Blocco WRF"
+
+# Fa girare un blocco di previsione (di solito 24 ore) su ARM e passa lo stato al blocco dopo.
+# Non si lancia da solo: lo chiama "Previsione Nerola".
+on:
+  workflow_call:
+    inputs:
+      corsa:
+        type: string
+        required: true
+      da:
+        type: number
+        required: true
+      a:
+        type: number
+        required: true
+      blocco:
+        type: number
+        required: true
+      stato_in:
+        type: string
+        required: true
+      stato_out:
+        type: string
+        required: true
+
+jobs:
+  blocco:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 345
+    env:
+      CORSA: ${{ inputs.corsa }}
+      DA: ${{ inputs.da }}
+      A: ${{ inputs.a }}
+      BLOCCO: ${{ inputs.blocco }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Programmi necessari
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mpich libnetcdf-dev libnetcdff-dev python3-numpy python3-netcdf4
+
+      - name: Recupero WRF compilato per ARM
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/wrf-install
+          key: wrf-arm-v1-cerca
+          restore-keys: wrf-arm-v1-
+          fail-on-cache-miss: true
+
+      - name: Recupero lo stato del blocco prima
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.stato_in }}
+          path: /home/runner/stato
+
+      - name: Preparo la cartella di calcolo
+        run: |
+          mkdir -p /home/runner/run
+          cd /home/runner/run
+          cp -aL /home/runner/wrf-install/WRF/run/. .
+          cp -L /home/runner/wrf-install/WRF/wrf.exe .
+          tar -xzf /home/runner/stato/stato.tgz
+          ls -l
+          cat corsa.txt
+          test "$(cut -d' ' -f1 corsa.txt)" = "$CORSA" || { echo "ERRORE: lo stato e' di un'altra corsa"; exit 1; }
+
+      - name: Calcolo con wrf.exe
+        run: |
+          cd /home/runner/run
+          read C NLEV NSOIL < corsa.txt
+          python3 "$GITHUB_WORKSPACE/wrf/namelist.py" --corsa "$C" --da "$DA" --a "$A" --nlev "$NLEV" --nsoil "$NSOIL" > namelist.input
+          grep -E "run_hours|start_|end_|restart" namelist.input | head -24
+          ulimit -s unlimited || true
+          export OMP_NUM_THREADS=1
+          rm -f rsl.*
+          T0=$(date +%s)
+          echo "== wrf.exe da +${DA} h a +${A} h, 4 processi ($(date -u +%H:%M) UTC)"
+          set +e
+          mpirun -np 4 ./wrf.exe > wrf_stdout.log 2>&1
+          RC=$?
+          set -e
+          T1=$(date +%s)
+          mkdir -p /home/runner/uscite
+          echo "blocco $BLOCCO: da +${DA} h a +${A} h, $((T1-T0)) secondi ($(( (T1-T0)/60 )) minuti), uscita $RC" | tee /home/runner/uscite/tempi_b${BLOCCO}.txt
+          if ! grep -q "SUCCESS COMPLETE WRF" rsl.error.0000 2>/dev/null; then
+            echo "ERRORE: wrf.exe non e' riuscito."
+            grep -n -i -E "fatal|error|cfl|segmentation|forrtl|nan" rsl.error.* 2>/dev/null | head -20 || true
+            for f in rsl.error.0000 rsl.out.0000; do
+              if [ -e $f ]; then echo "---- $f (ultime 30 righe) ----"; tail -n 30 $f; fi
+            done
+            tail -n 30 wrf_stdout.log || true
+            exit 1
+          fi
+          echo "wrf.exe riuscito"
+          ls wrfout_d0* | wc -l
+          FINE=$(date -u -d "${C:0:8} ${C:8:2}:00 UTC + ${A} hours" +%Y-%m-%d_%H:%M:%S)
+          for d in 1 2; do
+            test -s "wrfrst_d0${d}_${FINE}" || { echo "ERRORE: manca il file di ripresa del dominio ${d} alle ${FINE}"; ls wrfrst_* 2>/dev/null || true; exit 1; }
+          done
+          echo "$FINE" > fine.txt
+
+      - name: Impacchetto lo stato per il blocco dopo
+        run: |
+          cd /home/runner/run
+          FINE=$(cat fine.txt)
+          mkdir -p /home/runner/stato_out
+          tar -czf /home/runner/stato_out/stato.tgz wrfinput_d01 wrfinput_d02 wrfbdy_d01 "wrfrst_d01_${FINE}" "wrfrst_d02_${FINE}" corsa.txt
+          ls -lh /home/runner/stato_out
+
+      - name: Tengo solo i campi che servono (file piccoli)
+        run: |
+          python3 wrf/postprocess.py --run /home/runner/run --blocco "$BLOCCO" --out /home/runner/uscite
+          ls -lh /home/runner/uscite
+
+      - name: Salvo lo stato per il blocco dopo
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.stato_out }}
+          path: /home/runner/stato_out/stato.tgz
+          retention-days: 2
+          compression-level: 0
+
+      - name: Salvo le uscite del blocco
+        uses: actions/upload-artifact@v4
+        with:
+          name: uscite-${{ inputs.blocco }}
+          path: /home/runner/uscite/*
+          retention-days: 3
+
+      - name: Log (solo se qualcosa e' andato storto)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-blocco-${{ inputs.blocco }}
+          path: |
+            /home/runner/run/namelist.input
+            /home/runner/run/rsl.error.0000
+            /home/runner/run/rsl.out.0000
+            /home/runner/run/wrf_stdout.log
+          if-no-files-found: ignore
+          retention-days: 7
