@@ -26,9 +26,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepara:
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 150
+  dati:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
     outputs:
       corsa: ${{ steps.scelta.outputs.corsa }}
     env:
@@ -39,24 +39,7 @@ jobs:
       - name: Programmi necessari
         run: |
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tcsh cdo libeccodes-tools mpich \
-            libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev python3-requests python3-numpy python3-netcdf4
-
-      - name: Recupero WRF e WPS compilati per ARM
-        uses: actions/cache/restore@v4
-        with:
-          path: /home/runner/wrf-install
-          key: wrf-arm-v1-cerca
-          restore-keys: wrf-arm-v1-
-          fail-on-cache-miss: true
-
-      - name: Recupero i file del dominio
-        uses: actions/cache/restore@v4
-        with:
-          path: /home/runner/geo_em
-          key: geo-em-cerca
-          restore-keys: geo-em-
-          fail-on-cache-miss: true
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cdo libeccodes-tools python3-requests
 
       - name: Scelgo la corsa ECMWF
         id: scelta
@@ -86,6 +69,53 @@ jobs:
           bash prepara_grib.sh /home/runner/grezzi /home/runner/finali "$ORE"
           rm -rf /home/runner/grezzi
           du -sh /home/runner/finali
+
+      - name: Salvo i dati pronti
+        uses: actions/upload-artifact@v4
+        with:
+          name: dati-finali
+          path: /home/runner/finali
+          retention-days: 1
+
+  prepara:
+    needs: dati
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 150
+    outputs:
+      corsa: ${{ needs.dati.outputs.corsa }}
+    env:
+      ORE: ${{ inputs.ore }}
+      CORSA: ${{ needs.dati.outputs.corsa }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Programmi necessari
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tcsh mpich \
+            libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev python3-numpy python3-netcdf4
+
+      - name: Recupero WRF e WPS compilati per ARM
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/wrf-install
+          key: wrf-arm-v1-cerca
+          restore-keys: wrf-arm-v1-
+          fail-on-cache-miss: true
+
+      - name: Recupero i file del dominio
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/geo_em
+          key: geo-em-cerca
+          restore-keys: geo-em-
+          fail-on-cache-miss: true
+
+      - name: Recupero i dati pronti
+        uses: actions/download-artifact@v4
+        with:
+          name: dati-finali
+          path: /home/runner/finali
 
       - name: ungrib e metgrid
         run: |
