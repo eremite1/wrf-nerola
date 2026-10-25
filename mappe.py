@@ -148,11 +148,16 @@ def km(la1, lo1, la2, lo2):
     return np.hypot((la1 - la2) * 111.0, (lo1 - lo2) * 111.0 * np.cos(np.radians(la1)))
 
 
-def scegli_paesi(sfondo, lat, lon, minimo_km, massimo):
+def scegli_paesi(sfondo, lat, lon, minimo_km, massimo, vicini=False):
     """Paesi dentro la mappa, i piu' grandi per primi, senza accavallamenti. Nerola c'e' sempre."""
     dentro = [(n, la, lo) for n, (la, lo) in PAESI_FISSI.items() if lat.min() < la < lat.max() and lon.min() < lo < lon.max()]
     scelti = list(dentro)
-    for p in sfondo.get("paesi", []):
+    elenco = sfondo.get("paesi", [])
+    if vicini:  # dominio piccolo: prima i comuni piu' vicini a Nerola, cosi' compaiono anche i paesi piccoli attorno
+        elenco = sorted(elenco, key=lambda p: (not p.get("sede"), km(p["lat"], p["lon"], *NEROLA)))
+    for p in elenco:
+        if p["nome"] == "Rome":
+            p = dict(p, nome="Roma")
         if len(scelti) >= massimo:
             break
         if not (lat.min() + 0.02 < p["lat"] < lat.max() - 0.02 and lon.min() + 0.02 < p["lon"] < lon.max() - 0.03):
@@ -329,7 +334,8 @@ def main():
         frames = {p["id"]: [i for i in range(p["inizio"], n, p["passo"])] for p in parametri}
         parametri = [p for p in parametri if frames[p["id"]]]
         lim = limiti_automatici(d, parametri, frames)
-        paesi = scegli_paesi(sf, d["lat"], d["lon"], 7.0 if etichetta == "1 km" else 16.0, 22 if etichetta == "1 km" else 26)
+        paesi = scegli_paesi(sf, d["lat"], d["lon"], 5.0 if etichetta == "1 km" else 16.0, 30 if etichetta == "1 km" else 26,
+                              vicini=etichetta == "1 km")
         voce = {"etichetta": etichetta, "parametri": {}}
         for p in parametri:
             cart = out / "mappe" / cartella_dom / p["id"]
