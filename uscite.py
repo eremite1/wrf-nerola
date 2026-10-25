@@ -15,8 +15,8 @@ def carica(cartella, dominio):
     for f in file:
         z = np.load(f, allow_pickle=False)
         if stat is None:
-            stat = {k: z[k] for k in ("lat", "lon", "hgt")}
-        campi = [k for k in z.files if k not in ("tempi", "lat", "lon", "hgt")]
+            stat = {k: z[k] for k in ("lat", "lon", "hgt", "landmask") if k in z.files}
+        campi = [k for k in z.files if k not in ("tempi", "lat", "lon", "hgt", "landmask")]
         for i, t in enumerate(z["tempi"]):
             per_tempo[str(t)] = {k: z[k][i] for k in campi}
     tempi = sorted(per_tempo)

@@ -297,17 +297,43 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit $RC
 
+      - name: Recupero confini e nomi dei paesi (dalla cache)
+        id: cache-sfondo
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/sfondo
+          key: sfondo-v1
+
+      - name: Scarico confini e nomi dei paesi (solo la prima volta)
+        id: sfondo
+        if: steps.cache-sfondo.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: |
+          python3 sfondo.py --scarica /home/runner/sfondo
+          if [ -f /home/runner/sfondo/sfondo.json ]; then echo "completo=si" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Salvo confini e nomi nella cache
+        if: steps.sfondo.outputs.completo == 'si'
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/sfondo
+          key: sfondo-v1
+
       - name: Mappe e meteogramma
         run: |
-          python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico
+          python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo
           cp /home/runner/controllo.txt /home/runner/pubblico/
           cp /home/runner/uscite/tempi_b*.txt /home/runner/pubblico/
           cat > /home/runner/pubblico/LEGGIMI.md <<EOT
           # Previsione WRF su Nerola
 
-          Corsa ECMWF **$CORSA UTC**, $ORE ore. Mappe ogni 3 ore a 1 km (\`mappe_1km\`) e a 3 km (\`mappe_3km\`),
-          meteogramma del punto di Nerola (\`meteogramma_nerola.png\`) e dati (\`d01_tutto.npz\`, \`d02_tutto.npz\`).
-          I nomi dei file delle mappe sono data e ora UTC (AAAAMMGG_HH).
+          Corsa ECMWF **$CORSA UTC**, $ORE ore.
+
+          - \`mappe/1km/<parametro>/AAAAMMGG_HH.png\` e \`mappe/3km/...\`: una mappa per parametro (ora UTC nel nome del file).
+          - \`indice.json\`: elenco di tutte le mappe, per le pagine web.
+          - \`meteogramma_nerola.png\`: andamento nel punto di Nerola.
+          - \`d01_tutto.npz\`, \`d02_tutto.npz\`: i dati.
+          Confini: Natural Earth (pubblico dominio). Nomi dei paesi: GeoNames (CC BY 4.0).
 
           Modello WRF 4.7.0, dati di partenza e al contorno: ECMWF IFS open data 0,1 gradi
           (https://www.ecmwf.int/en/forecasts/datasets/open-data), licenza CC BY 4.0.
