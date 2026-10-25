@@ -34,6 +34,7 @@ jobs:
       DA: ${{ inputs.da }}
       A: ${{ inputs.a }}
       BLOCCO: ${{ inputs.blocco }}
+      UCX_TLS: sm,self,tcp        # MPI usa solo la memoria del computer (niente InfiniBand)
     steps:
       - uses: actions/checkout@v4
 

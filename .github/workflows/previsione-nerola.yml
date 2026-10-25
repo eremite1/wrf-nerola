@@ -86,6 +86,7 @@ jobs:
     env:
       ORE: ${{ inputs.ore }}
       CORSA: ${{ needs.dati.outputs.corsa }}
+      UCX_TLS: sm,self,tcp        # MPI usa solo la memoria del computer (niente InfiniBand)
     steps:
       - uses: actions/checkout@v4
 
