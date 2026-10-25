@@ -1,5 +1,5 @@
 name: "Previsione Nerola"
-run-name: "Previsione Nerola ${{ inputs.ore }} h ${{ inputs.corsa }}"
+run-name: "Previsione Nerola ${{ inputs.ore }} h (blocchi da ${{ inputs.ore_blocco }}) ${{ inputs.corsa }}"
 
 # Previsione WRF a 3 km e 1 km su Nerola, con dati ECMWF IFS 0,1 gradi.
 # 1) prepara: scarica i dati, li prepara per WRF (WPS) e crea le condizioni iniziali e al contorno (real.exe)
@@ -9,9 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       ore:
-        description: "Ore di previsione"
+        description: "Ore di previsione (6 e 12 solo per le prove)"
         type: choice
-        options: ["24", "48", "72"]
+        options: ["6", "12", "24", "48", "72"]
+        default: "24"
+      ore_blocco:
+        description: "Ore per ogni blocco (24 normalmente; 3 solo per provare la ripartenza con 6 ore)"
+        type: choice
+        options: ["24", "12", "6", "3"]
         default: "24"
       corsa:
         description: "Corsa ECMWF AAAAMMGGHH (vuoto = l'ultima disponibile)"
@@ -31,10 +36,25 @@ jobs:
     timeout-minutes: 90
     outputs:
       corsa: ${{ steps.scelta.outputs.corsa }}
+      n: ${{ steps.blocchi.outputs.n }}
+      b1: ${{ steps.blocchi.outputs.b1 }}
+      b2: ${{ steps.blocchi.outputs.b2 }}
+      b3: ${{ steps.blocchi.outputs.b3 }}
     env:
       ORE: ${{ inputs.ore }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Quanti blocchi servono
+        id: blocchi
+        env:
+          BL: ${{ inputs.ore_blocco }}
+        run: |
+          [ $((ORE % BL)) -eq 0 ] || { echo "ERRORE: le ore ($ORE) devono essere un multiplo delle ore del blocco ($BL)"; exit 1; }
+          N=$((ORE / BL))
+          { [ "$N" -ge 1 ] && [ "$N" -le 3 ]; } || { echo "ERRORE: servirebbero $N blocchi, ne sono ammessi da 1 a 3"; exit 1; }
+          echo "$N blocchi da $BL ore"
+          { echo "n=$N"; echo "b1=$BL"; echo "b2=$((2 * BL))"; echo "b3=$((3 * BL))"; } >> "$GITHUB_OUTPUT"
 
       - name: Programmi necessari
         run: |
@@ -203,43 +223,43 @@ jobs:
           retention-days: 7
 
   blocco1:
-    needs: prepara
+    needs: [dati, prepara]
     uses: ./.github/workflows/blocco-wrf.yml
     with:
       corsa: ${{ needs.prepara.outputs.corsa }}
       da: 0
-      a: 24
+      a: ${{ fromJSON(needs.dati.outputs.b1) }}
       blocco: 1
       stato_in: stato-0
       stato_out: stato-1
 
   blocco2:
-    needs: [prepara, blocco1]
-    if: ${{ inputs.ore != '24' }}
+    needs: [dati, prepara, blocco1]
+    if: ${{ fromJSON(needs.dati.outputs.n) >= 2 }}
     uses: ./.github/workflows/blocco-wrf.yml
     with:
       corsa: ${{ needs.prepara.outputs.corsa }}
-      da: 24
-      a: 48
+      da: ${{ fromJSON(needs.dati.outputs.b1) }}
+      a: ${{ fromJSON(needs.dati.outputs.b2) }}
       blocco: 2
       stato_in: stato-1
       stato_out: stato-2
 
   blocco3:
-    needs: [prepara, blocco2]
-    if: ${{ inputs.ore == '72' }}
+    needs: [dati, prepara, blocco2]
+    if: ${{ fromJSON(needs.dati.outputs.n) >= 3 }}
     uses: ./.github/workflows/blocco-wrf.yml
     with:
       corsa: ${{ needs.prepara.outputs.corsa }}
-      da: 48
-      a: 72
+      da: ${{ fromJSON(needs.dati.outputs.b2) }}
+      a: ${{ fromJSON(needs.dati.outputs.b3) }}
       blocco: 3
       stato_in: stato-2
       stato_out: stato-3
 
   pubblica:
-    needs: [prepara, blocco1, blocco2, blocco3]
-    if: ${{ always() && needs.blocco1.result == 'success' && (inputs.ore == '24' || needs.blocco2.result == 'success') && (inputs.ore != '72' || needs.blocco3.result == 'success') }}
+    needs: [dati, prepara, blocco1, blocco2, blocco3]
+    if: ${{ always() && needs.blocco1.result == 'success' && (fromJSON(needs.dati.outputs.n) < 2 || needs.blocco2.result == 'success') && (fromJSON(needs.dati.outputs.n) < 3 || needs.blocco3.result == 'success') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
