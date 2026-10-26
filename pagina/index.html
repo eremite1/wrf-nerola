@@ -382,7 +382,8 @@ function grafico(titolo, tempi, serie, opz = {}) {
   const X = (t) => mL + ((t.getTime() - t0) / (t1 - t0 || 1)) * (W - mL - mR);
   const Y = (v) => mT + (1 - (v - min) / (max - min)) * (H - mT - mB);
   let g = "";
-  for (const v of ticks(min, max, 4)) g += `<line class="griglia" x1="${mL}" x2="${W - mR}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${mL - 4}" y="${Y(v) + 4}" text-anchor="end">${nf0.format(v)}</text>`;
+  const fmtY = (max - min) < 6 ? nf1 : nf0;
+  for (const v of ticks(min, max, 4)) g += `<line class="griglia" x1="${mL}" x2="${W - mR}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${mL - 4}" y="${Y(v) + 4}" text-anchor="end">${fmtY.format(v)}</text>`;
   tempi.forEach((t, i) => {
     const h = +fmtOra.format(t);
     if (h === 0) g += `<line class="giorno" x1="${X(t)}" x2="${X(t)}" y1="${mT}" y2="${H - mB}"/><text x="${X(t) + 3}" y="${H - 6}">${fmtGg.format(t)}</text>`;
