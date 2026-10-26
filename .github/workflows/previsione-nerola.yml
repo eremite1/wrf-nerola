@@ -1,11 +1,16 @@
 name: "Previsione Nerola"
-run-name: "Previsione Nerola ${{ inputs.ore }} h (blocchi da ${{ inputs.ore_blocco }}) ${{ inputs.corsa }}"
+run-name: "Previsione Nerola ${{ inputs.ore || '48' }} h (blocchi da ${{ inputs.ore_blocco || '24' }}) ${{ inputs.corsa }}"
 
 # Previsione WRF a 3 km e 1 km su Nerola, con dati ECMWF IFS 0,1 gradi.
 # 1) prepara: scarica i dati, li prepara per WRF (WPS) e crea le condizioni iniziali e al contorno (real.exe)
 # 2) blocchi da 24 ore: WRF su ARM, ogni blocco riparte dal precedente
 # 3) pubblica: controllo di plausibilita', mappe e meteogramma nel ramo "risultati"
 on:
+  # Avvio automatico due volte al giorno (orari UTC): le corse ECMWF delle 00 e delle 12 sono complete circa 7-8 ore dopo.
+  # Con l'avvio automatico si fanno 48 ore con blocchi da 24 (gli ingressi qui sotto valgono solo per l'avvio a mano).
+  schedule:
+    - cron: "30 8 * * *"
+    - cron: "30 20 * * *"
   workflow_dispatch:
     inputs:
       ore:
@@ -41,14 +46,14 @@ jobs:
       b2: ${{ steps.blocchi.outputs.b2 }}
       b3: ${{ steps.blocchi.outputs.b3 }}
     env:
-      ORE: ${{ inputs.ore }}
+      ORE: ${{ inputs.ore || '48' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Quanti blocchi servono
         id: blocchi
         env:
-          BL: ${{ inputs.ore_blocco }}
+          BL: ${{ inputs.ore_blocco || '24' }}
         run: |
           [ $((ORE % BL)) -eq 0 ] || { echo "ERRORE: le ore ($ORE) devono essere un multiplo delle ore del blocco ($BL)"; exit 1; }
           N=$((ORE / BL))
@@ -104,7 +109,7 @@ jobs:
     outputs:
       corsa: ${{ needs.dati.outputs.corsa }}
     env:
-      ORE: ${{ inputs.ore }}
+      ORE: ${{ inputs.ore || '48' }}
       CORSA: ${{ needs.dati.outputs.corsa }}
       UCX_TLS: sm,self,tcp        # MPI usa solo la memoria del computer (niente InfiniBand)
     steps:
@@ -263,7 +268,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      ORE: ${{ inputs.ore }}
+      ORE: ${{ inputs.ore || '48' }}
       CORSA: ${{ needs.prepara.outputs.corsa }}
     steps:
       - uses: actions/checkout@v4
