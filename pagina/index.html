@@ -63,6 +63,11 @@
   .graf text { fill: var(--muto); font-size: 11px; }
   .graf .griglia { stroke: var(--linea); stroke-width: 1; }
   .graf .giorno { stroke: var(--muto); stroke-width: 1; stroke-dasharray: 3 3; }
+  details.info { margin-top: 12px; }
+  details.info summary { cursor: pointer; font-weight: 600; }
+  details.info h4 { margin: 12px 0 2px; font-size: .92rem; }
+  details.info p, details.info li { font-size: .86rem; color: var(--muto); margin: 3px 0; }
+  details.info ul { margin: 4px 0 4px 18px; padding: 0; }
   .nascosto { display: none; }
 </style>
 </head>
@@ -93,6 +98,34 @@
     <p class="suggerimento" id="suggerimento">Passa sulla mappa per leggere il valore; clicca (o tocca) un punto per il meteogramma di quel punto. Tasto destro sull'immagine per copiarla o salvarla.</p>
     <div id="punto" class="nascosto"></div>
   </section>
+  <details class="card info" id="spiegazioni">
+    <summary>Come si leggono le mappe e come sono calcolati i valori</summary>
+    <h4>Quota e celle del modello</h4>
+    <p>Il modello calcola un valore per ogni cella di 1 km (3 km nella zona ampia) e usa per ogni cella una quota media del terreno.
+       Su un crinale con valli profonde intorno, come a Nerola, la quota del modello è più bassa di quella vera del paese.
+       Dove conosciamo la quota reale (da un rilievo di circa 100 m) il valore sotto il puntatore viene mostrato anche
+       corretto alla quota reale, togliendo 0,65 °C ogni 100 m di dislivello. È una correzione media: nelle notti serene e
+       calme, con l'aria fredda ferma nelle valli, il rapporto si inverte e la correzione non vale.</p>
+    <h4>Rischio di gelata</h4>
+    <p>Per ogni punto si guardano le ultime 24 ore e si usano quattro valori:</p>
+    <ul>
+      <li><b>minima dell'aria a 2 m</b>: la temperatura più bassa raggiunta;</li>
+      <li><b>bulbo umido</b>: la temperatura a cui scende l'aria facendo evaporare acqua. Con aria secca è molto più bassa della temperatura normale e anticipa il gelo;</li>
+      <li><b>minima stimata sul prato</b>: sul prato, nelle notti serene e senza vento, fa fino a 4 °C meno che a 2 m. La stima toglie
+          alla temperatura a 2 m fino a 4 °C, tanto meno quanto più il cielo è coperto (si ricava dalla radiazione infrarossa del modello) e
+          quanto più c'è vento. Vale solo di notte. Sono valori orientativi, da tarare con misure vere;</li>
+      <li>le classi si decidono così, dalla più grave: <i>gelata forte</i> (aria sotto -4 °C), <i>moderata</i> (da -2 a -4), <i>debole</i> (da 0 a -2),
+          <i>gelata al suolo (brina)</i> (aria sopra 0 °C ma prato a 0 °C o meno), <i>attenzione</i> (prato fino a 2 °C o bulbo umido fino a 1 °C).</li>
+    </ul>
+    <h4>Nebbia</h4>
+    <p>Si stima la visibilità dall'acqua liquida delle nubi nel primo strato del modello. Nelle prime ore di ogni corsa il modello parte senza nubi,
+       quindi la nebbia appare con un po' di ritardo e va confrontata con la realtà.</p>
+    <h4>Suolo</h4>
+    <p>Temperatura e umidità del suolo vengono dal modello del suolo di WRF. L'umidità iniziale arriva da ECMWF, che ha una risoluzione minore:
+       conta soprattutto l'andamento, meno il valore assoluto.</p>
+    <h4>Pioggia</h4>
+    <p>Somma di pioggia convettiva e a grande scala calcolata dal modello nelle ore indicate.</p>
+  </details>
   <div class="tip nascosto" id="tip"></div>
 
   <section id="vista-meteo" class="card nascosto">
@@ -115,7 +148,7 @@ const GRUPPI = [
 ];
 const $ = (id) => document.getElementById(id);
 let indice = null, immagini = [], posizione = 0, timer = null;
-let griglia = null, valoriParam = null, puntoScelto = null;
+let griglia = null, valoriParam = null, puntoScelto = null, quotaGrid = null;
 const cacheBin = {}, cacheSerie = {};
 const fmtGiorno = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
 const fmtUtc = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
@@ -138,7 +171,7 @@ async function carica() {
   $("info").textContent = `Corsa ECMWF del ${c.slice(6, 8)}/${c.slice(4, 6)}/${c.slice(0, 4)} ore ${c.slice(8, 10)} UTC · aggiornata ${indice.creato.replace("T", " ").replace("Z", " UTC")}`;
   const dom = $("dominio");
   for (const [k, v] of Object.entries(indice.domini)) dom.add(new Option("Dominio " + v.etichetta + (k === "1km" ? " (zona di Nerola)" : " (area più ampia)"), k));
-  dom.onchange = () => { puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); };
+  dom.onchange = () => { puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); caricaQuota().catch(() => {}); };
   $("parametro").onchange = scegliParametro;
   $("cursore").oninput = () => mostra(+$("cursore").value, false);
   $("indietro").onclick = () => { ferma(); mostra(posizione - 1); };
@@ -154,6 +187,7 @@ async function carica() {
   $("meteogramma").src = "meteogramma_nerola.png?v=" + encodeURIComponent(indice.creato);
   riempiParametri(true);
   caricaGriglia().catch(() => {});
+  caricaQuota().catch(() => {});
   const img = $("mappa");
   img.addEventListener("mousemove", (e) => sulPuntatore(e, false));
   img.addEventListener("mouseleave", () => $("tip").classList.add("nascosto"));
@@ -186,6 +220,22 @@ async function caricaGriglia() {
   const g = await leggiBin(D.griglia, "f4");
   const n = D.layout.ny * D.layout.nx;
   if (dominioAttuale() === D) griglia = { lat: g.subarray(0, n), lon: g.subarray(n, 2 * n), hgt: g.subarray(2 * n, 3 * n), n };
+}
+
+async function caricaQuota() {
+  quotaGrid = null;
+  const D = dominioAttuale();
+  if (!D.quota) return;
+  const z = await leggiBin(D.quota.file, "i2");
+  if (dominioAttuale() === D) quotaGrid = { ...D.quota, z };
+}
+
+function quotaReale(lat, lon) {
+  if (!quotaGrid) return null;
+  const q = quotaGrid;
+  const i = Math.round((lat - q.lat0) / q.passo), j = Math.round((lon - q.lon0) / q.passo);
+  if (i < 0 || j < 0 || i >= q.ny || j >= q.nx) return null;
+  return q.z[i * q.nx + j];
 }
 
 async function caricaValori() {
@@ -311,13 +361,19 @@ function sulPuntatore(e, clic) {
   const P = dominioAttuale().parametri[$("parametro").value];
   const raw = valoriParam[posizione * griglia.n + k];
   const luogo = descrizioneLuogo(griglia.lat[k], griglia.lon[k]);
-  let riga1;
+  const hMod = griglia.hgt[k];
+  const hRe = quotaReale(pos.lat, pos.lon);
+  let riga1, riga3 = "";
   if (raw === -32768) riga1 = "<b>nessun dato</b>";
   else {
     const v = raw / P.scala;
-    riga1 = `<b>${(P.scala >= 10 ? nf1 : nf0).format(v)} ${P.unita_dato || ""}</b>`;
+    if (P.classi_etichette) riga1 = `<b>${P.classi_etichette[Math.max(0, Math.min(P.classi_etichette.length - 1, Math.round(v)))]}</b>`;
+    else riga1 = `<b>${(P.scala >= 10 ? nf1 : nf0).format(v)} ${P.unita_dato || ""}</b>`;
+    if (P.corr_quota && hRe !== null && Math.abs(hRe - hMod) >= 30)
+      riga3 = `<small>alla quota reale (${nf0.format(hRe)} m): <b>${nf1.format(v - 0.0065 * (hRe - hMod))} ${P.unita_dato}</b></small>`;
   }
-  tip.innerHTML = `${riga1}<small>${P.etichetta_dato}</small><small>${luogo} · quota ${nf0.format(griglia.hgt[k])} m</small>` +
+  const quote = hRe !== null ? `quota ${nf0.format(hRe)} m (modello ${nf0.format(hMod)} m)` : `quota del modello ${nf0.format(hMod)} m`;
+  tip.innerHTML = `${riga1}<small>${P.etichetta_dato}</small>${riga3}<small>${luogo} · ${quote}</small>` +
                   (clic ? "" : "<small>clicca per il meteogramma</small>");
   tip.classList.remove("nascosto");
   const w = tip.offsetWidth, h = tip.offsetHeight;
@@ -405,6 +461,9 @@ function grafico(titolo, tempi, serie, opz = {}) {
          `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${titolo}">${g}</svg></div>`;
 }
 
+function hMod0(k) { return griglia.hgt[k]; }
+function quotaRealeTesto(k) { const h = quotaReale(griglia.lat[k], griglia.lon[k]); return h === null ? "" : ` · quota reale ${nf0.format(h)} m`; }
+
 function disegnaPunto(k, dati) {
   const D = dominioAttuale(), S = D.serie, nt = S.n_t, nf = S.campi.length;
   const tempi = S.tempi.map((t) => data(t));
@@ -416,8 +475,11 @@ function disegnaPunto(k, dati) {
   });
   const orario = campo.PIOGGIA ? campo.PIOGGIA.map((v, i) => (i === 0 ? 0 : Math.max(0, v - campo.PIOGGIA[i - 1]))) : null;
   let html = `<button class="chiudi" id="chiudi-punto">Chiudi</button><h2>Meteogramma: ${descrizioneLuogo(griglia.lat[k], griglia.lon[k])}</h2>` +
-             `<div class="sub">${griglia.lat[k].toFixed(3)}°N ${griglia.lon[k].toFixed(3)}°E · quota del modello ${nf0.format(griglia.hgt[k])} m · orari in ora locale · zona ${D.etichetta}</div>`;
+             `<div class="sub">${griglia.lat[k].toFixed(3)}°N ${griglia.lon[k].toFixed(3)}°E · quota del modello ${nf0.format(hMod0(k))} m${quotaRealeTesto(k)} · orari in ora locale · zona ${D.etichetta}</div>`;
+  const hMod = griglia.hgt[k], hRe = quotaReale(griglia.lat[k], griglia.lon[k]);
   const serieT = [{ v: campo.T2, c: "#e0482f", nome: "aria 2 m" }];
+  if (hRe !== null && Math.abs(hRe - hMod) >= 30) serieT.push({ v: campo.T2.map((x) => (x === null ? null : x - 0.0065 * (hRe - hMod))), c: "#f08a24", nome: "aria 2 m alla quota reale", tratteggio: true });
+  if (campo.TPRATO) serieT.push({ v: campo.TPRATO, c: "#3f78c9", nome: "prato (stima)", tratteggio: true });
   if (campo.TSUOLO) serieT.push({ v: campo.TSUOLO, c: "#9b6b3c", nome: "suolo 0-10 cm", tratteggio: true });
   html += grafico("Temperatura (°C)", tempi, serieT, { zero: true, minSpan: 4 });
   html += grafico("Umidità relativa a 2 m (%)", tempi, [{ v: campo.UMID, c: "#1f9bb5" }], { minSpan: 20 });

@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/sfondo
-          key: sfondo-v1
+          key: sfondo-v2
 
       - name: Scarico confini e nomi dei paesi (solo se mancano)
         id: sfondo
@@ -56,7 +56,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /home/runner/sfondo
-          key: sfondo-v1
+          key: sfondo-v2
 
       - name: Mappe, dati e pagina
         run: |
