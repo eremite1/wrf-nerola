@@ -322,6 +322,8 @@ jobs:
       - name: Mappe e meteogramma
         run: |
           python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo
+          cp pagina/index.html /home/runner/pubblico/index.html
+          touch /home/runner/pubblico/.nojekyll
           cp /home/runner/controllo.txt /home/runner/pubblico/
           cp /home/runner/uscite/tempi_b*.txt /home/runner/pubblico/
           cat > /home/runner/pubblico/LEGGIMI.md <<EOT
@@ -330,7 +332,7 @@ jobs:
           Corsa ECMWF **$CORSA UTC**, $ORE ore.
 
           - \`mappe/1km/<parametro>/AAAAMMGG_HH.png\` e \`mappe/3km/...\`: una mappa per parametro (ora UTC nel nome del file).
-          - \`indice.json\`: elenco di tutte le mappe, per le pagine web.
+          - \`index.html\`: la pagina web (con \`indice.json\`, l'elenco di tutte le mappe).
           - \`meteogramma_nerola.png\`: andamento nel punto di Nerola.
           - \`d01_tutto.npz\`, \`d02_tutto.npz\`: i dati.
           Confini: Natural Earth (pubblico dominio). Nomi dei paesi: GeoNames (CC BY 4.0).

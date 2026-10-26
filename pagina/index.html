@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meteo Nerola, WRF 1 km</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --testo: #1b2430; --muto: #5b6775; --linea: #d8dee5;
+    --accento: #1f6fb5; --accento-testo: #ffffff; --evid: #e8f1fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="chiaro"]) {
+      --bg: #12171d; --card: #1b232c; --testo: #e6ebf0; --muto: #98a4b1; --linea: #2d3945;
+      --accento: #5aa9ec; --accento-testo: #0c1620; --evid: #223142;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--testo); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 14px 16px 6px; max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 1.25rem; margin: 0; }
+  .sotto { color: var(--muto); font-size: .86rem; margin-top: 2px; }
+  main { max-width: 980px; margin: 0 auto; padding: 8px 16px 28px; }
+  .card { background: var(--card); border: 1px solid var(--linea); border-radius: 12px; padding: 12px; }
+  .schede { display: flex; gap: 6px; margin: 8px 0 10px; }
+  .schede button { flex: 1; padding: 9px 10px; border: 1px solid var(--linea); background: var(--card); color: var(--testo);
+                   border-radius: 10px; font: inherit; cursor: pointer; }
+  .schede button[aria-selected="true"] { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); font-weight: 600; }
+  .scelte { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  @media (max-width: 560px) { .scelte { grid-template-columns: 1fr; } }
+  label { display: block; font-size: .8rem; color: var(--muto); margin-bottom: 3px; }
+  select { width: 100%; padding: 9px 10px; font: inherit; color: var(--testo); background: var(--card); border: 1px solid var(--linea); border-radius: 10px; }
+  .quando { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }
+  .quando strong { font-size: 1.05rem; }
+  .quando span { color: var(--muto); font-size: .85rem; }
+  .comandi { display: flex; gap: 8px; align-items: center; margin: 8px 0 4px; }
+  .comandi button { min-width: 44px; height: 44px; border: 1px solid var(--linea); background: var(--card); color: var(--testo);
+                    border-radius: 10px; font-size: 1.1rem; cursor: pointer; }
+  .comandi button.on { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); }
+  input[type=range] { flex: 1; height: 44px; accent-color: var(--accento); }
+  .tacche { display: flex; justify-content: space-between; color: var(--muto); font-size: .72rem; padding: 0 52px 0 108px; }
+  .immagine { text-align: center; margin-top: 6px; min-height: 240px; }
+  .immagine img { max-width: 100%; height: auto; border-radius: 8px; background: #fff; }
+  .errore { padding: 14px; border: 1px solid #c0392b; border-radius: 10px; color: #c0392b; background: var(--card); }
+  footer { max-width: 980px; margin: 0 auto; padding: 0 16px 30px; color: var(--muto); font-size: .78rem; }
+  footer a { color: var(--accento); }
+  .nascosto { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Meteo Nerola · WRF a 1 km</h1>
+  <div class="sotto" id="info">Caricamento…</div>
+</header>
+<main>
+  <div class="schede" role="tablist">
+    <button role="tab" id="s-mappe" aria-selected="true">Mappe</button>
+    <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
+  </div>
+
+  <section id="vista-mappe" class="card">
+    <div class="scelte">
+      <div><label for="dominio">Zona</label><select id="dominio"></select></div>
+      <div><label for="parametro">Parametro</label><select id="parametro"></select></div>
+    </div>
+    <div class="quando"><strong id="data-ora">–</strong><span id="ora-utc"></span></div>
+    <div class="comandi">
+      <button id="indietro" aria-label="Ora precedente">◀</button>
+      <button id="gioca" aria-label="Avvia o ferma">▶</button>
+      <button id="avanti" aria-label="Ora successiva">▶|</button>
+      <input type="range" id="cursore" min="0" max="0" value="0" aria-label="Scegli l'ora">
+    </div>
+    <div class="immagine"><img id="mappa" alt="Mappa meteo" decoding="async"></div>
+  </section>
+
+  <section id="vista-meteo" class="card nascosto">
+    <div class="immagine"><img id="meteogramma" alt="Meteogramma di Nerola" decoding="async"></div>
+  </section>
+</main>
+<footer>
+  Previsione sperimentale: non usarla per decisioni importanti o di sicurezza.
+  Modello WRF 4.7.0 su dati ECMWF IFS open data 0,1° (licenza <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, dati modificati;
+  ECMWF non garantisce i dati). Confini: Natural Earth. Nomi dei paesi: GeoNames (CC BY 4.0).
+</footer>
+
+<script>
+"use strict";
+const GRUPPI = [
+  ["Principali", ["temperatura", "vento", "umidita", "pressione"]],
+  ["Pioggia", ["pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale"]],
+  ["Gelo e nebbia", ["tmin24", "tmax24", "gelata", "nebbia"]],
+  ["Suolo", ["suolo_temp", "suolo_umidita_10", "suolo_umidita_40"]],
+];
+const $ = (id) => document.getElementById(id);
+let indice = null, immagini = [], posizione = 0, timer = null;
+const fmtGiorno = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+const fmtUtc = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+
+function data(iso) { return new Date(iso.replace("Z", ":00Z")); }
+
+async function carica() {
+  try {
+    const r = await fetch("indice.json?v=" + Date.now());
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    indice = await r.json();
+  } catch (e) {
+    $("info").textContent = "";
+    document.querySelector("main").insertAdjacentHTML("afterbegin",
+      '<div class="errore">Non riesco a leggere l\'elenco delle mappe (indice.json). ' +
+      "Se hai aperto il file dal computer, usa l'indirizzo pubblico della pagina. (" + e.message + ")</div>");
+    return;
+  }
+  const c = indice.corsa;
+  $("info").textContent = `Corsa ECMWF del ${c.slice(6, 8)}/${c.slice(4, 6)}/${c.slice(0, 4)} ore ${c.slice(8, 10)} UTC · aggiornata ${indice.creato.replace("T", " ").replace("Z", " UTC")}`;
+  const dom = $("dominio");
+  for (const [k, v] of Object.entries(indice.domini)) dom.add(new Option("Dominio " + v.etichetta + (k === "1km" ? " (zona di Nerola)" : " (area più ampia)"), k));
+  dom.onchange = riempiParametri;
+  $("parametro").onchange = scegliParametro;
+  $("cursore").oninput = () => mostra(+$("cursore").value, false);
+  $("indietro").onclick = () => { ferma(); mostra(posizione - 1); };
+  $("avanti").onclick = () => { ferma(); mostra(posizione + 1); };
+  $("gioca").onclick = () => (timer ? ferma() : parti());
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "SELECT") return;
+    if (e.key === "ArrowLeft") { ferma(); mostra(posizione - 1); }
+    if (e.key === "ArrowRight") { ferma(); mostra(posizione + 1); }
+  });
+  $("s-mappe").onclick = () => scheda(true);
+  $("s-meteo").onclick = () => scheda(false);
+  $("meteogramma").src = "meteogramma_nerola.png?v=" + encodeURIComponent(indice.creato);
+  riempiParametri(true);
+}
+
+function scheda(mappe) {
+  ferma();
+  $("vista-mappe").classList.toggle("nascosto", !mappe);
+  $("vista-meteo").classList.toggle("nascosto", mappe);
+  $("s-mappe").setAttribute("aria-selected", mappe);
+  $("s-meteo").setAttribute("aria-selected", !mappe);
+}
+
+function riempiParametri(primo) {
+  const dom = indice.domini[$("dominio").value];
+  const prec = $("parametro").value;
+  const sel = $("parametro");
+  sel.innerHTML = "";
+  const usati = new Set();
+  for (const [nome, ids] of GRUPPI) {
+    const og = document.createElement("optgroup");
+    og.label = nome;
+    for (const id of ids) {
+      if (!dom.parametri[id]) continue;
+      og.appendChild(new Option(dom.parametri[id].titolo, id));
+      usati.add(id);
+    }
+    if (og.children.length) sel.appendChild(og);
+  }
+  const altri = Object.keys(dom.parametri).filter((i) => !usati.has(i));
+  if (altri.length) {
+    const og = document.createElement("optgroup");
+    og.label = "Altri";
+    altri.forEach((id) => og.appendChild(new Option(dom.parametri[id].titolo, id)));
+    sel.appendChild(og);
+  }
+  if (dom.parametri[prec]) sel.value = prec;
+  scegliParametro(primo === true);
+}
+
+function scegliParametro() {
+  ferma();
+  const dom = indice.domini[$("dominio").value];
+  const p = dom.parametri[$("parametro").value];
+  const quandoPrima = immagini.length ? data(immagini[posizione].valido_utc).getTime() : null;
+  immagini = p.immagini;
+  $("cursore").max = immagini.length - 1;
+  // resta sull'ora che si stava guardando (o la piu' vicina); all'inizio parte da "adesso" se e' dentro la previsione
+  let obiettivo = quandoPrima ?? Date.now();
+  let meglio = 0, dist = Infinity;
+  immagini.forEach((im, i) => { const d = Math.abs(data(im.valido_utc).getTime() - obiettivo); if (d < dist) { dist = d; meglio = i; } });
+  mostra(meglio);
+}
+
+function mostra(i, aggiornaCursore = true) {
+  if (!immagini.length) return;
+  posizione = Math.max(0, Math.min(immagini.length - 1, i));
+  const im = immagini[posizione];
+  const d = data(im.valido_utc);
+  const g = fmtGiorno.format(d);
+  $("data-ora").textContent = g.charAt(0).toUpperCase() + g.slice(1) + " (ora locale)";
+  $("ora-utc").textContent = fmtUtc.format(d) + " UTC · " + (posizione + 1) + "/" + immagini.length;
+  $("mappa").src = im.file;
+  $("mappa").alt = indice.domini[$("dominio").value].parametri[$("parametro").value].titolo;
+  if (aggiornaCursore) $("cursore").value = posizione;
+  for (const k of [posizione + 1, posizione - 1]) if (immagini[k]) new Image().src = immagini[k].file;
+}
+
+function parti() {
+  $("gioca").classList.add("on"); $("gioca").textContent = "❚❚";
+  timer = setInterval(() => { mostra(posizione + 1 >= immagini.length ? 0 : posizione + 1); }, 700);
+  immagini.forEach((im) => { new Image().src = im.file; });
+}
+function ferma() {
+  if (timer) clearInterval(timer);
+  timer = null;
+  $("gioca").classList.remove("on"); $("gioca").textContent = "▶";
+}
+carica();
+</script>
+</body>
+</html>
