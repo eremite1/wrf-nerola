@@ -42,16 +42,13 @@ FONTE = "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)"
 CREDITI = "Rilievo: Terrain Tiles (SRTM/GMTED) · Confini: ISTAT, Natural Earth · Nomi: GeoNames"
 DOMINI = (("d02", "1km", "1 km"), ("d01", "3km", "3 km"))
 
-FIG = (8.6, 6.4)   # pollici
+FIG = (7.6, 6.6)   # pollici
 DPI = 85
-AREA_MAPPA = [0.085, 0.14, 0.60, 0.72]   # sinistra, basso, larghezza, altezza (frazioni della figura)
+AREA_MAPPA = [0.03, 0.09, 0.80, 0.76]   # sinistra, basso, larghezza, altezza (frazioni della figura)
 AREA_LEGENDA = [0.725, 0.22, 0.022, 0.56]
 GRADO_PER_KM_LAT = 1 / 111.0
 
 # ---- costanti della stima di raffreddamento notturno sul prato (da tarare con le misure vere)
-DELTA_MAX = 4.0        # K: differenza massima tra la temperatura a 2 m e quella sul prato, notte serena e senza vento
-VENTO_DIM = 2.0        # m/s: a questa velocita' il raffreddamento si riduce a meta'
-SOGLIA_NOTTE = 15.0    # W/m2: sotto questa radiazione solare e' notte
 SIGMA = 5.670374e-8
 
 
@@ -88,17 +85,15 @@ def bulbo_umido(t, rh):
 
 
 def campi_gelo(d):
-    """Temperatura a 2 m, bulbo umido e temperatura stimata sul prato, [tempo, y, x], in gradi C.
-
-    Sul prato, nelle notti serene e senza vento, fa fino a 3-5 gradi meno che a 2 m. La stima riduce la temperatura
-    a 2 m di DELTA_MAX gradi moltiplicati per (1 - nuvolosita') e divisi per (1 + (vento/VENTO_DIM)^2); di giorno nulla.
+    """Campi orari per il gelo, tutti calcolati dal modello (niente stime inventate):
+    temperatura a 2 m, bulbo umido, temperatura della superficie del suolo (TSK) e classe oraria di gelo.
     La nuvolosita' (0 sereno, 1 coperto) viene dalla radiazione a onda lunga verso il basso (GLW) confrontata con
     quella del cielo sereno (formula di Brutsaert)."""
     t2 = d["T2"] - 273.15
     rh = rh2(d)
     tw = bulbo_umido(t2, rh)
-    notte = d["SWDOWN"] < SOGLIA_NOTTE
     vento = np.hypot(d["U10"], d["V10"])
+    ts = np.minimum(d["TSK"] - 273.15, t2) if "TSK" in d else t2
     if "GLW" in d:
         tk = d["T2"]
         e = d["Q2"] * (d["PSFC"] / 100.0) / (0.622 + d["Q2"])
@@ -109,8 +104,12 @@ def campi_gelo(d):
         nuv = np.where(d["GLW"] < 1.0, 0.5, nuv)   # primo istante: la radiazione non e' ancora calcolata
     else:
         nuv = np.full_like(t2, 0.5)
-    delta = np.where(notte, DELTA_MAX * (1 - nuv) / (1 + (vento / VENTO_DIM) ** 2), 0.0)
-    return t2, tw, t2 - delta
+    # classe oraria: 0 nessuna, 1 brina, 2 gelata, 3 gelata forte
+    forte = (t2 <= -3) | ((tw <= -3) & (t2 <= -1))
+    gelata = (t2 <= 0) | ((tw <= 0) & (ts <= 0))
+    brina = (ts <= 0) & (tw <= 2) & (vento <= 4) & (nuv < 0.6)
+    classe = np.select([forte, gelata, brina], [3, 2, 1], 0).astype("float64")
+    return t2, tw, ts, classe
 
 
 _CACHE_GELO = {}
@@ -128,18 +127,7 @@ def finestra(a, i, n, f):
     return f(a[i - n:i + 1], axis=0)
 
 
-# classi del rischio di gelata (codice = posizione)
-CLASSI_GELO = ["nessun rischio", "attenzione: prato ≤ 2 °C\no bulbo umido ≤ 1 °C", "gelata al suolo (brina)\naria sopra 0 °C",
-               "gelata debole\naria da 0 a -2 °C", "gelata moderata\naria da -2 a -4 °C", "gelata forte\naria sotto -4 °C"]
-
-
-def classifica_gelo(t2min, twmin, tpmin):
-    return np.select([t2min <= -4, t2min <= -2, t2min <= 0, tpmin <= 0, (tpmin <= 2) | (twmin <= 1)], [5, 4, 3, 2, 1], 0).astype("float64")
-
-
-def campi_gelo_i(d, i):
-    t2, tw, tp = gelo(d)
-    return {"t2min": finestra(t2, i, 24, np.min), "twmin": finestra(tw, i, 24, np.min), "tpmin": finestra(tp, i, 24, np.min)}
+CLASSI_GELO = ["nessuna", "brina", "gelata", "gelata forte"]
 
 
 # ---------------------------------------------------------------- definizione dei parametri
@@ -175,7 +163,7 @@ def p_pioggia(n):
 
 PARAMETRI = [
     {"id": "temperatura", "titolo": "Temperatura a 2 m", "unita": "°C", "calcola": lambda d, i: d["T2"][i] - 273.15,
-     "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True, "corr_quota": True},
+     "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
     {"id": "vento", "titolo": "Vento a 10 m", "unita": "km/h", "calcola": lambda d, i: np.hypot(d["U10"][i], d["V10"][i]) * 3.6,
      "cmap": "viridis", "limiti": (0, 60), "passo": 3, "inizio": 0, "frecce": True},
     {"id": "umidita", "titolo": "Umidità relativa a 2 m", "unita": "%", "calcola": lambda d, i: rh2(d)[i],
@@ -185,24 +173,23 @@ PARAMETRI = [
     p_pioggia(1), p_pioggia(3), p_pioggia(6), p_pioggia(12), p_pioggia(24), p_pioggia(0),
     {"id": "tmin24", "titolo": "Temperatura minima a 2 m nelle ultime 24 ore", "unita": "°C",
      "calcola": lambda d, i: finestra(gelo(d)[0], i, 24, np.min), "cmap": "RdYlBu_r", "limiti": "auto",
-     "passo": 3, "inizio": 24, "isolinee": True, "corr_quota": True},
+     "passo": 3, "inizio": 24, "isolinee": True},
     {"id": "tmax24", "titolo": "Temperatura massima a 2 m nelle ultime 24 ore", "unita": "°C",
      "calcola": lambda d, i: finestra(gelo(d)[0], i, 24, np.max), "cmap": "RdYlBu_r", "limiti": "auto",
-     "passo": 3, "inizio": 24, "isolinee": True, "corr_quota": True},
+     "passo": 3, "inizio": 24, "isolinee": True},
     {"id": "twmin24", "titolo": "Temperatura minima di bulbo umido (ultime 24 ore)", "unita": "°C",
      "calcola": lambda d, i: finestra(gelo(d)[1], i, 24, np.min), "cmap": "RdYlBu_r", "limiti": "auto",
-     "passo": 3, "inizio": 24, "isolinee": True, "corr_quota": True,
+     "passo": 3, "inizio": 24, "isolinee": True,
      "nota": "bulbo umido: temperatura a cui scende l'aria evaporando acqua; vicino a 0 °C con aria secca c'è rischio di gelo"},
-    {"id": "tprato24", "titolo": "Temperatura minima stimata sul prato (ultime 24 ore)", "unita": "°C",
+    {"id": "tprato24", "titolo": "Temperatura minima della superficie del suolo (ultime 24 ore)", "unita": "°C",
      "calcola": lambda d, i: finestra(gelo(d)[2], i, 24, np.min), "cmap": "RdYlBu_r", "limiti": "auto",
-     "passo": 3, "inizio": 24, "isolinee": True, "corr_quota": True,
-     "nota": "stima: 2 m meno il raffreddamento notturno (cielo sereno, vento debole)"},
-    {"id": "gelata", "titolo": "Rischio di gelata (ultime 24 ore)", "unita": "",
-     "calcola": lambda d, i: classifica_gelo(**campi_gelo_i(d, i)), "passo": 3, "inizio": 24,
-     "multi": campi_gelo_i, "classifica": lambda c: classifica_gelo(c["t2min"], c["twmin"], c["tpmin"]),
-     "classi": {"bordi": [0.5, 1.5, 2.5, 3.5, 4.5], "colori": ["#ffffff", "#ffe066", "#8fd0f0", "#4f9be0", "#2a5fc7", "#6a2c91"],
+     "passo": 3, "inizio": 24, "isolinee": True,
+     "nota": "temperatura della superficie del suolo calcolata dal modello (WRF, campo TSK)"},
+    {"id": "gelata", "titolo": "Brina e gelate (ultime 24 ore)", "unita": "",
+     "calcola": lambda d, i: finestra(gelo(d)[3], i, 24, np.max), "passo": 3, "inizio": 24,
+     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#ffffff", "#8fd8f2", "#2f6fd6", "#6a2c91"],
                 "etichette": CLASSI_GELO, "nascondi": {0}},
-     "scala": 1, "etichetta_dato": "Rischio di gelata", "nota": "indice orientativo: vedi la spiegazione nella pagina"},
+     "scala": 1, "etichetta_dato": "Brina / gelata", "nota": "classe peggiore nelle 24 ore, da temperatura a 2 m, bulbo umido, suolo, cielo e vento"},
     {"id": "nebbia", "titolo": "Nebbia: visibilità stimata", "unita": "",
      "calcola": lambda d, i: visibilita(d)[i], "passo": 3, "inizio": 3, "serve": "QCLOUD1",
      "classi": {"bordi": [200, 500, 1000, 5000], "colori": ["#4b4b4b", "#7d7d7d", "#b0b0b0", "#dcdcdc", "#ffffff"],
@@ -359,9 +346,9 @@ def posiziona_etichette(cand, lon, lat, massimo, estensione=None):
             continue
         for dx, dy, ha, va in posizioni:
             t = ax.annotate(p["nome"], (p["lon"], p["lat"]), textcoords="offset points", xytext=(dx, dy), ha=ha, va=va,
-                            fontsize=9.5 if grande else 8, fontweight="bold" if grande else "normal")
+                            fontsize=9.5 if grande else 8.5, fontweight="bold")
             bb = t.get_window_extent(rend)
-            bb = matplotlib.transforms.Bbox.from_extents(bb.x0 - 2, bb.y0 - 1, bb.x1 + 2, bb.y1 + 1)
+            bb = matplotlib.transforms.Bbox.from_extents(bb.x0 - 4, bb.y0 - 3, bb.x1 + 4, bb.y1 + 3)
             t.remove()
             if not sovrappone(bb):
                 occupati += [bb, marcatore]
@@ -389,7 +376,7 @@ def disegna(d, p, i, dom, etichetta, corsa, ctx, cartella, lim):
     z = np.array(p["calcola"](d, i), dtype="float64")
     if p.get("terra") and "landmask" in d:
         z = np.where(d["landmask"] > 0.5, z, np.nan)
-    fig = plt.figure(figsize=FIG)
+    fig = plt.figure(figsize=FIG, facecolor="white")
     ax = fig.add_axes(AREA_MAPPA)
     cax = fig.add_axes(AREA_LEGENDA)
     if ctx["rilievo"] is not None:
@@ -399,9 +386,7 @@ def disegna(d, p, i, dom, etichetta, corsa, ctx, cartella, lim):
     f = ctx["sovra"]
     cl = p.get("classi")
     if cl:
-        campi = p["multi"](d, i) if p.get("multi") else {"z": z}
-        fine = {k: sovra(v, f) for k, v in campi.items()}
-        codice = p["classifica"](fine) if p.get("classifica") else np.digitize(fine["z"], cl["bordi"]).astype("float64")
+        codice = np.digitize(sovra(z, f), cl["bordi"]).astype("float64")
         mostrate = [k for k in range(len(cl["colori"])) if k not in cl["nascondi"]]
         nuovo = {k: n for n, k in enumerate(mostrate)}
         mappa = np.full(codice.shape, np.nan)
@@ -415,7 +400,7 @@ def disegna(d, p, i, dom, etichetta, corsa, ctx, cartella, lim):
         cb = fig.colorbar(sm, cax=cax)
         cb.set_ticks(range(len(mostrate)))
         cb.set_ticklabels([cl["etichette"][k] for k in mostrate])
-        cb.ax.tick_params(labelsize=8)
+        cb.ax.tick_params(labelsize=9, length=0)
         if p["unita"]:
             cb.set_label(p["unita"])
     else:
@@ -443,27 +428,45 @@ def disegna(d, p, i, dom, etichetta, corsa, ctx, cartella, lim):
     ax.set_xlim(lon.min(), lon.max())
     ax.set_ylim(lat.min(), lat.max())
     ax.set_aspect(1.0 / np.cos(np.radians(42.1)))
-    ax.tick_params(labelsize=8, colors="#555555", length=3)
-    ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.1f}°E".replace(".", ",")))
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.1f}°N".replace(".", ",")))
+    ax.set_xticks([])
+    ax.set_yticks([])
     for s_ in ax.spines.values():
-        s_.set_color("#888888")
-        s_.set_linewidth(0.8)
+        s_.set_color("#111111")
+        s_.set_linewidth(1.3)
     for nome, la, lo, dx, dy, ha, va in ctx["etichette"]:
         grande = nome == "Nerola"
-        ax.plot([lo], [la], marker="*" if grande else "o", color="#d6341f" if grande else "#222222", markersize=12 if grande else 3.6,
+        ax.plot([lo], [la], marker="*" if grande else "o", color="#d6341f" if grande else "#111111", markersize=12 if grande else 4.2,
                 markeredgecolor="white", markeredgewidth=0.7, zorder=5)
-        t = ax.annotate(nome, (lo, la), textcoords="offset points", xytext=(dx, dy), ha=ha, va=va, fontsize=9.5 if grande else 8,
-                        fontweight="bold" if grande else "normal", color="#111111", zorder=6)
-        t.set_path_effects([pe.withStroke(linewidth=2.2, foreground="white")])
+        ax.annotate(nome, (lo, la), textcoords="offset points", xytext=(dx, dy), ha=ha, va=va, fontsize=9.5 if grande else 8.5,
+                    fontweight="bold", color="#111111", zorder=6,
+                    bbox=dict(boxstyle="square,pad=0.12", facecolor="white", edgecolor="none", alpha=0.85))
+    ax.text(0.985, 0.02, "www.meteonerola.it", transform=ax.transAxes, ha="right", va="bottom", fontsize=9.5, fontweight="bold",
+            color="#111111", zorder=7, bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#333333", linewidth=0.8, alpha=0.92))
     utc, loc = quando(d["tempi"][i])
+    utc0 = quando(d["tempi"][0])[0]
+    ore = int(round((utc - utc0).total_seconds() / 3600))
     c = datetime.strptime(corsa, "%Y%m%d%H")
-    fig.text(0.085, 0.955, f"{p['titolo']}", fontsize=14, fontweight="bold", ha="left", va="center", color="#1b2430")
-    fig.text(0.085, 0.915, f"{utc:%d/%m/%Y %H:%M} UTC ({loc:%H:%M} ora locale)  ·  dominio {etichetta}  ·  ECMWF {c:%d/%m %H} UTC",
-             fontsize=9, ha="left", va="center", color="#5b6775")
-    nota = p.get("nota", "")
-    fig.text(0.085, 0.012, (nota + "\n" if nota else "") + FONTE + "\n" + CREDITI, ha="left", va="bottom", fontsize=6.8, color="#6b7480")
+    # disposizione: mappa in alto a sinistra sotto il titolo, barra dei colori a destra; il gruppo e' centrato nella figura
     ax.apply_aspect()
+    bx = ax.get_position()
+    larg_etichette = 0.15 if cl else 0.085
+    totale = bx.width + 0.022 + 0.024 + larg_etichette
+    x0 = max(0.015, (1 - totale) / 2)
+    y0 = AREA_MAPPA[1] + AREA_MAPPA[3] - bx.height
+    ax.set_position([x0, y0, bx.width, bx.height])
+    cax.set_position([x0 + bx.width + 0.022, y0 + 0.01, 0.024, bx.height - 0.02])
+    xr = x0 + bx.width + 0.022 + 0.024 + larg_etichette * 0.55
+    gg = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"][loc.weekday()]
+    mesi = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
+    tit = p["titolo"]
+    dim = 20 if len(tit) <= 24 else 16 if len(tit) <= 38 else 13
+    fig.text(x0, 0.945, tit, fontsize=dim, fontweight="bold", ha="left", va="center", color="#111111")
+    fig.text(x0, 0.885, f"{gg} {loc.day} {mesi[loc.month - 1]}, ore {loc:%H:%M}", fontsize=13, ha="left", va="center", color="#222222")
+    fig.text(xr, 0.945, f"WRF {etichetta}", fontsize=16, fontweight="bold", ha="right", va="center", color="#1d4e89")
+    fig.text(xr, 0.885, f"+{ore}h", fontsize=13, fontweight="bold", ha="right", va="center", color="#555555")
+    nota = p.get("nota", "")
+    fig.text(x0, 0.012, (nota + "\n" if nota else "") + f"{FONTE} · corsa {c:%d/%m %H} UTC · ora italiana ({utc:%H} UTC)\n" + CREDITI,
+             ha="left", va="bottom", fontsize=6.8, color="#6b7480", style="italic")
     pos = ax.get_position()
     layout = {"asse": [round(pos.x0, 5), round(pos.y0, 5), round(pos.width, 5), round(pos.height, 5)],
               "pixel": [int(round(FIG[0] * DPI)), int(round(FIG[1] * DPI))]}
@@ -496,7 +499,7 @@ def campi_serie(d):
               ("PIOGGIA", "Pioggia dall'inizio", "mm", 10, pr - pr[0]),
               ("PRESS", "Pressione al livello del mare", "hPa", 10, pressione_mare(d)),
               ("TW", "Temperatura di bulbo umido", "°C", 10, gelo(d)[1]),
-              ("TPRATO", "Temperatura stimata sul prato", "°C", 10, gelo(d)[2])]
+              ("TPRATO", "Temperatura della superficie del suolo", "°C", 10, gelo(d)[2])]
     if "TSLB" in d:
         elenco.append(("TSUOLO", "Temperatura del suolo 0-10 cm", "°C", 10, d["TSLB"][:, 0] - 273.15))
     if "SMOIS" in d:
@@ -610,7 +613,7 @@ def main():
         lim = limiti_automatici(d, parametri, frames)
         piccolo = etichetta == "1 km"
         cand = candidati(sf, d["lat"], d["lon"], vicini=piccolo)
-        etichette = posiziona_etichette(cand, d["lon"], d["lat"], 30 if piccolo else 24)
+        etichette = posiziona_etichette(cand, d["lon"], d["lat"], 16 if piccolo else 14)
         print(dom, "etichette:", len(etichette), "su", len(cand), "candidati")
         lon0, lon1, lat0, lat1 = float(d["lon"].min()), float(d["lon"].max()), float(d["lat"].min()), float(d["lat"].max())
         pezzo = ritaglia_dem(dem, lon0, lon1, lat0, lat1)
@@ -636,8 +639,6 @@ def main():
             (cart_dati / f"{p['id']}.bin").write_bytes(np.stack(valori).tobytes())
             meta = {"titolo": p["titolo"], "unita": p["unita"], "immagini": files, "dati": f"dati/{cartella_dom}/{p['id']}.bin",
                     "scala": p["scala"], "unita_dato": p["unita_dato"], "etichetta_dato": p["etichetta_dato"]}
-            if p.get("corr_quota"):
-                meta["corr_quota"] = True
             if p.get("classi") and p["scala"] == 1 and p["unita_dato"] == "":
                 meta["classi_etichette"] = [e.replace("\n", ", ") for e in p["classi"]["etichette"]]
             voce["parametri"][p["id"]] = meta
@@ -654,10 +655,6 @@ def main():
             "serie": {"file": f"dati/{cartella_dom}/serie.bin", "n_t": n, "tempi": [quando(t)[0].strftime("%Y-%m-%dT%H:%MZ") for t in d["tempi"]],
                       "campi": [{"id": c[0], "titolo": c[1], "unita": c[2], "scala": c[3]} for c in campi]},
             "luoghi": luoghi})
-        if pezzo is not None:   # quota reale su griglia regolare lon/lat, per la correzione di temperatura nella pagina
-            sub, passo, li, ai = pezzo
-            sub.astype("<i2").tofile(cart_dati / "quota.bin")
-            voce["quota"] = {"file": f"dati/{cartella_dom}/quota.bin", "lon0": li, "lat0": ai, "passo": passo, "nx": int(sub.shape[1]), "ny": int(sub.shape[0])}
         indice["domini"][cartella_dom] = voce
         print(dom, "parametri:", len(parametri), "immagini:", sum(len(v["immagini"]) for v in voce["parametri"].values()))
         salva = {k: v for k, v in d.items() if k != "tempi"}
