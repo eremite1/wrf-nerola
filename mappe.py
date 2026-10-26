@@ -9,6 +9,7 @@ Scrive:
   meteogramma_nerola.png, d01_tutto.npz, d02_tutto.npz
 """
 import argparse
+import io
 import json
 import os
 import sys
@@ -25,6 +26,7 @@ import matplotlib.patheffects  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.collections import LineCollection  # noqa: E402
 from matplotlib.colors import BoundaryNorm, ListedColormap  # noqa: E402
+from PIL import Image  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sfondo as sfondo_mod  # noqa: E402
@@ -231,8 +233,12 @@ def disegna(d, p, i, dom, etichetta, corsa, sfondo, paesi, cartella, lim):
     nota = p.get("nota", "")
     ax.text(0.5, -0.12, (nota + "\n" if nota else "") + FONTE, transform=ax.transAxes, ha="center", va="top", fontsize=7.5, color="0.35")
     nome_file = f"{cartella}/{utc:%Y%m%d_%H}.png"
-    fig.savefig(nome_file, dpi=85, bbox_inches="tight")
+    buf = io.BytesIO()
+    fig.savefig(buf, dpi=85, bbox_inches="tight", format="png")
     plt.close(fig)
+    buf.seek(0)
+    # palette a 128 colori: le immagini pesano un terzo e per delle mappe non si nota
+    Image.open(buf).convert("RGB").quantize(128, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(nome_file, optimize=True)
     return f"{utc:%Y%m%d_%H}.png", utc
 
 
