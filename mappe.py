@@ -183,13 +183,50 @@ def disegna_sfondo(ax, sfondo):
     linee("costa", colors="k", linewidths=1.0)
 
 
+FIG = (8.6, 6.4)   # pollici
+DPI = 85
+AREA_MAPPA = [0.085, 0.14, 0.60, 0.72]   # sinistra, basso, larghezza, altezza (frazioni della figura)
+AREA_LEGENDA = [0.715, 0.22, 0.022, 0.56]
+
+# aggiunte ai parametri: linee di livello, e come mostrare il valore quando si passa il puntatore sulla pagina web
+EXTRA = {
+    "temperatura": {"isolinee": True},
+    "tmin24": {"isolinee": True},
+    "tmax24": {"isolinee": True},
+    "suolo_temp": {"isolinee": True},
+    "pressione": {"isolinee": True},
+    "gelata": {"unita_dato": "°C", "etichetta_dato": "Temperatura minima 24 h"},
+    "nebbia": {"unita_dato": "m", "etichetta_dato": "Visibilità stimata", "scala": 1, "clip": 30000},
+}
+for _p in PARAMETRI:
+    _p.pop("quote", None)  # niente curve di livello del terreno: sporcano la mappa
+    _p.update(EXTRA.get(_p["id"], {}))
+
+
+def passo_isolinee(vmin, vmax):
+    for passo in (0.5, 1, 2, 4, 5, 10, 20):
+        if (vmax - vmin) / passo <= 8:
+            return passo
+    return 20
+
+
+def leviga(z, volte=2):
+    """Media mobile 3x3: le linee di livello sono piu' pulite (a 1 km il campo e' molto irregolare)."""
+    z = np.array(z, dtype="float64")
+    for _ in range(volte):
+        p = np.pad(z, 1, mode="edge")
+        z = sum(p[a:a + z.shape[0], b:b + z.shape[1]] for a in range(3) for b in range(3)) / 9.0
+    return z
+
+
 def disegna(d, p, i, dom, etichetta, corsa, sfondo, paesi, cartella, lim):
     lon, lat, hgt = d["lon"], d["lat"], d["hgt"]
     z = np.array(p["calcola"](d, i), dtype="float64")
     if p.get("terra") and "landmask" in d:
         z = np.where(d["landmask"] > 0.5, z, np.nan)
-    fig, ax = plt.subplots(figsize=(7.6, 6.4))
-    mappa_col = None
+    fig = plt.figure(figsize=FIG)
+    ax = fig.add_axes(AREA_MAPPA)
+    cax = fig.add_axes(AREA_LEGENDA)
     cl = p.get("classi")
     if cl:
         mostrate = [k for k in range(len(cl["colori"])) if k not in cl["nascondi"]]
@@ -199,7 +236,7 @@ def disegna(d, p, i, dom, etichetta, corsa, sfondo, paesi, cartella, lim):
         classe[np.isnan(z)] = np.nan
         cmap = ListedColormap([cl["colori"][k] for k in mostrate])
         mappa_col = ax.pcolormesh(lon, lat, classe, cmap=cmap, vmin=-0.5, vmax=len(mostrate) - 0.5, shading="auto")
-        cb = fig.colorbar(mappa_col, ax=ax, shrink=0.8, pad=0.02)
+        cb = fig.colorbar(mappa_col, cax=cax)
         cb.set_ticks(range(len(mostrate)))
         cb.set_ticklabels([cl["etichette"][k] for k in mostrate])
         if p["unita"]:
@@ -207,10 +244,17 @@ def disegna(d, p, i, dom, etichetta, corsa, sfondo, paesi, cartella, lim):
     else:
         vmin, vmax = lim[p["id"]] if p.get("limiti") == "auto" else p.get("limiti")
         mappa_col = ax.pcolormesh(lon, lat, z, cmap=p["cmap"], vmin=vmin, vmax=vmax, shading="auto")
-        cb = fig.colorbar(mappa_col, ax=ax, shrink=0.8, pad=0.02, extend="both" if p.get("limiti") != "auto" else "neither")
+        cb = fig.colorbar(mappa_col, cax=cax, extend="both" if p.get("limiti") != "auto" else "neither")
         cb.set_label(p["unita"])
-    if p.get("quote"):
-        ax.contour(lon, lat, hgt, levels=np.arange(200, 3000, 200), colors="k", linewidths=0.3, alpha=0.4)
+        if p.get("isolinee") and p.get("limiti") == "auto":
+            passo = passo_isolinee(vmin, vmax)
+            livelli = np.arange(np.ceil(vmin / passo) * passo, vmax + 1e-9, passo)
+            zs = leviga(np.nan_to_num(z, nan=np.nanmean(z)))
+            if len(livelli) and np.nanmin(zs) < livelli.max() and np.nanmax(zs) > livelli.min():
+                cs = ax.contour(lon, lat, zs, levels=livelli, colors="#1a1a1a", linewidths=0.7, alpha=0.75)
+                testi = ax.clabel(cs, fmt=lambda v: f"{v:g}", fontsize=8, inline=True, inline_spacing=3)
+                for t in testi:
+                    t.set_path_effects([matplotlib.patheffects.withStroke(linewidth=1.8, foreground="white")])
     if p.get("frecce"):
         s = 4 if etichetta == "3 km" else 3
         ax.quiver(lon[::s, ::s], lat[::s, ::s], d["U10"][i][::s, ::s], d["V10"][i][::s, ::s], color="w", scale=120, width=0.003)
@@ -228,18 +272,47 @@ def disegna(d, p, i, dom, etichetta, corsa, sfondo, paesi, cartella, lim):
         t.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2, foreground="white")])
     utc, loc = quando(d["tempi"][i])
     c = datetime.strptime(corsa, "%Y%m%d%H")
-    fig.suptitle(f"{p['titolo']}  ({etichetta})", fontsize=13, fontweight="bold", y=0.98)
+    fig.suptitle(f"{p['titolo']}  ({etichetta})", fontsize=13, fontweight="bold", y=0.975)
     ax.set_title(f"valido {utc:%d/%m/%Y %H:%M} UTC ({loc:%H:%M} ora locale)  |  corsa ECMWF {c:%d/%m %H} UTC", fontsize=9)
     nota = p.get("nota", "")
-    ax.text(0.5, -0.12, (nota + "\n" if nota else "") + FONTE, transform=ax.transAxes, ha="center", va="top", fontsize=7.5, color="0.35")
+    fig.text(0.5, 0.012, (nota + "\n" if nota else "") + FONTE, ha="center", va="bottom", fontsize=7.5, color="0.35")
+    ax.apply_aspect()
+    pos = ax.get_position()
+    layout = {"asse": [round(pos.x0, 5), round(pos.y0, 5), round(pos.width, 5), round(pos.height, 5)],
+              "pixel": [int(round(FIG[0] * DPI)), int(round(FIG[1] * DPI))]}
     nome_file = f"{cartella}/{utc:%Y%m%d_%H}.png"
     buf = io.BytesIO()
-    fig.savefig(buf, dpi=85, bbox_inches="tight", format="png")
+    fig.savefig(buf, dpi=DPI, format="png")
     plt.close(fig)
     buf.seek(0)
-    # palette a 128 colori: le immagini pesano un terzo e per delle mappe non si nota
-    Image.open(buf).convert("RGB").quantize(128, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(nome_file, optimize=True)
-    return f"{utc:%Y%m%d_%H}.png", utc
+    # palette a 256 colori (ottimizzata): le immagini pesano un terzo e la legenda resta fedele
+    Image.open(buf).convert("RGB").quantize(256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE).save(nome_file, optimize=True)
+    return f"{utc:%Y%m%d_%H}.png", utc, z, layout
+
+
+def quantizza(z, scala=10, clip=None):
+    """Numeri interi a 16 bit per la pagina web (-32768 = nessun dato)."""
+    z = np.asarray(z, dtype="float64")
+    if clip is not None:
+        z = np.minimum(z, clip)
+    q = np.round(z * scala)
+    q = np.where(np.isfinite(q), np.clip(q, -32767, 32767), -32768)
+    return q.astype("<i2")
+
+
+def campi_serie(d):
+    """Campi orari per il meteogramma di un punto qualsiasi: (id, titolo, unita, scala, array [t, y, x])."""
+    pr = uscite.pioggia(d)
+    elenco = [("T2", "Temperatura a 2 m", "°C", 10, d["T2"] - 273.15),
+              ("UMID", "Umidità relativa a 2 m", "%", 10, rh2(d)),
+              ("VENTO", "Vento a 10 m", "km/h", 10, np.hypot(d["U10"], d["V10"]) * 3.6),
+              ("PIOGGIA", "Pioggia dall'inizio", "mm", 10, pr - pr[0]),
+              ("PRESS", "Pressione al livello del mare", "hPa", 10, pressione_mare(d))]
+    if "TSLB" in d:
+        elenco.append(("TSUOLO", "Temperatura del suolo 0-10 cm", "°C", 10, d["TSLB"][:, 0] - 273.15))
+    if "SMOIS" in d:
+        elenco.append(("UMSUOLO", "Umidità del suolo 0-10 cm", "% vol", 10, d["SMOIS"][:, 0] * 100))
+    return elenco
 
 
 def limiti_automatici(d, parametri, frames):
@@ -343,14 +416,38 @@ def main():
         paesi = scegli_paesi(sf, d["lat"], d["lon"], 5.0 if etichetta == "1 km" else 16.0, 30 if etichetta == "1 km" else 26,
                               vicini=etichetta == "1 km")
         voce = {"etichetta": etichetta, "parametri": {}}
+        ny, nx = d["lat"].shape
+        cart_dati = out / "dati" / cartella_dom
+        cart_dati.mkdir(parents=True, exist_ok=True)
+        layout = None
         for p in parametri:
             cart = out / "mappe" / cartella_dom / p["id"]
             cart.mkdir(parents=True, exist_ok=True)
-            files = []
+            files, valori = [], []
             for i in frames[p["id"]]:
-                nome, utc = disegna(d, p, i, dom, etichetta, a.corsa, sf, paesi, str(cart), lim)
+                nome, utc, z, lay = disegna(d, p, i, dom, etichetta, a.corsa, sf, paesi, str(cart), lim)
+                layout = layout or lay
                 files.append({"file": f"mappe/{cartella_dom}/{p['id']}/{nome}", "valido_utc": utc.strftime("%Y-%m-%dT%H:%MZ")})
-            voce["parametri"][p["id"]] = {"titolo": p["titolo"], "unita": p["unita"], "immagini": files}
+                valori.append(quantizza(z, p.get("scala", 10), p.get("clip")).reshape(-1))
+            (cart_dati / f"{p['id']}.bin").write_bytes(np.stack(valori).tobytes())
+            voce["parametri"][p["id"]] = {
+                "titolo": p["titolo"], "unita": p["unita"], "immagini": files,
+                "dati": f"dati/{cartella_dom}/{p['id']}.bin", "scala": p.get("scala", 10),
+                "unita_dato": p.get("unita_dato", p["unita"]), "etichetta_dato": p.get("etichetta_dato", p["titolo"])}
+        # griglia (per trovare il punto sotto il puntatore) e serie orarie (per il meteogramma di un punto)
+        np.concatenate([d["lat"].reshape(-1), d["lon"].reshape(-1), d["hgt"].reshape(-1)]).astype("<f4").tofile(cart_dati / "griglia.bin")
+        campi = campi_serie(d)
+        serie = np.stack([quantizza(arr, sc).reshape(arr.shape[0], -1) for _, _, _, sc, arr in campi])  # [campo, t, punto]
+        np.ascontiguousarray(serie.transpose(2, 0, 1)).tofile(cart_dati / "serie.bin")                    # [punto, campo, t]
+        luoghi = [{"nome": nome, "lat": round(la, 4), "lon": round(lo, 4)}
+                  for nome, la, lo in scegli_paesi(sf, d["lat"], d["lon"], 2.5, 120, vicini=True)]
+        voce.update({
+            "layout": {**layout, "estensione": [float(d["lon"].min()), float(d["lon"].max()), float(d["lat"].min()), float(d["lat"].max())],
+                       "ny": int(ny), "nx": int(nx)},
+            "griglia": f"dati/{cartella_dom}/griglia.bin",
+            "serie": {"file": f"dati/{cartella_dom}/serie.bin", "n_t": n, "tempi": [quando(t)[0].strftime("%Y-%m-%dT%H:%MZ") for t in d["tempi"]],
+                      "campi": [{"id": c[0], "titolo": c[1], "unita": c[2], "scala": c[3]} for c in campi]},
+            "luoghi": luoghi})
         indice["domini"][cartella_dom] = voce
         print(dom, "parametri:", len(parametri), "immagini:", sum(len(v["immagini"]) for v in voce["parametri"].values()))
         salva = {k: v for k, v in d.items() if k != "tempi"}

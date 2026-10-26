@@ -38,12 +38,31 @@
                     border-radius: 10px; font-size: 1.1rem; cursor: pointer; }
   .comandi button.on { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); }
   input[type=range] { flex: 1; height: 44px; accent-color: var(--accento); }
-  .tacche { display: flex; justify-content: space-between; color: var(--muto); font-size: .72rem; padding: 0 52px 0 108px; }
   .immagine { text-align: center; margin-top: 6px; min-height: 240px; }
   .immagine img { max-width: 100%; height: auto; border-radius: 8px; background: #fff; }
   .errore { padding: 14px; border: 1px solid #c0392b; border-radius: 10px; color: #c0392b; background: var(--card); }
   footer { max-width: 980px; margin: 0 auto; padding: 0 16px 30px; color: var(--muto); font-size: .78rem; }
   footer a { color: var(--accento); }
+  #contenitore { display: inline-block; position: relative; max-width: 100%; line-height: 0; }
+  #contenitore img { display: block; }
+  .immagine img { cursor: crosshair; }
+  .tip { position: fixed; z-index: 20; pointer-events: none; background: rgba(20,28,38,.94); color: #fff; padding: 6px 9px;
+         border-radius: 8px; font-size: .82rem; line-height: 1.3; max-width: 260px; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  .tip b { font-size: 1rem; }
+  .tip small { opacity: .8; display: block; }
+  .marcatore { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border: 2px solid #fff; border-radius: 50%;
+               box-shadow: 0 0 0 2px #d6341f, inset 0 0 0 2px #d6341f; pointer-events: none; }
+  .suggerimento { color: var(--muto); font-size: .8rem; margin: 4px 0 0; text-align: center; }
+  #punto { margin-top: 12px; }
+  #punto h2 { font-size: 1rem; margin: 0 0 2px; }
+  #punto .sub { color: var(--muto); font-size: .82rem; margin-bottom: 8px; }
+  #punto .chiudi { float: right; border: 1px solid var(--linea); background: var(--card); color: var(--testo); border-radius: 8px; padding: 4px 10px; cursor: pointer; font: inherit; }
+  .graf { margin: 6px 0 12px; }
+  .graf h3 { font-size: .85rem; margin: 0; color: var(--muto); font-weight: 600; }
+  .graf svg { width: 100%; height: auto; display: block; }
+  .graf text { fill: var(--muto); font-size: 11px; }
+  .graf .griglia { stroke: var(--linea); stroke-width: 1; }
+  .graf .giorno { stroke: var(--muto); stroke-width: 1; stroke-dasharray: 3 3; }
   .nascosto { display: none; }
 </style>
 </head>
@@ -70,8 +89,11 @@
       <button id="avanti" aria-label="Ora successiva">▶|</button>
       <input type="range" id="cursore" min="0" max="0" value="0" aria-label="Scegli l'ora">
     </div>
-    <div class="immagine"><img id="mappa" alt="Mappa meteo" decoding="async"></div>
+    <div class="immagine" id="contenitore"><img id="mappa" alt="Mappa meteo" decoding="async"><div class="marcatore nascosto" id="marcatore"></div></div>
+    <p class="suggerimento" id="suggerimento">Passa sulla mappa per leggere il valore; clicca (o tocca) un punto per il meteogramma di quel punto. Tasto destro sull'immagine per copiarla o salvarla.</p>
+    <div id="punto" class="nascosto"></div>
   </section>
+  <div class="tip nascosto" id="tip"></div>
 
   <section id="vista-meteo" class="card nascosto">
     <div class="immagine"><img id="meteogramma" alt="Meteogramma di Nerola" decoding="async"></div>
@@ -93,6 +115,8 @@ const GRUPPI = [
 ];
 const $ = (id) => document.getElementById(id);
 let indice = null, immagini = [], posizione = 0, timer = null;
+let griglia = null, valoriParam = null, puntoScelto = null;
+const cacheBin = {}, cacheSerie = {};
 const fmtGiorno = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
 const fmtUtc = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
 
@@ -114,7 +138,7 @@ async function carica() {
   $("info").textContent = `Corsa ECMWF del ${c.slice(6, 8)}/${c.slice(4, 6)}/${c.slice(0, 4)} ore ${c.slice(8, 10)} UTC · aggiornata ${indice.creato.replace("T", " ").replace("Z", " UTC")}`;
   const dom = $("dominio");
   for (const [k, v] of Object.entries(indice.domini)) dom.add(new Option("Dominio " + v.etichetta + (k === "1km" ? " (zona di Nerola)" : " (area più ampia)"), k));
-  dom.onchange = riempiParametri;
+  dom.onchange = () => { puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); };
   $("parametro").onchange = scegliParametro;
   $("cursore").oninput = () => mostra(+$("cursore").value, false);
   $("indietro").onclick = () => { ferma(); mostra(posizione - 1); };
@@ -129,6 +153,11 @@ async function carica() {
   $("s-meteo").onclick = () => scheda(false);
   $("meteogramma").src = "meteogramma_nerola.png?v=" + encodeURIComponent(indice.creato);
   riempiParametri(true);
+  caricaGriglia().catch(() => {});
+  const img = $("mappa");
+  img.addEventListener("mousemove", (e) => sulPuntatore(e, false));
+  img.addEventListener("mouseleave", () => $("tip").classList.add("nascosto"));
+  img.addEventListener("click", (e) => sulPuntatore(e, true));
 }
 
 function scheda(mappe) {
@@ -137,6 +166,33 @@ function scheda(mappe) {
   $("vista-meteo").classList.toggle("nascosto", mappe);
   $("s-mappe").setAttribute("aria-selected", mappe);
   $("s-meteo").setAttribute("aria-selected", !mappe);
+}
+
+function dominioAttuale() { return indice.domini[$("dominio").value]; }
+
+async function leggiBin(url, tipo) {
+  if (cacheBin[url]) return cacheBin[url];
+  const r = await fetch(url + "?v=" + encodeURIComponent(indice.creato));
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const buf = await r.arrayBuffer();
+  const out = tipo === "f4" ? new Float32Array(buf) : new Int16Array(buf);
+  cacheBin[url] = out;
+  return out;
+}
+
+async function caricaGriglia() {
+  griglia = null;
+  const D = dominioAttuale();
+  const g = await leggiBin(D.griglia, "f4");
+  const n = D.layout.ny * D.layout.nx;
+  if (dominioAttuale() === D) griglia = { lat: g.subarray(0, n), lon: g.subarray(n, 2 * n), hgt: g.subarray(2 * n, 3 * n), n };
+}
+
+async function caricaValori() {
+  valoriParam = null;
+  const id = $("parametro").value, D = dominioAttuale();
+  const v = await leggiBin(D.parametri[id].dati, "i2");
+  if ($("parametro").value === id && dominioAttuale() === D) valoriParam = v;
 }
 
 function riempiParametri(primo) {
@@ -172,6 +228,7 @@ function scegliParametro() {
   const p = dom.parametri[$("parametro").value];
   const quandoPrima = immagini.length ? data(immagini[posizione].valido_utc).getTime() : null;
   immagini = p.immagini;
+  caricaValori().catch(() => {});
   $("cursore").max = immagini.length - 1;
   // resta sull'ora che si stava guardando (o la piu' vicina); all'inizio parte da "adesso" se e' dentro la previsione
   let obiettivo = quandoPrima ?? Date.now();
@@ -204,6 +261,173 @@ function ferma() {
   timer = null;
   $("gioca").classList.remove("on"); $("gioca").textContent = "▶";
 }
+
+// ---------------------------------------------------------------- valori sotto il puntatore e meteogramma di un punto
+const nf1 = new Intl.NumberFormat("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const nf0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 });
+
+function posizioneSuMappa(e) {
+  const D = dominioAttuale(), L = D.layout, r = $("mappa").getBoundingClientRect();
+  const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+  const ax = (fx - L.asse[0]) / L.asse[2], ay = ((1 - fy) - L.asse[1]) / L.asse[3];
+  if (ax < 0 || ax > 1 || ay < 0 || ay > 1) return null;
+  const [lo0, lo1, la0, la1] = L.estensione;
+  return { lon: lo0 + ax * (lo1 - lo0), lat: la0 + ay * (la1 - la0), fx, fy };
+}
+
+function puntoPiuVicino(lat, lon) {
+  if (!griglia) return -1;
+  const c = Math.cos(lat * Math.PI / 180);
+  let m = Infinity, k = -1;
+  for (let i = 0; i < griglia.n; i++) {
+    const dy = griglia.lat[i] - lat, dx = (griglia.lon[i] - lon) * c, d = dy * dy + dx * dx;
+    if (d < m) { m = d; k = i; }
+  }
+  return k;
+}
+
+function luogoVicino(lat, lon) {
+  const D = dominioAttuale(), c = Math.cos(lat * Math.PI / 180);
+  let m = Infinity, nome = null;
+  for (const l of D.luoghi || []) {
+    const km = 111 * Math.hypot(l.lat - lat, (l.lon - lon) * c);
+    if (km < m) { m = km; nome = l.nome; }
+  }
+  return nome ? { nome, km: m } : null;
+}
+
+function descrizioneLuogo(lat, lon) {
+  const l = luogoVicino(lat, lon);
+  if (!l) return `${lat.toFixed(3)}°N ${lon.toFixed(3)}°E`;
+  return l.km < 1.5 ? l.nome : `${nf1.format(l.km)} km da ${l.nome}`;
+}
+
+function sulPuntatore(e, clic) {
+  const tip = $("tip");
+  const pos = posizioneSuMappa(e);
+  if (!pos || !griglia || !valoriParam) { tip.classList.add("nascosto"); return; }
+  const k = puntoPiuVicino(pos.lat, pos.lon);
+  if (k < 0) return;
+  const P = dominioAttuale().parametri[$("parametro").value];
+  const raw = valoriParam[posizione * griglia.n + k];
+  const luogo = descrizioneLuogo(griglia.lat[k], griglia.lon[k]);
+  let riga1;
+  if (raw === -32768) riga1 = "<b>nessun dato</b>";
+  else {
+    const v = raw / P.scala;
+    riga1 = `<b>${(P.scala >= 10 ? nf1 : nf0).format(v)} ${P.unita_dato || ""}</b>`;
+  }
+  tip.innerHTML = `${riga1}<small>${P.etichetta_dato}</small><small>${luogo} · quota ${nf0.format(griglia.hgt[k])} m</small>` +
+                  (clic ? "" : "<small>clicca per il meteogramma</small>");
+  tip.classList.remove("nascosto");
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + w > window.innerWidth - 4) x = e.clientX - w - 14;
+  if (y + h > window.innerHeight - 4) y = e.clientY - h - 14;
+  tip.style.left = Math.max(4, x) + "px"; tip.style.top = Math.max(4, y) + "px";
+  if (clic) { ferma(); scegliPunto(k, pos.fx, pos.fy); }
+}
+
+async function leggiSerie(k) {
+  const D = dominioAttuale(), S = D.serie, nf = S.campi.length, nt = S.n_t;
+  const url = S.file + "?v=" + encodeURIComponent(indice.creato);
+  const inizio = k * nf * nt * 2, fine = inizio + nf * nt * 2 - 1;
+  if (cacheSerie[S.file]) return new Int16Array(cacheSerie[S.file].slice(inizio, fine + 1));
+  const r = await fetch(url, { headers: { Range: `bytes=${inizio}-${fine}` } });
+  if (r.status === 206) return new Int16Array(await r.arrayBuffer());
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const tutto = await r.arrayBuffer();   // il server non ha accettato l'intervallo: ho tutto il file
+  cacheSerie[S.file] = tutto;
+  return new Int16Array(tutto.slice(inizio, fine + 1));
+}
+
+async function scegliPunto(k, fx, fy) {
+  puntoScelto = { k, fx, fy, dom: $("dominio").value };
+  const m = $("marcatore");
+  m.style.left = (fx * 100) + "%"; m.style.top = (fy * 100) + "%"; m.classList.remove("nascosto");
+  const box = $("punto");
+  box.classList.remove("nascosto");
+  box.innerHTML = "<p>Carico il meteogramma…</p>";
+  try {
+    const dati = await leggiSerie(k);
+    if (!puntoScelto || puntoScelto.k !== k) return;
+    disegnaPunto(k, dati);
+    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (err) {
+    box.innerHTML = "<p>Non riesco a leggere i dati del punto (" + err.message + ").</p>";
+  }
+}
+
+function ticks(min, max, n) {
+  const span = max - min || 1, grezzo = span / n, mag = Math.pow(10, Math.floor(Math.log10(grezzo)));
+  const passo = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((p) => p >= grezzo) || 10 * mag;
+  const out = [];
+  for (let v = Math.ceil(min / passo) * passo; v <= max + 1e-9; v += passo) out.push(+v.toFixed(6));
+  return out;
+}
+
+const fmtOra = new Intl.DateTimeFormat("it-IT", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Rome" });
+const fmtGg = new Intl.DateTimeFormat("it-IT", { weekday: "short", day: "numeric", timeZone: "Europe/Rome" });
+
+function grafico(titolo, tempi, serie, opz = {}) {
+  const W = 640, H = 150, mL = 40, mR = opz.barre ? 40 : 10, mT = 8, mB = 22;
+  const tutti = serie.flatMap((s) => s.v).filter((x) => x !== null);
+  if (!tutti.length) return "";
+  let min = Math.min(...tutti), max = Math.max(...tutti);
+  if (opz.da0) min = Math.min(0, min);
+  if (opz.zero) { min = Math.min(min, 0); max = Math.max(max, 0); }
+  if (max - min < (opz.minSpan || 1)) max = min + (opz.minSpan || 1);
+  const pad = (max - min) * 0.08; min -= opz.da0 ? 0 : pad; max += pad;
+  const t0 = tempi[0].getTime(), t1 = tempi[tempi.length - 1].getTime();
+  const X = (t) => mL + ((t.getTime() - t0) / (t1 - t0 || 1)) * (W - mL - mR);
+  const Y = (v) => mT + (1 - (v - min) / (max - min)) * (H - mT - mB);
+  let g = "";
+  for (const v of ticks(min, max, 4)) g += `<line class="griglia" x1="${mL}" x2="${W - mR}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${mL - 4}" y="${Y(v) + 4}" text-anchor="end">${nf0.format(v)}</text>`;
+  tempi.forEach((t, i) => {
+    const h = +fmtOra.format(t);
+    if (h === 0) g += `<line class="giorno" x1="${X(t)}" x2="${X(t)}" y1="${mT}" y2="${H - mB}"/><text x="${X(t) + 3}" y="${H - 6}">${fmtGg.format(t)}</text>`;
+    else if (h % 6 === 0) g += `<text x="${X(t)}" y="${H - 6}" text-anchor="middle">${h}</text>`;
+  });
+  if (opz.zero) g += `<line x1="${mL}" x2="${W - mR}" y1="${Y(0)}" y2="${Y(0)}" stroke="#7aa6d6" stroke-width="1"/>`;
+  for (const s of serie) {
+    if (s.barre) {
+      const w = Math.max(2, (W - mL - mR) / tempi.length - 2);
+      s.v.forEach((v, i) => { if (v > 0.04) g += `<rect x="${X(tempi[i]) - w / 2}" y="${Y(v)}" width="${w}" height="${Y(0) - Y(v)}" fill="${s.c}" opacity=".85"/>`; });
+    } else {
+      let d = "";
+      s.v.forEach((v, i) => { if (v !== null) d += (d ? "L" : "M") + X(tempi[i]).toFixed(1) + " " + Y(v).toFixed(1); });
+      g += `<path d="${d}" fill="none" stroke="${s.c}" stroke-width="2" ${s.tratteggio ? 'stroke-dasharray="5 4"' : ""}/>`;
+    }
+  }
+  const legenda = serie.filter((s) => s.nome).map((s) => `<span style="color:${s.c}">■</span> ${s.nome}`).join(" &nbsp; ");
+  return `<div class="graf"><h3>${titolo}${legenda ? " &nbsp; <span style=\"font-weight:400\">" + legenda + "</span>" : ""}</h3>` +
+         `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${titolo}">${g}</svg></div>`;
+}
+
+function disegnaPunto(k, dati) {
+  const D = dominioAttuale(), S = D.serie, nt = S.n_t, nf = S.campi.length;
+  const tempi = S.tempi.map((t) => data(t));
+  const campo = {};
+  S.campi.forEach((c, j) => {
+    const v = [];
+    for (let t = 0; t < nt; t++) { const q = dati[j * nt + t]; v.push(q === -32768 ? null : q / c.scala); }
+    campo[c.id] = v;
+  });
+  const orario = campo.PIOGGIA ? campo.PIOGGIA.map((v, i) => (i === 0 ? 0 : Math.max(0, v - campo.PIOGGIA[i - 1]))) : null;
+  let html = `<button class="chiudi" id="chiudi-punto">Chiudi</button><h2>Meteogramma: ${descrizioneLuogo(griglia.lat[k], griglia.lon[k])}</h2>` +
+             `<div class="sub">${griglia.lat[k].toFixed(3)}°N ${griglia.lon[k].toFixed(3)}°E · quota del modello ${nf0.format(griglia.hgt[k])} m · orari in ora locale · zona ${D.etichetta}</div>`;
+  const serieT = [{ v: campo.T2, c: "#e0482f", nome: "aria 2 m" }];
+  if (campo.TSUOLO) serieT.push({ v: campo.TSUOLO, c: "#9b6b3c", nome: "suolo 0-10 cm", tratteggio: true });
+  html += grafico("Temperatura (°C)", tempi, serieT, { zero: true, minSpan: 4 });
+  html += grafico("Umidità relativa a 2 m (%)", tempi, [{ v: campo.UMID, c: "#1f9bb5" }], { minSpan: 20 });
+  html += grafico("Vento a 10 m (km/h)", tempi, [{ v: campo.VENTO, c: "#2f9e44" }], { da0: true, minSpan: 10 });
+  if (orario) html += grafico("Pioggia oraria (mm) e totale", tempi, [{ v: orario, c: "#2a6cc7", barre: true }, { v: campo.PIOGGIA, c: "#13315c", nome: "totale dall'inizio" }], { da0: true, barre: true, minSpan: 1 });
+  html += grafico("Pressione al livello del mare (hPa)", tempi, [{ v: campo.PRESS, c: "#7b4fb3" }], { minSpan: 4 });
+  if (campo.UMSUOLO) html += grafico("Umidità del suolo 0-10 cm (% di volume)", tempi, [{ v: campo.UMSUOLO, c: "#8a6d3b" }], { minSpan: 5 });
+  $("punto").innerHTML = html;
+  $("chiudi-punto").onclick = () => { puntoScelto = null; $("punto").classList.add("nascosto"); $("marcatore").classList.add("nascosto"); };
+}
+
 carica();
 </script>
 </body>

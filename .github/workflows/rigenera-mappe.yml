@@ -1,0 +1,82 @@
+name: "Rigenera mappe e pagina"
+run-name: "Rigenera mappe e pagina dai risultati gia' calcolati"
+
+# Rifa mappe, pagina web e dati per la pagina partendo dai risultati gia' pubblicati nel ramo "risultati"
+# (d01_tutto.npz e d02_tutto.npz), senza rifare il calcolo di WRF. Serve quando si cambia solo la grafica.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rigenera-mappe
+  cancel-in-progress: false
+
+jobs:
+  rigenera:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Programmi necessari
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-numpy python3-matplotlib
+
+      - name: Scarico i risultati gia' pubblicati
+        run: |
+          git clone -q --depth 1 -b risultati "https://github.com/${GITHUB_REPOSITORY}.git" /home/runner/vecchio
+          mkdir -p /home/runner/uscite
+          cp /home/runner/vecchio/d01_tutto.npz /home/runner/uscite/d01_b1.npz
+          cp /home/runner/vecchio/d02_tutto.npz /home/runner/uscite/d02_b1.npz
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          print("CORSA=" + json.load(open("/home/runner/vecchio/indice.json"))["corsa"])
+          PY
+
+      - name: Recupero confini e nomi dei paesi (dalla cache)
+        id: cache-sfondo
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/sfondo
+          key: sfondo-v1
+
+      - name: Scarico confini e nomi dei paesi (solo se mancano)
+        id: sfondo
+        if: steps.cache-sfondo.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: |
+          python3 sfondo.py --scarica /home/runner/sfondo
+          if [ -f /home/runner/sfondo/sfondo.json ]; then echo "completo=si" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Salvo confini e nomi nella cache
+        if: steps.sfondo.outputs.completo == 'si'
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/sfondo
+          key: sfondo-v1
+
+      - name: Mappe, dati e pagina
+        run: |
+          python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo
+          cp pagina/index.html /home/runner/pubblico/index.html
+          touch /home/runner/pubblico/.nojekyll
+          for f in controllo.txt LEGGIMI.md tempi_b1.txt tempi_b2.txt tempi_b3.txt; do
+            [ -f "/home/runner/vecchio/$f" ] && cp "/home/runner/vecchio/$f" /home/runner/pubblico/ || true
+          done
+          du -sh /home/runner/pubblico
+
+      - name: Pubblico nel ramo "risultati"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd /home/runner/pubblico
+          git init -q -b risultati
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Mappe e pagina rigenerate, corsa ECMWF $CORSA"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" risultati
+          echo "Pubblicato: https://github.com/${GITHUB_REPOSITORY}/tree/risultati"
