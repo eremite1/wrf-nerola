@@ -12,19 +12,33 @@ jobs:
       - name: Provo gli indirizzi
         run: |
           exec > /tmp/esito.txt 2>&1
-          for u in \
-            "https://meteohub.agenziaitaliameteo.it/api/datasets" \
-            "https://meteohub.agenziaitaliameteo.it/api/" \
-            "https://dati.agenziaitaliameteo.it/api/3/action/package_show?id=osservazioni-idro-meteo-stazioni-al-suolo" \
-            "https://dati.agenziaitaliameteo.it/api/3/action/package_show?id=meteonetwork" \
-            "https://dati.lazio.it/api/3/action/package_show?id=rete-agrometeorologica" \
-            "https://dati.lazio.it/api/3/action/package_search?q=meteo&rows=30" \
-            "https://temporeale.regione.lazio.it/" \
-            "https://aviationweather.gov/api/data/metar?ids=LIQN&format=json&hours=2" ; do
-            echo "=== $u"
-            curl -sS -L -m 40 -A "Mozilla/5.0 wrf-nerola" -o /tmp/r.txt -w "HTTP %{http_code} tipo %{content_type} byte %{size_download}\n" "$u" || echo "ERRORE curl"
-            head -c 1500 /tmp/r.txt; echo
-          done
+          python3 - <<'PY'
+          import json, urllib.request
+          def get(u):
+              r = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 wrf-nerola"})
+              return urllib.request.urlopen(r, timeout=60).read().decode("utf-8", "replace")
+          for pid in ("osservazioni-idro-meteo-stazioni-al-suolo", "meteonetwork"):
+              print("=== pacchetto", pid)
+              try:
+                  j = json.loads(get("https://dati.agenziaitaliameteo.it/api/3/action/package_show?id=" + pid))["result"]
+                  print(j.get("title"), "|", (j.get("notes") or "")[:800])
+                  for x in j["resources"]:
+                      print("-", x.get("name"), "|", x.get("format"), "|", x.get("url"), "|", (x.get("description") or "")[:300])
+              except Exception as e:
+                  print("ERRORE", e)
+          print("=== meteohub datasets")
+          try:
+              for d in json.loads(get("https://meteohub.agenziaitaliameteo.it/api/datasets")):
+                  if d.get("category") != "FOR":
+                      print(json.dumps(d, ensure_ascii=False)[:500])
+          except Exception as e:
+              print("ERRORE", e)
+          print("=== temporeale")
+          try:
+              print(get("https://temporeale.regione.lazio.it/")[:600])
+          except Exception as e:
+              print("ERRORE", e)
+          PY
       - name: Salvo l'esito nel ramo prova
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
