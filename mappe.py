@@ -47,6 +47,21 @@ DPI = 85
 AREA_MAPPA = [0.03, 0.09, 0.80, 0.76]   # sinistra, basso, larghezza, altezza (frazioni della figura)
 AREA_LEGENDA = [0.725, 0.22, 0.022, 0.56]
 GRADO_PER_KM_LAT = 1 / 111.0
+MARG = (0.35, 0.75, 1.65, 1.05, 5.2, 5.2)
+
+
+def imposta_geometria(lon, lat, altezza=5.2, larghezza_max=7.6):
+    """La figura si adatta alla forma dell'area: la mappa riempie il riquadro, senza bordi bianchi inutili."""
+    global FIG, AREA_MAPPA, MARG
+    asp = (float(lon.max() - lon.min()) * np.cos(np.radians(42.1))) / float(lat.max() - lat.min())
+    h = altezza
+    w = h * asp
+    if w > larghezza_max:
+        w, h = larghezza_max, larghezza_max / asp
+    sx, sy, dx_, dy_ = 0.35, 0.75, 1.65, 1.05   # margini in pollici: sinistra, sotto, destra (barra colori), sopra (titolo)
+    FIG = (w + sx + dx_, h + sy + dy_)
+    AREA_MAPPA = [sx / FIG[0], sy / FIG[1], w / FIG[0], h / FIG[1]]
+    MARG = (sx, sy, dx_, dy_, w, h)
 
 # ---- costanti della stima di raffreddamento notturno sul prato (da tarare con le misure vere)
 SIGMA = 5.670374e-8
@@ -278,7 +293,7 @@ def rilievo_rgb(sub, passo, lon_ini, lat_ini):
     z = sub.astype("float64")
     gy = np.gradient(z, dy, axis=0)
     gx = np.gradient(z, axis=1) / dx
-    ve = 2.0   # esagerazione verticale: i rilievi si leggono meglio
+    ve = 1.6   # esagerazione verticale: i rilievi si leggono meglio
     pend = np.arctan(ve * np.hypot(gx, gy))
     esp = np.arctan2(gy, -gx)
     zen, az = np.radians(45.0), np.radians(315.0)
@@ -289,12 +304,31 @@ def rilievo_rgb(sub, passo, lon_ini, lat_ini):
     alto = np.array([0.84, 0.78, 0.68])
     base = basso[None, None, :] * (1 - quota[..., None]) + alto[None, None, :] * quota[..., None]
     base = np.where((z <= 0)[..., None], np.array([0.80, 0.88, 0.96])[None, None, :], base)
-    ombra = np.clip((piano - hs) / piano, 0, 1) * 0.75     # versante in ombra: nero trasparente
-    luce = np.clip((hs - piano) / (1 - piano), 0, 1) * 0.45  # versante illuminato: bianco trasparente
+    ombra = np.clip((piano - hs) / piano, 0, 1) * 0.42     # versante in ombra: nero trasparente
+    luce = np.clip((hs - piano) / (1 - piano), 0, 1) * 0.22  # versante illuminato: bianco trasparente
     ov = np.zeros(z.shape + (4,))
     ov[..., :3] = np.where((hs < piano)[..., None], 0.0, 1.0)
     ov[..., 3] = np.where(hs < piano, ombra, luce)
     return np.clip(base, 0, 1), ov
+
+
+CAPOLUOGHI = [("Rieti", "RI", 42.404, 12.857), ("Roma", "RM", 41.893, 12.483), ("Viterbo", "VT", 42.417, 12.105),
+              ("Latina", "LT", 41.467, 12.903), ("Frosinone", "FR", 41.640, 13.343), ("Terni", "TR", 42.563, 12.643),
+              ("Perugia", "PG", 43.112, 12.389), ("L'Aquila", "AQ", 42.350, 13.399), ("Teramo", "TE", 42.659, 13.704),
+              ("Pescara", "PE", 42.464, 14.214), ("Ascoli Piceno", "AP", 42.854, 13.575), ("Macerata", "MC", 43.300, 13.453),
+              ("Fermo", "FM", 43.160, 13.719), ("Ancona", "AN", 43.617, 13.516), ("Chieti", "CH", 42.351, 14.168),
+              ("Campobasso", "CB", 41.560, 14.668), ("Isernia", "IS", 41.593, 14.233), ("Caserta", "CE", 41.073, 14.333),
+              ("Napoli", "NA", 40.852, 14.268), ("Grosseto", "GR", 42.760, 11.113), ("Siena", "SI", 43.318, 11.331),
+              ("Arezzo", "AR", 43.463, 11.880)]
+
+
+def candidati_capoluoghi(lat, lon):
+    """Nerola e le sigle dei capoluoghi di provincia dentro la mappa (per la mappa a 3 km)."""
+    out = [{"nome": "Nerola", "lat": NEROLA[0], "lon": NEROLA[1], "pop": 0, "sede": True, "quota": None}]
+    for nome, sigla, la, lo in CAPOLUOGHI:
+        if lat.min() + 0.03 < la < lat.max() - 0.03 and lon.min() + 0.04 < lo < lon.max() - 0.04:
+            out.append({"nome": nome, "sigla": sigla, "lat": la, "lon": lo, "pop": 0, "sede": True, "quota": None})
+    return out
 
 
 def candidati(sf, lat, lon, vicini):
@@ -302,7 +336,8 @@ def candidati(sf, lat, lon, vicini):
     elenco = [{"nome": "Nerola", "lat": NEROLA[0], "lon": NEROLA[1], "pop": 0, "sede": True, "quota": None}]
     dentro = []
     for p in sf.get("paesi", []):
-        if lat.min() + 0.015 < p["lat"] < lat.max() - 0.015 and lon.min() + 0.02 < p["lon"] < lon.max() - 0.02 and p["nome"] != "Nerola":
+        if lat.min() + 0.015 < p["lat"] < lat.max() - 0.015 and lon.min() + 0.02 < p["lon"] < lon.max() - 0.02 and p["nome"] != "Nerola" \
+                and len(p["nome"]) <= 16:
             dentro.append(p)
     if vicini:
         grandi = sorted([p for p in dentro if p["pop"] >= 20000], key=lambda p: -p["pop"])
@@ -318,7 +353,7 @@ def candidati(sf, lat, lon, vicini):
     return out
 
 
-def posiziona_etichette(cand, lon, lat, massimo, estensione=None):
+def posiziona_etichette(cand, lon, lat, massimo, piccolo=True):
     """Sceglie quali nomi scrivere e dove, in modo che non si sovrappongano. Ritorna [(nome, lat, lon, dx, dy, ha, va)]."""
     fig = plt.figure(figsize=FIG, dpi=DPI)
     ax = fig.add_axes(AREA_MAPPA)
@@ -345,25 +380,27 @@ def posiziona_etichette(cand, lon, lat, massimo, estensione=None):
         if any(marcatore.overlaps(o) for o in occupati):
             continue
         for dx, dy, ha, va in posizioni:
-            t = ax.annotate(p["nome"], (p["lon"], p["lat"]), textcoords="offset points", xytext=(dx, dy), ha=ha, va=va,
-                            fontsize=9.5 if grande else 8.5, fontweight="bold")
+            testo = p.get("sigla") or p["nome"]
+            t = ax.annotate(testo, (p["lon"], p["lat"]), textcoords="offset points", xytext=(dx, dy), ha=ha, va=va,
+                            fontsize=9.5 if grande else (7.5 if piccolo else 9), fontweight="bold")
             bb = t.get_window_extent(rend)
             bb = matplotlib.transforms.Bbox.from_extents(bb.x0 - 4, bb.y0 - 3, bb.x1 + 4, bb.y1 + 3)
             t.remove()
             if not sovrappone(bb):
                 occupati += [bb, marcatore]
-                scelte.append((p["nome"], p["lat"], p["lon"], dx, dy, ha, va))
+                scelte.append((testo, p["lat"], p["lon"], dx, dy, ha, va))
                 break
     plt.close(fig)
     return scelte
 
 
-def disegna_sfondo(ax, sfondo, sul_rilievo):
+def disegna_sfondo(ax, sfondo, sul_rilievo, dettaglio=True):
     def linee(chiave, **stile):
         ls = sfondo.get(chiave) or []
         if ls:
             ax.add_collection(LineCollection(ls, **stile))
-    linee("comuni", colors="#3d3d3d", linewidths=0.35, alpha=0.55, zorder=3)
+    if dettaglio:
+        linee("comuni", colors="#3d3d3d", linewidths=0.3, alpha=0.4, zorder=3)
     linee("province", colors="#1a1a1a", linewidths=0.9, linestyles=(0, (5, 3)), alpha=0.85, zorder=3)
     linee("regioni", colors="#1a1a1a", linewidths=1.4, alpha=0.9, zorder=3)
     linee("laghi", colors="#2a6cc7", linewidths=0.8, zorder=3)
@@ -424,7 +461,7 @@ def disegna(d, p, i, dom, etichetta, corsa, ctx, cartella, lim):
         s = 4 if etichetta == "3 km" else 3
         q = ax.quiver(lon[::s, ::s], lat[::s, ::s], d["U10"][i][::s, ::s], d["V10"][i][::s, ::s], color="white", scale=120,
                       width=0.0035, edgecolor="#222222", linewidth=0.4, zorder=2.5)
-    disegna_sfondo(ax, ctx["sfondo"], ctx["rilievo"] is not None)
+    disegna_sfondo(ax, ctx["sfondo"], ctx["rilievo"] is not None, dettaglio=ctx["piccolo"])
     ax.set_xlim(lon.min(), lon.max())
     ax.set_ylim(lat.min(), lat.max())
     ax.set_aspect(1.0 / np.cos(np.radians(42.1)))
@@ -437,35 +474,31 @@ def disegna(d, p, i, dom, etichetta, corsa, ctx, cartella, lim):
         grande = nome == "Nerola"
         ax.plot([lo], [la], marker="*" if grande else "o", color="#d6341f" if grande else "#111111", markersize=12 if grande else 4.2,
                 markeredgecolor="white", markeredgewidth=0.7, zorder=5)
-        ax.annotate(nome, (lo, la), textcoords="offset points", xytext=(dx, dy), ha=ha, va=va, fontsize=9.5 if grande else 8.5,
-                    fontweight="bold", color="#111111", zorder=6,
-                    bbox=dict(boxstyle="square,pad=0.12", facecolor="white", edgecolor="none", alpha=0.85))
+        ax.annotate(nome, (lo, la), textcoords="offset points", xytext=(dx, dy), ha=ha, va=va,
+                    fontsize=9.5 if grande else (7.5 if ctx["piccolo"] else 9), fontweight="bold", color="#111111", zorder=6,
+                    bbox=dict(boxstyle="square,pad=0.1", facecolor="white", edgecolor="none", alpha=0.6 if ctx["piccolo"] else 0.85))
     ax.text(0.985, 0.02, "www.meteonerola.it", transform=ax.transAxes, ha="right", va="bottom", fontsize=9.5, fontweight="bold",
             color="#111111", zorder=7, bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#333333", linewidth=0.8, alpha=0.92))
     utc, loc = quando(d["tempi"][i])
     utc0 = quando(d["tempi"][0])[0]
     ore = int(round((utc - utc0).total_seconds() / 3600))
     c = datetime.strptime(corsa, "%Y%m%d%H")
-    # disposizione: mappa in alto a sinistra sotto il titolo, barra dei colori a destra; il gruppo e' centrato nella figura
-    ax.apply_aspect()
-    bx = ax.get_position()
-    larg_etichette = 0.15 if cl else 0.085
-    totale = bx.width + 0.022 + 0.024 + larg_etichette
-    x0 = max(0.015, (1 - totale) / 2)
-    y0 = AREA_MAPPA[1] + AREA_MAPPA[3] - bx.height
-    ax.set_position([x0, y0, bx.width, bx.height])
-    cax.set_position([x0 + bx.width + 0.022, y0 + 0.01, 0.024, bx.height - 0.02])
-    xr = x0 + bx.width + 0.022 + 0.024 + larg_etichette * 0.55
+    sx, sy, dx_, dy_, w, h = MARG
+    Fw, Fh = FIG
+    cax.set_position([(sx + w + 0.22) / Fw, sy / Fh + 0.01, 0.25 / Fw, h / Fh - 0.02])
+    xr = (Fw - 0.2) / Fw
     gg = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"][loc.weekday()]
     mesi = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
     tit = p["titolo"]
-    dim = 20 if len(tit) <= 24 else 16 if len(tit) <= 38 else 13
-    fig.text(x0, 0.945, tit, fontsize=dim, fontweight="bold", ha="left", va="center", color="#111111")
-    fig.text(x0, 0.885, f"{gg} {loc.day} {mesi[loc.month - 1]}, ore {loc:%H:%M}", fontsize=13, ha="left", va="center", color="#222222")
-    fig.text(xr, 0.945, f"WRF {etichetta}", fontsize=16, fontweight="bold", ha="right", va="center", color="#1d4e89")
-    fig.text(xr, 0.885, f"+{ore}h", fontsize=13, fontweight="bold", ha="right", va="center", color="#555555")
+    spazio = Fw - sx - 0.2 - 1.5     # pollici disponibili per il titolo a sinistra di "WRF x km"
+    dim = max(10, min(20, spazio * 72 / (0.58 * len(tit))))
+    x0 = sx / Fw
+    fig.text(x0, 1 - 0.36 / Fh, tit, fontsize=dim, fontweight="bold", ha="left", va="center", color="#111111")
+    fig.text(x0, 1 - 0.80 / Fh, f"{gg} {loc.day} {mesi[loc.month - 1]}, ore {loc:%H:%M}", fontsize=13, ha="left", va="center", color="#222222")
+    fig.text(xr, 1 - 0.36 / Fh, f"WRF {etichetta}", fontsize=16, fontweight="bold", ha="right", va="center", color="#1d4e89")
+    fig.text(xr, 1 - 0.80 / Fh, f"+{ore}h", fontsize=13, fontweight="bold", ha="right", va="center", color="#555555")
     nota = p.get("nota", "")
-    fig.text(x0, 0.012, (nota + "\n" if nota else "") + f"{FONTE} · corsa {c:%d/%m %H} UTC · ora italiana ({utc:%H} UTC)\n" + CREDITI,
+    fig.text(x0, 0.08 / Fh, (nota + "\n" if nota else "") + f"{FONTE} · corsa {c:%d/%m %H} UTC · ora italiana ({utc:%H} UTC)\n" + CREDITI,
              ha="left", va="bottom", fontsize=6.8, color="#6b7480", style="italic")
     pos = ax.get_position()
     layout = {"asse": [round(pos.x0, 5), round(pos.y0, 5), round(pos.width, 5), round(pos.height, 5)],
@@ -612,8 +645,10 @@ def main():
         parametri = [p for p in parametri if frames[p["id"]]]
         lim = limiti_automatici(d, parametri, frames)
         piccolo = etichetta == "1 km"
-        cand = candidati(sf, d["lat"], d["lon"], vicini=piccolo)
-        etichette = posiziona_etichette(cand, d["lon"], d["lat"], 16 if piccolo else 14)
+        cand = candidati(sf, d["lat"], d["lon"], vicini=True)     # elenco completo (serve alla pagina per dire "x km da ...")
+        imposta_geometria(d["lon"], d["lat"])
+        scelti = cand if piccolo else candidati_capoluoghi(d["lat"], d["lon"])
+        etichette = posiziona_etichette(scelti, d["lon"], d["lat"], 14 if piccolo else 30, piccolo)
         print(dom, "etichette:", len(etichette), "su", len(cand), "candidati")
         lon0, lon1, lat0, lat1 = float(d["lon"].min()), float(d["lon"].max()), float(d["lat"].min()), float(d["lat"].max())
         pezzo = ritaglia_dem(dem, lon0, lon1, lat0, lat1)
@@ -621,7 +656,7 @@ def main():
         if pezzo is not None:
             sub, passo, li, ai = pezzo
             rilievo = (rilievo_rgb(sub, passo, li, ai), [li, li + (sub.shape[1] - 1) * passo, ai, ai + (sub.shape[0] - 1) * passo])
-        ctx = {"sfondo": sf, "rilievo": rilievo, "etichette": etichette, "sovra": 3 if piccolo else 2}
+        ctx = {"sfondo": sf, "rilievo": rilievo, "etichette": etichette, "piccolo": piccolo, "sovra": 3 if piccolo else 2}
         voce = {"etichetta": etichetta, "parametri": {}}
         ny, nx = d["lat"].shape
         cart_dati = out / "dati" / cartella_dom
