@@ -2,6 +2,8 @@ name: "Prova fonti dati stazioni"
 run-name: "Prova: quali fonti di osservazioni sono raggiungibili"
 on:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   prova:
     runs-on: ubuntu-24.04
@@ -9,6 +11,7 @@ jobs:
     steps:
       - name: Provo gli indirizzi
         run: |
+          exec > /tmp/esito.txt 2>&1
           for u in \
             "https://meteohub.agenziaitaliameteo.it/api/datasets" \
             "https://meteohub.agenziaitaliameteo.it/api/" \
@@ -22,3 +25,9 @@ jobs:
             curl -sS -L -m 40 -A "Mozilla/5.0 wrf-nerola" -o /tmp/r.txt -w "HTTP %{http_code} tipo %{content_type} byte %{size_download}\n" "$u" || echo "ERRORE curl"
             head -c 1500 /tmp/r.txt; echo
           done
+      - name: Salvo l'esito nel ramo prova
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir /tmp/p && cd /tmp/p && git init -q -b prova && cp /tmp/esito.txt . && git config user.name bot && git config user.email bot@x.y
+          git add -A && git commit -q -m esito && git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" prova
