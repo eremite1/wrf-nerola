@@ -1,0 +1,24 @@
+name: "Prova fonti dati stazioni"
+run-name: "Prova: quali fonti di osservazioni sono raggiungibili"
+on:
+  workflow_dispatch:
+jobs:
+  prova:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Provo gli indirizzi
+        run: |
+          for u in \
+            "https://meteohub.agenziaitaliameteo.it/api/datasets" \
+            "https://meteohub.agenziaitaliameteo.it/api/" \
+            "https://dati.agenziaitaliameteo.it/api/3/action/package_show?id=osservazioni-idro-meteo-stazioni-al-suolo" \
+            "https://dati.agenziaitaliameteo.it/api/3/action/package_show?id=meteonetwork" \
+            "https://dati.lazio.it/api/3/action/package_show?id=rete-agrometeorologica" \
+            "https://dati.lazio.it/api/3/action/package_search?q=meteo&rows=30" \
+            "https://temporeale.regione.lazio.it/" \
+            "https://aviationweather.gov/api/data/metar?ids=LIQN&format=json&hours=2" ; do
+            echo "=== $u"
+            curl -sS -L -m 40 -A "Mozilla/5.0 wrf-nerola" -o /tmp/r.txt -w "HTTP %{http_code} tipo %{content_type} byte %{size_download}\n" "$u" || echo "ERRORE curl"
+            head -c 1500 /tmp/r.txt; echo
+          done
