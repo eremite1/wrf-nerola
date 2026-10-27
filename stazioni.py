@@ -12,10 +12,12 @@ Uso:  stazioni.py --storico CARTELLA --uscite CARTELLA_CON_NPZ --corsa AAAAMMGGH
 """
 import argparse
 import csv
+import os
 import json
 import math
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -39,6 +41,78 @@ def scarica(url, tentativi=4):
             ultimo = e
             time.sleep(5 * (n + 1))
     raise RuntimeError(f"download fallito: {ultimo}")
+
+
+NEROLA = (42.13, 12.77)
+RETI_METEOHUB = ("dpcn-lazio", "dpcn-umbria", "mnw")     # rete regionale Lazio e Umbria (Protezione Civile), MeteoNetwork
+BASE_MH = "https://meteohub.agenziaitaliameteo.it"
+# variabile BUFR, livello e tipo di elaborazione degli strumenti standard
+MH_VAR = {"B12101": ("103,2000,0,0", "T"), "B13003": ("103,2000,0,0", "RH"), "B11002": ("103,10000,0,0", "V")}
+
+
+def richiesta(url, dati=None, intestazioni=None, metodo=None):
+    rich = urllib.request.Request(url, data=dati, headers={"User-Agent": "wrf-nerola", **(intestazioni or {})}, method=metodo)
+    with urllib.request.urlopen(rich, timeout=180) as r:
+        return r.read().decode("utf-8")
+
+
+def leggi_meteohub(ore=72):
+    """Osservazioni orarie delle reti della Protezione Civile (MeteoHub di ItaliaMeteo). Serve un account gratuito:
+    nome utente e password stanno nei segreti METEOHUB_USERNAME e METEOHUB_PASSWORD."""
+    utente, parola = os.environ.get("METEOHUB_USERNAME", ""), os.environ.get("METEOHUB_PASSWORD", "")
+    if not utente or not parola:
+        print("MeteoHub: nome utente e password non impostati, salto la rete della Protezione Civile")
+        return []
+    r = json.loads(richiesta(BASE_MH + "/auth/login", json.dumps({"username": utente, "password": parola}).encode(),
+                             {"Content-Type": "application/json"}, "POST"))
+    token = r if isinstance(r, str) else (r.get("token") or r.get("access_token") or r.get("jwt"))
+    fine = datetime.now(timezone.utc)
+    inizio = fine - timedelta(hours=ore)
+    q = f"reftime: >={inizio:%Y-%m-%d %H:%M},<={fine:%Y-%m-%d %H:%M};license:CCBY_COMPLIANT"
+    righe = []
+    for rete in RETI_METEOHUB:
+        par = urllib.parse.urlencode({"networks": rete, "q": q, "reliabilityCheck": "true", "lonmin": BBOX[1], "latmin": BBOX[0],
+                                      "lonmax": BBOX[3], "latmax": BBOX[2]})
+        try:
+            risposta = json.loads(richiesta(BASE_MH + "/api/observations?" + par, intestazioni={"Authorization": "Bearer " + token,
+                                                                                               "Accept": "application/json"}))
+        except Exception as e:  # noqa: BLE001
+            print(f"MeteoHub {rete}: errore {e}", file=sys.stderr)
+            continue
+        n0 = len(righe)
+        for item in risposta.get("data", []):
+            st = item["stat"]
+            det = {d["var"]: d["val"] for d in st.get("details", [])}
+            nome = str(det.get("B01019") or f"{st['lat']:.3f},{st['lon']:.3f}")
+            sid = f"{rete}:{nome}"
+            quota = det.get("B07030", det.get("B07031", ""))
+            ore_v = {}
+            for prod in item.get("prod", []):
+                voce = MH_VAR.get(prod["var"])
+                if not voce or prod.get("lev") != voce[0] or prod.get("trange") not in ("254,0,0", "0,0,0"):
+                    continue
+                for v in prod.get("val", []):
+                    if v.get("val") is None or v.get("rel") not in (1, None):
+                        continue
+                    t = datetime.strptime(v["ref"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                    h = (t + timedelta(minutes=30)).replace(minute=0, second=0, microsecond=0)
+                    ore_v.setdefault(ora_iso(h), {}).setdefault(voce[1], []).append(float(v["val"]))
+            for h, d in ore_v.items():
+                if "T" not in d:
+                    continue
+                t_c = sum(d["T"]) / len(d["T"]) - 273.15
+                if not -35 < t_c < 50:
+                    continue
+                td = ""
+                if "RH" in d:
+                    rh = min(100.0, max(1.0, sum(d["RH"]) / len(d["RH"])))
+                    g = math.log(rh / 100.0) + 17.62 * t_c / (243.12 + t_c)
+                    td = round(243.12 * g / (17.62 - g), 1)
+                v = round(sum(d["V"]) / len(d["V"]) * 3.6, 1) if "V" in d else ""
+                righe.append({"id": sid, "nome": nome, "lat": st["lat"], "lon": st["lon"], "quota": quota, "ora": h,
+                              "T": round(t_c, 1), "Td": td, "V": v})
+        print(f"MeteoHub {rete}: stazioni {len({r['id'] for r in righe[n0:]})}, righe {len(righe) - n0}")
+    return righe
 
 
 def ora_iso(t):
@@ -230,12 +304,14 @@ def calcola_pagella(oss_righe, prev_righe, giorni=GIORNI_FINESTRA):
     elenco = []
     for sid, st in sorted(stazioni.items()):
         voce = dict(st)
+        voce["dist_km"] = round(math.hypot(st["lat"] - NEROLA[0], (st["lon"] - NEROLA[1]) * math.cos(math.radians(NEROLA[0]))) * 111.0, 1)
         voce["quota_modello"] = {}
         for dom, suff in (("1km", "d02"), ("3km", "d01")):
             qs = [num(r[f"h_{suff}"]) for r in prev_righe if r["id"] == sid and num(r[f"h_{suff}"]) is not None][:1]
             if qs:
                 voce["quota_modello"][dom] = qs[0]
         voce["errori"] = {dom: {v: statistiche(c) for v, c in vv.items()} for dom, vv in per_stazione.get(sid, {}).items()}
+        voce["con_serie"] = False
         ore_serie = sorted({k[1] for k in ultime if k[0] == sid} | {k[1] for k in oss if k[0] == sid and k[1] >= limite})
         voce["serie"] = {
             "tempi": ore_serie,
@@ -245,6 +321,9 @@ def calcola_pagella(oss_righe, prev_righe, giorni=GIORNI_FINESTRA):
         }
         if voce["errori"] or any(x is not None for x in voce["serie"]["oss"]["T"]):
             elenco.append(voce)
+    elenco.sort(key=lambda v: v["dist_km"])
+    for v in elenco[40:]:     # il grafico serve solo per le 40 stazioni piu' vicine a Nerola: il file resta leggero
+        v["serie"] = {"tempi": [], "oss": {}, "wrf1": {}, "wrf3": {}}
     return {
         "aggiornato": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
         "giorni": giorni,
@@ -265,10 +344,14 @@ def main():
     cart.mkdir(parents=True, exist_ok=True)
     try:
         nuove = leggi_metar(a.ore)
-        print("osservazioni scaricate:", len(nuove), "stazioni:", len({r['id'] for r in nuove}))
+        print("METAR scaricati:", len(nuove), "stazioni:", len({r['id'] for r in nuove}))
     except Exception as e:  # noqa: BLE001
-        print("ATTENZIONE: osservazioni non scaricate:", e, file=sys.stderr)
+        print("ATTENZIONE: METAR non scaricati:", e, file=sys.stderr)
         nuove = []
+    try:
+        nuove += leggi_meteohub(a.ore)
+    except Exception as e:  # noqa: BLE001
+        print("ATTENZIONE: MeteoHub non scaricato:", e, file=sys.stderr)
     oss = unisci_osservazioni(cart / "osservazioni.csv", nuove)
     stazioni = {r["id"]: {"id": r["id"], "lat": float(r["lat"]), "lon": float(r["lon"])} for r in oss}
     if a.uscite and a.corsa:

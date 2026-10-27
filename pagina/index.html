@@ -537,8 +537,12 @@ async function caricaPagella() {
   $("pag-riepilogo").innerHTML = h + "</tbody></table></div>";
   const sel = $("pag-stazione");
   sel.innerHTML = "";
-  pagella.stazioni.forEach((st, i) => sel.add(new Option(`${st.nome} (${st.id}), ${nf0.format(st.quota ?? 0)} m`, i)));
-  const pref = pagella.stazioni.findIndex((st) => /rieti/i.test(st.nome));
+  pagella.stazioni.forEach((st, i) => sel.add(new Option(`${st.nome} · ${nf0.format(st.dist_km)} km da Nerola · ${nf0.format(st.quota ?? 0)} m`, i)));
+  let t2 = '<h3 style="font-size:.95rem;margin:16px 0 4px">Le stazioni più vicine a Nerola (temperatura, prime 24 ore di previsione)</h3><div style="overflow-x:auto"><table class="tab"><thead><tr><th>Stazione</th><th>Distanza</th><th>Quota stazione / modello 1 km</th><th>Errore medio 1 km</th><th>Errore medio 3 km</th></tr></thead><tbody>';
+  for (const st of pagella.stazioni.filter((x) => x.errori && (x.errori["1km"] || x.errori["3km"])).slice(0, 15))
+    t2 += `<tr><th>${st.nome}</th><td>${nf0.format(st.dist_km)} km</td><td>${nf0.format(st.quota ?? 0)} / ${st.quota_modello["1km"] != null ? nf0.format(st.quota_modello["1km"]) : "–"} m</td><td>${cella(st.errori["1km"] && st.errori["1km"].T)}</td><td>${cella(st.errori["3km"] && st.errori["3km"].T)}</td></tr>`;
+  $("pag-riepilogo").insertAdjacentHTML("beforeend", t2 + "</tbody></table></div>");
+  const pref = pagella.stazioni.findIndex((st) => st.serie.tempi.length);
   if (pref >= 0) sel.value = pref;
   sel.onchange = disegnaPagella;
   disegnaPagella();
@@ -547,6 +551,7 @@ async function caricaPagella() {
 function disegnaPagella() {
   const st = pagella.stazioni[+$("pag-stazione").value];
   if (!st) { $("pag-grafici").innerHTML = ""; return; }
+  if (!st.serie.tempi.length) { $("pag-grafici").innerHTML = '<p class="suggerimento" style="text-align:left">Il grafico è disponibile solo per le 40 stazioni più vicine a Nerola.</p>'; return; }
   const tempi = st.serie.tempi.map(data);
   const qm = st.quota_modello;
   let h = `<p class="suggerimento" style="text-align:left">${st.nome}: quota della stazione ${nf0.format(st.quota ?? 0)} m, quota del modello ${qm["1km"] != null ? nf0.format(qm["1km"]) + " m (1 km)" : ""}${qm["3km"] != null ? " · " + nf0.format(qm["3km"]) + " m (3 km)" : ""}.</p>`;

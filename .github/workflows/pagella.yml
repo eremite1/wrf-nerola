@@ -45,6 +45,9 @@ jobs:
           fi
 
       - name: Confronto previsione e osservazioni
+        env:
+          METEOHUB_USERNAME: ${{ secrets.METEOHUB_USERNAME }}
+          METEOHUB_PASSWORD: ${{ secrets.METEOHUB_PASSWORD }}
         run: |
           python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA"
 
