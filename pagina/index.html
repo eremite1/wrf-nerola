@@ -99,6 +99,10 @@
   details.info h4 { margin: 12px 0 2px; font-size: .92rem; }
   details.info p, details.info li { font-size: .86rem; color: var(--muto); margin: 3px 0; }
   details.info ul { margin: 4px 0 4px 18px; padding: 0; }
+  table.tab { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  table.tab th, table.tab td { border-bottom: 1px solid var(--linea); padding: 6px 8px; text-align: center; }
+  table.tab th:first-child { text-align: left; font-weight: 500; }
+  table.tab thead th { color: var(--muto); font-weight: 600; font-size: .8rem; }
   .nascosto { display: none; }
 </style>
 </head>
@@ -109,6 +113,7 @@
     <div class="schede" role="tablist">
       <button role="tab" id="s-mappe" aria-selected="true">Mappe</button>
       <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
+      <button role="tab" id="s-pagella" aria-selected="false">Pagella</button>
     </div>
     <div class="sotto" id="info">Caricamento…</div>
   </div>
@@ -163,6 +168,21 @@
     <p>Temperatura e umidità del suolo vengono dal modello del suolo di WRF (l'umidità iniziale arriva da ECMWF). La pioggia è la somma di quella convettiva e a grande scala.</p>
   </details>
   <div class="tip nascosto" id="tip"></div>
+
+  <section id="vista-pagella" class="card nascosto">
+    <h2 style="margin:0 0 4px;font-size:1.1rem">Pagella: la previsione contro la realtà</h2>
+    <p class="suggerimento" style="text-align:left" id="pag-intro">Caricamento…</p>
+    <div id="pag-riepilogo"></div>
+    <div class="scelte" style="margin-top:14px"><div><label for="pag-stazione">Stazione</label><select id="pag-stazione"></select></div><div></div></div>
+    <div id="pag-grafici"></div>
+    <details class="info"><summary>Come si legge</summary>
+      <p><b>Errore medio</b>: di quanto, in media, la previsione sbaglia (senza considerare se per eccesso o per difetto). Più è basso, meglio è.</p>
+      <p><b>Tendenza</b>: se è positiva WRF tende a prevedere valori più alti di quelli misurati (ad esempio più caldo), se è negativa più bassi.</p>
+      <p>Le fasce (0-12 ore, 12-24 ore, ...) dicono a quante ore dall'inizio della corsa si riferisce la previsione: di solito le prime ore sono più precise.
+         Le osservazioni sono quelle degli aeroporti (bollettini METAR); le quote delle stazioni sono diverse da quelle del modello, quindi sui rilievi una differenza è normale.
+         Il confronto usa gli ultimi giorni e si arricchisce a ogni corsa.</p>
+    </details>
+  </section>
 
   <section id="vista-meteo" class="card nascosto">
     <div class="immagine"><img id="meteogramma" alt="Meteogramma di Nerola" decoding="async"></div>
@@ -233,8 +253,9 @@ async function carica() {
     if (e.key === "ArrowLeft") { ferma(); mostra(posizione - 1); }
     if (e.key === "ArrowRight") { ferma(); mostra(posizione + 1); }
   });
-  $("s-mappe").onclick = () => scheda(true);
-  $("s-meteo").onclick = () => scheda(false);
+  $("s-mappe").onclick = () => scheda("mappe");
+  $("s-meteo").onclick = () => scheda("meteo");
+  $("s-pagella").onclick = () => scheda("pagella");
   $("meteogramma").src = "meteogramma_nerola.png?v=" + encodeURIComponent(indice.creato);
   riempiParametri(true);
   caricaGriglia().catch(() => {});
@@ -244,12 +265,13 @@ async function carica() {
   img.addEventListener("click", (e) => sulPuntatore(e, true));
 }
 
-function scheda(mappe) {
+function scheda(nome) {
   ferma();
-  $("vista-mappe").classList.toggle("nascosto", !mappe);
-  $("vista-meteo").classList.toggle("nascosto", mappe);
-  $("s-mappe").setAttribute("aria-selected", mappe);
-  $("s-meteo").setAttribute("aria-selected", !mappe);
+  for (const [id, n] of [["mappe", "vista-mappe"], ["meteo", "vista-meteo"], ["pagella", "vista-pagella"]]) {
+    $(n).classList.toggle("nascosto", id !== nome);
+    $("s-" + id).setAttribute("aria-selected", id === nome);
+  }
+  if (nome === "pagella" && !pagella) caricaPagella();
 }
 
 function dominioAttuale() { return indice.domini[$("dominio").value]; }
@@ -490,6 +512,49 @@ async function scegliPunto(k, fx, fy) {
   } catch (err) {
     box.innerHTML = "<p>Non riesco a leggere i dati del punto (" + err.message + ").</p>";
   }
+}
+
+let pagella = null;
+const URL_PAGELLA = "https://raw.githubusercontent.com/eremite1/wrf-nerola/storico/pagella.json";
+const NOMI_VAR = { T: ["Temperatura", "°C"], Td: ["Punto di rugiada", "°C"], V: ["Vento", "km/h"] };
+
+async function caricaPagella() {
+  try {
+    const r = await fetch(URL_PAGELLA + "?t=" + Date.now());
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    pagella = await r.json();
+  } catch (e) {
+    $("pag-intro").textContent = "La pagella non è ancora disponibile (" + e.message + "). Compare dopo il primo confronto con le stazioni.";
+    return;
+  }
+  const n = pagella.stazioni.length;
+  $("pag-intro").textContent = `Aggiornata ${pagella.aggiornato.replace("T", " ").replace("Z", " UTC")} · ${n} stazioni · ultimi ${pagella.giorni} giorni · ${pagella.fonte}`;
+  const fasce = Object.keys(pagella.riepilogo["1km"].T);
+  const cella = (st) => !st || st.n < 5 ? "–" : `<b>${nf1.format(st.mae)}</b><small style="display:block;color:var(--muto)">tendenza ${st.bias > 0 ? "+" : ""}${nf1.format(st.bias)}</small>`;
+  let h = '<div style="overflow-x:auto"><table class="tab"><thead><tr><th>Errore medio</th>' + fasce.map((f) => `<th>${f}</th>`).join("") + "</tr></thead><tbody>";
+  for (const v of ["T", "Td", "V"]) for (const d of ["1km", "3km"])
+    h += `<tr><th>${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]}) · WRF ${d === "1km" ? "1 km" : "3 km"}</th>` + fasce.map((f) => `<td>${cella(pagella.riepilogo[d][v][f])}</td>`).join("") + "</tr>";
+  $("pag-riepilogo").innerHTML = h + "</tbody></table></div>";
+  const sel = $("pag-stazione");
+  sel.innerHTML = "";
+  pagella.stazioni.forEach((st, i) => sel.add(new Option(`${st.nome} (${st.id}), ${nf0.format(st.quota ?? 0)} m`, i)));
+  const pref = pagella.stazioni.findIndex((st) => /rieti/i.test(st.nome));
+  if (pref >= 0) sel.value = pref;
+  sel.onchange = disegnaPagella;
+  disegnaPagella();
+}
+
+function disegnaPagella() {
+  const st = pagella.stazioni[+$("pag-stazione").value];
+  if (!st) { $("pag-grafici").innerHTML = ""; return; }
+  const tempi = st.serie.tempi.map(data);
+  const qm = st.quota_modello;
+  let h = `<p class="suggerimento" style="text-align:left">${st.nome}: quota della stazione ${nf0.format(st.quota ?? 0)} m, quota del modello ${qm["1km"] != null ? nf0.format(qm["1km"]) + " m (1 km)" : ""}${qm["3km"] != null ? " · " + nf0.format(qm["3km"]) + " m (3 km)" : ""}.</p>`;
+  for (const v of ["T", "Td", "V"]) {
+    const serie = [{ v: st.serie.oss[v], c: "#222222", nome: "osservato" }, { v: st.serie.wrf1[v], c: "#e0482f", nome: "WRF 1 km" }, { v: st.serie.wrf3[v], c: "#2a6cc7", nome: "WRF 3 km", tratteggio: true }];
+    h += grafico(`${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`, tempi, serie, v === "V" ? { da0: true } : {});
+  }
+  $("pag-grafici").innerHTML = h;
 }
 
 function ticks(min, max, n) {
