@@ -1,0 +1,60 @@
+name: "Pagella (confronto con le stazioni)"
+run-name: "Pagella: previsione WRF contro osservazioni reali"
+
+# Scarica le osservazioni degli aeroporti della zona (METAR), le confronta con l'ultima previsione WRF pubblicata
+# e aggiorna lo storico nel ramo "storico" (osservazioni.csv, previsioni/, pagella.json). La pagina legge pagella.json da li'.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "25 */3 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pagella
+  cancel-in-progress: false
+
+jobs:
+  pagella:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Programmi necessari
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-numpy
+
+      - name: Scarico l'ultima previsione pubblicata
+        run: |
+          git clone -q --depth 1 -b risultati "https://github.com/${GITHUB_REPOSITORY}.git" /home/runner/vecchio
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          print("CORSA=" + json.load(open("/home/runner/vecchio/indice.json"))["corsa"])
+          PY
+
+      - name: Recupero lo storico
+        run: |
+          if git clone -q --depth 1 -b storico "https://github.com/${GITHUB_REPOSITORY}.git" /home/runner/storico 2>/dev/null; then
+            echo "storico trovato"
+          else
+            mkdir -p /home/runner/storico && cd /home/runner/storico && git init -q -b storico
+            echo "storico nuovo"
+          fi
+
+      - name: Confronto previsione e osservazioni
+        run: |
+          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA"
+
+      - name: Aggiorno lo storico
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd /home/runner/storico
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Pagella aggiornata ($(date -u +%Y-%m-%d\ %H:%M) UTC)" || { echo "niente di nuovo"; exit 0; }
+          git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" storico
