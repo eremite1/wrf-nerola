@@ -17,17 +17,47 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--testo); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { padding: 14px 16px 6px; max-width: 980px; margin: 0 auto; }
-  h1 { font-size: 1.25rem; margin: 0; }
-  .sotto { color: var(--muto); font-size: .86rem; margin-top: 2px; }
-  main { max-width: 980px; margin: 0 auto; padding: 8px 16px 28px; }
+  header { background: var(--card); border-bottom: 1px solid var(--linea); }
+  .testata { max-width: 1240px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 1.3rem; margin: 0; color: var(--accento); }
+  h1 small { font-size: .85rem; font-weight: 400; color: var(--muto); margin-left: 8px; }
+  .sotto { color: var(--muto); font-size: .8rem; margin-left: auto; text-align: right; }
+  main { max-width: 1240px; margin: 0 auto; padding: 14px 16px 28px; }
+  .griglia-pagina { display: grid; grid-template-columns: 250px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .griglia-pagina { grid-template-columns: 1fr; } #laterale { display: none; } .scelte.solo-mobile { display: grid !important; } }
+  .scelte.solo-mobile { display: none; }
+  #laterale { padding: 12px; }
+  #laterale h3 { font-size: .72rem; letter-spacing: .06em; color: var(--muto); margin: 14px 0 6px; font-weight: 600; }
+  #laterale h3:first-child { margin-top: 0; }
+  .voce { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 5px 8px; margin: 1px 0; border: 1px solid transparent;
+          background: transparent; color: var(--testo); border-radius: 10px; font: inherit; font-size: .9rem; cursor: pointer; }
+  .voce:hover { background: var(--evid); }
+  .voce[aria-pressed="true"] { background: var(--evid); color: var(--accento); font-weight: 600; }
+  .voce .ico { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--bg); font-size: 1rem; flex: none; }
+  .voce[aria-pressed="true"] .ico { background: var(--accento); }
+  .modello { display: block; width: 100%; text-align: left; padding: 10px 12px; margin: 4px 0; border: 1px solid var(--linea); background: var(--card);
+             color: var(--testo); border-radius: 12px; font: inherit; cursor: pointer; }
+  .modello b { display: block; }
+  .modello small { color: var(--muto); }
+  .modello[aria-pressed="true"] { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); }
+  .modello[aria-pressed="true"] small { color: var(--accento-testo); opacity: .85; }
+  .testa-mappa { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 4px 10px; border-bottom: 1px solid var(--linea); margin-bottom: 8px; }
+  .testa-mappa strong { font-size: 1.05rem; display: block; }
+  .testa-mappa span { color: var(--muto); font-size: .82rem; }
+  .chip { background: var(--evid); color: var(--muto); font-weight: 600; font-size: .82rem; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .barra { display: flex; gap: 10px; align-items: center; padding-top: 8px; border-top: 1px solid var(--linea); margin-top: 8px; }
+  .barra .cursore-box { flex: 1; position: relative; padding-bottom: 20px; }
+  .giorni { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; font-size: .74rem; color: var(--muto); font-weight: 600; }
+  .giorni span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .giorni span::before { content: ""; position: absolute; left: 50%; top: -6px; height: 4px; border-left: 1px solid var(--muto); }
+  .barra .comandi { margin: 0; }
+  .barra .comandi button#gioca { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); min-width: 52px; }
   .card { background: var(--card); border: 1px solid var(--linea); border-radius: 12px; padding: 12px; }
-  .schede { display: flex; gap: 6px; margin: 8px 0 10px; }
-  .schede button { flex: 1; padding: 9px 10px; border: 1px solid var(--linea); background: var(--card); color: var(--testo);
+  .schede { display: flex; gap: 6px; }
+  .schede button { padding: 8px 16px; border: 1px solid var(--linea); background: var(--card); color: var(--testo);
                    border-radius: 10px; font: inherit; cursor: pointer; }
   .schede button[aria-selected="true"] { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); font-weight: 600; }
   .scelte { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  @media (max-width: 560px) { .scelte { grid-template-columns: 1fr; } }
   label { display: block; font-size: .8rem; color: var(--muto); margin-bottom: 3px; }
   select { width: 100%; padding: 9px 10px; font: inherit; color: var(--testo); background: var(--card); border: 1px solid var(--linea); border-radius: 10px; }
   .quando { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }
@@ -39,7 +69,8 @@
   .comandi button.on { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); }
   input[type=range] { flex: 1; height: 44px; accent-color: var(--accento); }
   .immagine { text-align: center; margin-top: 6px; min-height: 240px; }
-  .immagine img { max-width: 100%; height: auto; border-radius: 8px; background: #fff; }
+  #contenitore { margin: 0 auto; }
+  .immagine img { max-width: 100%; max-height: 78vh; width: auto; height: auto; border-radius: 8px; background: #fff; }
   .errore { padding: 14px; border: 1px solid #c0392b; border-radius: 10px; color: #c0392b; background: var(--card); }
   footer { max-width: 980px; margin: 0 auto; padding: 0 16px 30px; color: var(--muto); font-size: .78rem; }
   footer a { color: var(--accento); }
@@ -73,31 +104,45 @@
 </head>
 <body>
 <header>
-  <h1>Meteo Nerola · WRF a 1 km</h1>
-  <div class="sotto" id="info">Caricamento…</div>
+  <div class="testata">
+    <h1>Meteo Nerola <small>previsioni WRF ad alta risoluzione</small></h1>
+    <div class="schede" role="tablist">
+      <button role="tab" id="s-mappe" aria-selected="true">Mappe</button>
+      <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
+    </div>
+    <div class="sotto" id="info">Caricamento…</div>
+  </div>
 </header>
 <main>
-  <div class="schede" role="tablist">
-    <button role="tab" id="s-mappe" aria-selected="true">Mappe</button>
-    <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
+  <div class="griglia-pagina" id="vista-mappe">
+    <aside class="card" id="laterale">
+      <h3>MODELLO</h3>
+      <div id="lista-modelli"></div>
+      <h3>PARAMETRO</h3>
+      <div id="lista-param"></div>
+    </aside>
+    <section class="card">
+      <div class="scelte solo-mobile">
+        <div><label for="dominio">Zona</label><select id="dominio"></select></div>
+        <div><label for="parametro">Parametro</label><select id="parametro"></select></div>
+      </div>
+      <div class="testa-mappa">
+        <div><strong id="data-ora">–</strong><span id="ora-utc"></span></div>
+        <div class="chip" id="chip-ore">+0h</div>
+      </div>
+      <div class="immagine" id="contenitore"><img id="mappa" alt="Mappa meteo" decoding="async"><div class="marcatore nascosto" id="marcatore"></div></div>
+      <p class="suggerimento" id="suggerimento">Passa sulla mappa per leggere il valore; clicca (o tocca) un punto per il meteogramma di quel punto. Tasto destro sull'immagine per copiarla o salvarla.</p>
+      <div class="barra">
+        <div class="comandi">
+          <button id="indietro" aria-label="Ora precedente">◀</button>
+          <button id="gioca" aria-label="Avvia o ferma">▶</button>
+          <button id="avanti" aria-label="Ora successiva">▶|</button>
+        </div>
+        <div class="cursore-box"><input type="range" id="cursore" min="0" max="0" value="0" aria-label="Scegli l'ora" style="width:100%"><div class="giorni" id="giorni"></div></div>
+      </div>
+      <div id="punto" class="nascosto"></div>
+    </section>
   </div>
-
-  <section id="vista-mappe" class="card">
-    <div class="scelte">
-      <div><label for="dominio">Zona</label><select id="dominio"></select></div>
-      <div><label for="parametro">Parametro</label><select id="parametro"></select></div>
-    </div>
-    <div class="quando"><strong id="data-ora">–</strong><span id="ora-utc"></span></div>
-    <div class="comandi">
-      <button id="indietro" aria-label="Ora precedente">◀</button>
-      <button id="gioca" aria-label="Avvia o ferma">▶</button>
-      <button id="avanti" aria-label="Ora successiva">▶|</button>
-      <input type="range" id="cursore" min="0" max="0" value="0" aria-label="Scegli l'ora">
-    </div>
-    <div class="immagine" id="contenitore"><img id="mappa" alt="Mappa meteo" decoding="async"><div class="marcatore nascosto" id="marcatore"></div></div>
-    <p class="suggerimento" id="suggerimento">Passa sulla mappa per leggere il valore; clicca (o tocca) un punto per il meteogramma di quel punto. Tasto destro sull'immagine per copiarla o salvarla.</p>
-    <div id="punto" class="nascosto"></div>
-  </section>
   <details class="card info" id="spiegazioni">
     <summary>Come si leggono le mappe</summary>
     <h4>Valori del modello</h4>
@@ -134,9 +179,16 @@
 const GRUPPI = [
   ["Principali", ["temperatura", "vento", "umidita", "pressione"]],
   ["Pioggia", ["pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale"]],
-  ["Gelo e nebbia", ["tmin24", "tmax24", "gelata", "nebbia"]],
+  ["Gelo e nebbia", ["gelata", "tmin24", "tmax24", "twmin24", "tprato24", "nebbia"]],
   ["Suolo", ["suolo_temp", "suolo_umidita_10", "suolo_umidita_40"]],
 ];
+const ICONE = { temperatura: "🌡️", vento: "🧭", umidita: "💧", pressione: "🎯", pioggia_1h: "🌧️", pioggia_3h: "🌧️", pioggia_6h: "🌧️", pioggia_12h: "🌧️",
+  pioggia_24h: "🌧️", pioggia_totale: "☔", tmin24: "❄️", tmax24: "🔥", twmin24: "💧", tprato24: "🌱", gelata: "🧊", nebbia: "🌫️",
+  suolo_temp: "🌍", suolo_umidita_10: "🌱", suolo_umidita_40: "🌱" };
+const BREVE = { temperatura: "Temperatura", vento: "Vento", umidita: "Umidità", pressione: "Pressione",
+  pioggia_1h: "Pioggia 1 h", pioggia_3h: "Pioggia 3 h", pioggia_6h: "Pioggia 6 h", pioggia_12h: "Pioggia 12 h", pioggia_24h: "Pioggia 24 h",
+  pioggia_totale: "Pioggia totale", tmin24: "Minima 24 h", tmax24: "Massima 24 h", twmin24: "Bulbo umido min. 24 h", tprato24: "Suolo min. 24 h",
+  gelata: "Brina e gelate", nebbia: "Nebbia", suolo_temp: "Temperatura suolo", suolo_umidita_10: "Umidità suolo 0-10 cm", suolo_umidita_40: "Umidità suolo 10-40 cm" };
 const $ = (id) => document.getElementById(id);
 let indice = null, immagini = [], posizione = 0, timer = null;
 let griglia = null, valoriParam = null, puntoScelto = null;
@@ -162,8 +214,16 @@ async function carica() {
   $("info").textContent = `Corsa ECMWF del ${c.slice(6, 8)}/${c.slice(4, 6)}/${c.slice(0, 4)} ore ${c.slice(8, 10)} UTC · aggiornata ${indice.creato.replace("T", " ").replace("Z", " UTC")}`;
   const dom = $("dominio");
   for (const [k, v] of Object.entries(indice.domini)) dom.add(new Option("Dominio " + v.etichetta + (k === "1km" ? " (zona di Nerola)" : " (area più ampia)"), k));
-  dom.onchange = () => { puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); };
-  $("parametro").onchange = scegliParametro;
+  const lm = $("lista-modelli");
+  for (const [k, v] of Object.entries(indice.domini)) {
+    const b = document.createElement("button");
+    b.className = "modello"; b.dataset.dom = k;
+    b.innerHTML = `<b>WRF ${v.etichetta}</b><small>${k === "1km" ? "zona di Nerola, circa 73 km" : "area più ampia, circa 240 km"}</small>`;
+    b.onclick = () => { dom.value = k; dom.onchange(); };
+    lm.appendChild(b);
+  }
+  dom.onchange = () => { puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); evidenzia(); };
+  $("parametro").onchange = () => { scegliParametro(); evidenzia(); };
   $("cursore").oninput = () => mostra(+$("cursore").value, false);
   $("indietro").onclick = () => { ferma(); mostra(posizione - 1); };
   $("avanti").onclick = () => { ferma(); mostra(posizione + 1); };
@@ -243,7 +303,52 @@ function riempiParametri(primo) {
     sel.appendChild(og);
   }
   if (dom.parametri[prec]) sel.value = prec;
+  costruisciLaterale();
   scegliParametro(primo === true);
+}
+
+function costruisciLaterale() {
+  const dom = indice.domini[$("dominio").value], box = $("lista-param");
+  box.innerHTML = "";
+  const sel = $("parametro");
+  for (const og of sel.querySelectorAll("optgroup")) {
+    const h = document.createElement("h3");
+    h.textContent = og.label.toUpperCase();
+    box.appendChild(h);
+    for (const op of og.querySelectorAll("option")) {
+      const b = document.createElement("button");
+      b.className = "voce"; b.dataset.id = op.value;
+      b.innerHTML = `<span class="ico">${ICONE[op.value] || "•"}</span><span>${BREVE[op.value] || dom.parametri[op.value].titolo}</span>`;
+      b.onclick = () => { sel.value = op.value; scegliParametro(); evidenzia(); };
+      box.appendChild(b);
+    }
+  }
+  evidenzia();
+}
+
+function evidenzia() {
+  document.querySelectorAll("#lista-param .voce").forEach((b) => b.setAttribute("aria-pressed", b.dataset.id === $("parametro").value));
+  document.querySelectorAll("#lista-modelli .modello").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dom === $("dominio").value));
+}
+
+function costruisciGiorni() {
+  const box = $("giorni");
+  box.innerHTML = "";
+  const n = immagini.length;
+  if (n < 2) return;
+  const fmt = new Intl.DateTimeFormat("it-IT", { weekday: "short", day: "numeric", timeZone: "Europe/Rome" });
+  const gior = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(d);
+  let prec = gior(data(immagini[0].valido_utc));
+  for (let i = 1; i < n; i++) {
+    const d = data(immagini[i].valido_utc), g = gior(d);
+    if (g !== prec) {
+      prec = g;
+      const sp = document.createElement("span");
+      sp.style.left = (100 * i / (n - 1)) + "%";
+      sp.textContent = fmt.format(d).replace(".", "");
+      box.appendChild(sp);
+    }
+  }
 }
 
 function scegliParametro() {
@@ -253,6 +358,7 @@ function scegliParametro() {
   const quandoPrima = immagini.length ? data(immagini[posizione].valido_utc).getTime() : null;
   immagini = p.immagini;
   caricaValori().catch(() => {});
+  costruisciGiorni();
   $("cursore").max = immagini.length - 1;
   // resta sull'ora che si stava guardando (o la piu' vicina); all'inizio parte da "adesso" se e' dentro la previsione
   let obiettivo = quandoPrima ?? Date.now();
@@ -269,6 +375,8 @@ function mostra(i, aggiornaCursore = true) {
   const g = fmtGiorno.format(d);
   $("data-ora").textContent = g.charAt(0).toUpperCase() + g.slice(1) + " (ora locale)";
   $("ora-utc").textContent = fmtUtc.format(d) + " UTC · " + (posizione + 1) + "/" + immagini.length;
+  const t0 = indice.domini[$("dominio").value].serie;
+  $("chip-ore").textContent = "+" + Math.round((d - data(t0.tempi[0])) / 3600000) + "h";
   $("mappa").src = im.file;
   $("mappa").alt = indice.domini[$("dominio").value].parametri[$("parametro").value].titolo;
   if (aggiornaCursore) $("cursore").value = posizione;

@@ -43,7 +43,7 @@ CREDITI = "Rilievo: Terrain Tiles (SRTM/GMTED) · Confini: ISTAT, Natural Earth 
 DOMINI = (("d02", "1km", "1 km"), ("d01", "3km", "3 km"))
 
 FIG = (7.6, 6.6)   # pollici
-DPI = 85
+DPI = 105
 AREA_MAPPA = [0.03, 0.09, 0.80, 0.76]   # sinistra, basso, larghezza, altezza (frazioni della figura)
 AREA_LEGENDA = [0.725, 0.22, 0.022, 0.56]
 GRADO_PER_KM_LAT = 1 / 111.0
