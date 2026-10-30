@@ -21,6 +21,10 @@ valide solo al livello del mare).
 import numpy as np
 
 G = 9.81
+PIOGGIA, MISTA, NEVE, GELICIDIO, GRANULI = 0, 1, 2, 3, 4
+# soglie di Bourgouin (2000) in J/kg, convertite in gradi C x metri: area[J/kg] = g/273,15 x area[C x m]
+A_NEVE = 5.6 * 273.15 / G        # circa 156: sotto, la neve non fonde abbastanza -> neve
+A_PIOGGIA = 13.2 * 273.15 / G    # circa 368: sopra, la neve fonde del tutto -> liquida
 
 
 def pressione_vapore_saturo(tc):
@@ -69,8 +73,17 @@ def indici(T_k, p_pa, qv, z_w, hgt, p_cima=500.0):
     sopra_zero = (tw > 0.0) & dentro
     k_alto = np.where(sopra_zero, k, -1).max(axis=0)          # ultimo livello (dal basso) ancora sopra 0
     ztw0 = np.where(k_alto < 0, hgt, np.take_along_axis(z_w, np.clip(k_alto + 1, 0, nz)[None], axis=0)[0])
+    # quota neve effettiva: il livello piu' basso dove un fiocco che arriva dall'alto si mantiene neve, cioe' dove il
+    # bulbo umido e' <= 2 gradi e l'area di fusione accumulata negli strati SOPRA (bulbo umido > 2) e' ancora sotto
+    # la soglia della neve (A_NEVE). Non e' quindi la quota dello zero di bulbo umido: uno strato tra 0 e 2 gradi
+    # lascia vivere il fiocco, uno strato sopra 2 gradi lo fa fondere.
+    fusione = np.where(caldo, (tw - 2.0) * dz, 0.0)
+    sopra = np.cumsum(fusione[::-1], axis=0)[::-1] - fusione        # fusione accumulata negli strati sopra il livello k
+    neve = (tw <= 2.0) & dentro & (sopra < A_NEVE)
+    k_neve = np.where(neve, k, nz).min(axis=0)
+    zneve = np.where(k_neve >= nz, np.nan, np.take_along_axis(zc, np.clip(k_neve, 0, nz - 1)[None], axis=0)[0])
     return {"TW2": tw[0].astype("float32"), "AFUS": afus.astype("float32"), "ARIG": arig.astype("float32"),
-            "ZTW0": ztw0.astype("float32")}
+            "ZTW0": ztw0.astype("float32"), "ZNEVE": zneve.astype("float32")}
 
 
 def da_wrfout(nc):
@@ -86,10 +99,6 @@ def da_wrfout(nc):
 
 # ------------------------------------------------------------------------------------------------- classificazione
 
-PIOGGIA, MISTA, NEVE, GELICIDIO, GRANULI = 0, 1, 2, 3, 4
-# soglie di Bourgouin (2000) in J/kg, convertite in gradi C x metri: area[J/kg] = g/273,15 x area[C x m]
-A_NEVE = 5.6 * 273.15 / G        # circa 156: sotto, la neve non fonde abbastanza -> neve
-A_PIOGGIA = 13.2 * 273.15 / G    # circa 368: sopra, la neve fonde del tutto -> liquida
 
 
 def classifica(afus, arig, tw_suolo):
