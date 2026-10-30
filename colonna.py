@@ -129,3 +129,94 @@ if __name__ == "__main__":
           lambda zc: np.where(zc < 300, -3, np.where(zc < 1000, -3 + (zc - 300) / 700 * 8, np.where(zc < 2000, 5, 5 - (zc - 2000) * 0.0065))))
     prova("strato caldo +3 tra 1500 e 2000 m, -8 sotto 1200 m (spesso)",
           lambda zc: np.where(zc < 1200, -8, np.where(zc < 1500, -8 + (zc - 1200) / 300 * 11, np.where(zc < 2000, 3, 3 - (zc - 2000) * 0.0065))))
+
+
+# ------------------------------------------------------------------------------------------------- parametri per il nowcasting
+
+def _a_livello(campo, p, p_liv):
+    """Valore di un campo 3D [livello, y, x] alla pressione p_liv (hPa), interpolato in log(p). NaN sotto il suolo."""
+    lp = np.log(p)
+    target = np.log(p_liv)
+    nz = p.shape[0]
+    # primo livello (dal basso) con pressione sotto il bersaglio
+    sopra = (p < p_liv)
+    k = np.argmax(sopra, axis=0)
+    k = np.clip(k, 1, nz - 1)
+    lp1 = np.take_along_axis(lp, (k - 1)[None], 0)[0]
+    lp2 = np.take_along_axis(lp, k[None], 0)[0]
+    c1 = np.take_along_axis(campo, (k - 1)[None], 0)[0]
+    c2 = np.take_along_axis(campo, k[None], 0)[0]
+    w = np.clip((target - lp1) / np.where(lp2 != lp1, lp2 - lp1, 1e-9), 0, 1)
+    out = c1 + w * (c2 - c1)
+    return np.where(p[0] < p_liv, np.nan, out)
+
+
+def parametri_nowcasting(nc):
+    """Dal wrfout: vento che spinge i temporali (media 850-500 hPa) e a 700 hPa, moto verticale e umidita' relativa a
+    700 hPa, convergenza al suolo, energia disponibile per i temporali (MUCAPE semplificata, metodo della particella).
+    Il vento e' ruotato verso nord/est."""
+    P = (np.array(nc["P"][0]) + np.array(nc["PB"][0])) / 100.0
+    theta = np.array(nc["T"][0]) + 300.0
+    T = theta * (P / 1000.0) ** 0.2854
+    qv = np.maximum(np.array(nc["QVAPOR"][0]), 0.0)
+    U = np.array(nc["U"][0]); V = np.array(nc["V"][0]); W = np.array(nc["W"][0])
+    u = 0.5 * (U[:, :, 1:] + U[:, :, :-1]); v = 0.5 * (V[:, 1:, :] + V[:, :-1, :]); w = 0.5 * (W[1:] + W[:-1])
+    c = np.array(nc["COSALPHA"][0]); s = np.array(nc["SINALPHA"][0])
+    ue = u * c - v * s
+    ve = v * c + u * s
+    e = qv * P / (0.622 + qv)
+    ur = np.clip(100 * e / pressione_vapore_saturo(T - 273.15), 0, 100)
+    out = {}
+    # vento medio 850-500 hPa (pesato in pressione): e' quello che sposta le celle temporalesche
+    pesi = np.where((P <= 850) & (P >= 500), 1.0, 0.0)
+    dp = np.abs(np.gradient(P, axis=0)) * pesi
+    den = np.maximum(dp.sum(0), 1e-6)
+    out["USTEER"] = (ue * dp).sum(0) / den
+    out["VSTEER"] = (ve * dp).sum(0) / den
+    for nome, campo in (("U700", ue), ("V700", ve), ("W700", w), ("RH700", ur)):
+        out[nome] = _a_livello(campo, P, 700.0)
+    # energia per i temporali: particella del livello piu' instabile nei primi 3 km, sollevata (adiabatica secca fino
+    # alla condensazione, poi umida); CAPE = somma di g (Tparticella - Tambiente)/Tambiente dz dove positivo
+    z = (np.array(nc["PH"][0]) + np.array(nc["PHB"][0])) / G
+    zc = 0.5 * (z[1:] + z[:-1])
+    out["CAPE"] = _cape(T, P, qv, zc, z)
+    return {k: np.asarray(v, dtype="float32") for k, v in out.items()}
+
+
+def _cape(T, P, qv, zc, zw):
+    Rd, cp, Lv, eps = 287.04, 1004.0, 2.5e6, 0.622
+    nz = T.shape[0]
+    hgt = zw[0]
+    # temperatura potenziale equivalente (Bolton) per scegliere la particella piu' instabile nei primi 3 km
+    e = qv * P / (eps + qv)
+    td = 243.5 * np.log(np.maximum(e, 1e-3) / 6.112) / (17.67 - np.log(np.maximum(e, 1e-3) / 6.112)) + 273.15
+    tl = 1 / (1 / (td - 56) + np.log(T / td) / 800) + 56
+    the = T * (1000 / P) ** (0.2854 * (1 - 0.28 * qv)) * np.exp((3.376 / tl - 0.00254) * qv * 1000 * (1 + 0.81 * qv))
+    bassi = (zc - hgt[None]) < 3000
+    k0 = np.argmax(np.where(bassi, the, -1), axis=0)
+    Tp = np.take_along_axis(T, k0[None], 0)[0]
+    qp = np.take_along_axis(qv, k0[None], 0)[0]
+    Pp = np.take_along_axis(P, k0[None], 0)[0]
+    th_e_p = np.take_along_axis(the, k0[None], 0)[0]
+    tlp = np.take_along_axis(tl, k0[None], 0)[0]
+    plcl = Pp * (tlp / Tp) ** (1 / 0.2854)
+    cape = np.zeros(Tp.shape)
+    k = np.arange(nz)[:, None, None]
+    for j in range(nz):
+        sopra = j >= k0
+        Pj, Tj = P[j], T[j]
+        secco = Pj >= plcl
+        Tsec = Tp * (Pj / Pp) ** 0.2854
+        # sopra la condensazione: temperatura con la stessa theta-e della particella (Newton)
+        Tu = np.where(secco, Tsec, Tj)
+        for _ in range(6):
+            es = 6.112 * np.exp(17.67 * (Tu - 273.15) / (Tu - 29.65))
+            qs = eps * es / np.maximum(Pj - es, 1e-3)
+            th = Tu * (1000 / Pj) ** (0.2854 * (1 - 0.28 * qs)) * np.exp((3.376 / np.maximum(Tu - 0.5, 150) - 0.00254) * qs * 1000 * (1 + 0.81 * qs))
+            f = th - th_e_p
+            Tu = Tu - f / np.maximum(th / Tu * (1 + 2.5e6 * qs / (461.5 * Tu)), 1e-3)
+        Tpar = np.where(secco, Tsec, Tu)
+        dz = zw[j + 1] - zw[j]
+        b = 9.81 * (Tpar - Tj) / Tj
+        cape += np.where(sopra & (b > 0) & (Pj > 150), b * dz, 0.0)
+    return np.minimum(cape, 6000)

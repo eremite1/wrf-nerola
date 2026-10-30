@@ -1,0 +1,54 @@
+name: "Sentinella WRF"
+run-name: "Sentinella WRF"
+
+# GitHub fa partire gli avvii a orario anche con molte ore di ritardo. Questa sentinella resta accesa (circa 5 ore e
+# 45 minuti, poi riparte da sola) e ogni 15 minuti controlla se ECMWF ha pubblicato una corsa piu' nuova di quella
+# dell'ultima previsione: se si', e se il WRF non sta gia' girando, lo fa partire subito.
+on:
+  schedule:
+    - cron: "41 */2 * * *"     # solo riserva, se la catena si interrompe
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/sentinella.yml"]
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: sentinella
+  cancel-in-progress: false
+
+jobs:
+  guarda:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - name: Controllo ogni 15 minuti
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq python3-requests >/dev/null
+          INIZIO=$(date +%s)
+          while [ $(( ($(date +%s) - INIZIO) / 60 )) -lt 340 ]; do
+            NUOVA=$(python3 scarica_ecmwf.py --trova --ore 48 2>/dev/null | tail -n 1 || true)
+            FATTA=$(curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/risultati/LEGGIMI.md" 2>/dev/null \
+                    | grep -o '[0-9]\{10\}' | head -n 1 || true)
+            ATTIVI=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow previsione-nerola.yml --json status \
+                     --jq '[.[] | select(.status != "completed")] | length' 2>/dev/null || echo 0)
+            echo "$(date -u +%H:%M) ECMWF disponibile: ${NUOVA:-?}, ultima previsione: ${FATTA:-?}, WRF in corso: $ATTIVI"
+            if [ -n "$NUOVA" ] && [ "$NUOVA" -gt "${FATTA:-0}" ] 2>/dev/null && [ "$ATTIVI" = "0" ]; then
+              echo "  -> faccio partire il WRF con la corsa $NUOVA"
+              gh workflow run previsione-nerola.yml --repo "$GITHUB_REPOSITORY" --ref main -f ore=48 -f ore_blocco=24 || true
+              sleep 300
+            fi
+            sleep 900
+          done
+      - name: Riparto
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run sentinella.yml --repo "$GITHUB_REPOSITORY" --ref main || echo "riavvio non riuscito: ci pensa la riserva"

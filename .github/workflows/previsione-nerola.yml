@@ -8,9 +8,8 @@ run-name: "Previsione Nerola ${{ inputs.ore || '48' }} h (blocchi da ${{ inputs.
 on:
   # Avvio automatico due volte al giorno (orari UTC): le corse ECMWF delle 00 e delle 12 sono complete circa 7-8 ore dopo.
   # Con l'avvio automatico si fanno 48 ore con blocchi da 24 (gli ingressi qui sotto valgono solo per l'avvio a mano).
-  schedule:
-    - cron: "30 8 * * *"
-    - cron: "30 20 * * *"
+  # niente piu' avvii a orario (GitHub li ritardava anche di 7 ore): il WRF lo fa partire la "Sentinella WRF"
+  # (sentinella.yml) appena ECMWF pubblica una corsa nuova.
   workflow_dispatch:
     inputs:
       ore:

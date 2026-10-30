@@ -60,6 +60,9 @@ def main():
                 try:
                     for k, v in colonna.da_wrfout(nc).items():
                         dati.setdefault(k, []).append(v)
+                    if all(x in nc.variables for x in ("U", "V", "W", "COSALPHA", "SINALPHA")):
+                        for k, v in colonna.parametri_nowcasting(nc).items():
+                            dati.setdefault(k, []).append(v)
                 except Exception as e:  # noqa: BLE001
                     print("ATTENZIONE: colonna d'aria non calcolata:", e, file=sys.stderr)
             c, s = np.array(nc["COSALPHA"][0]), np.array(nc["SINALPHA"][0])
