@@ -29,6 +29,9 @@
   #laterale { padding: 12px; }
   #laterale h3 { font-size: .72rem; letter-spacing: .06em; color: var(--muto); margin: 14px 0 6px; font-weight: 600; }
   #laterale h3:first-child { margin-top: 0; }
+  .sezione { display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; background: transparent; color: var(--muto);
+             font: inherit; font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; padding: 10px 4px 4px; cursor: pointer; }
+  .sezione[aria-expanded="false"] .freccia { transform: rotate(-90deg); }
   .voce { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 5px 8px; margin: 1px 0; border: 1px solid transparent;
           background: transparent; color: var(--testo); border-radius: 10px; font: inherit; font-size: .9rem; cursor: pointer; }
   .voce:hover { background: var(--evid); }
@@ -197,18 +200,22 @@
 <script>
 "use strict";
 const GRUPPI = [
-  ["Principali", ["temperatura", "vento", "umidita", "pressione"]],
-  ["Pioggia", ["pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale"]],
+  ["Tempo", ["temperatura", "percepita", "umidita", "tdew", "pressione", "nuvolosita", "radiazione"]],
+  ["Vento", ["vento", "pbl"]],
+  ["Precipitazioni", ["pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale", "tipo_prec", "neve_24h", "quota_neve", "cape"]],
   ["Gelo e nebbia", ["gelata", "tmin24", "tmax24", "twmin24", "tprato24", "nebbia"]],
-  ["Suolo", ["suolo_temp", "suolo_umidita_10", "suolo_umidita_40"]],
+  ["Suolo e agricoltura", ["suolo_temp", "suolo_umidita_10", "suolo_umidita_40", "et0_24h"]],
 ];
+const ICONE_SEZ = { "Tempo": "⛅", "Vento": "🌬️", "Precipitazioni": "🌧️", "Gelo e nebbia": "❄️", "Suolo e agricoltura": "🌱" };
 const ICONE = { temperatura: "🌡️", vento: "🧭", umidita: "💧", pressione: "🎯", pioggia_1h: "🌧️", pioggia_3h: "🌧️", pioggia_6h: "🌧️", pioggia_12h: "🌧️",
   pioggia_24h: "🌧️", pioggia_totale: "☔", tmin24: "❄️", tmax24: "🔥", twmin24: "💧", tprato24: "🌱", gelata: "🧊", nebbia: "🌫️",
-  suolo_temp: "🌍", suolo_umidita_10: "🌱", suolo_umidita_40: "🌱" };
+  suolo_temp: "🌍", suolo_umidita_10: "🌱", suolo_umidita_40: "🌱", percepita: "🥵", tdew: "💦", nuvolosita: "☁️", radiazione: "☀️", pbl: "🌀",
+  neve_24h: "🌨️", tipo_prec: "🌦️", quota_neve: "🏔️", cape: "⚡", et0_24h: "🚿" };
 const BREVE = { temperatura: "Temperatura", vento: "Vento", umidita: "Umidità", pressione: "Pressione",
   pioggia_1h: "Pioggia 1 h", pioggia_3h: "Pioggia 3 h", pioggia_6h: "Pioggia 6 h", pioggia_12h: "Pioggia 12 h", pioggia_24h: "Pioggia 24 h",
   pioggia_totale: "Pioggia totale", tmin24: "Minima 24 h", tmax24: "Massima 24 h", twmin24: "Bulbo umido min. 24 h", tprato24: "Suolo min. 24 h",
-  gelata: "Brina e gelate", nebbia: "Nebbia", suolo_temp: "Temperatura suolo", suolo_umidita_10: "Umidità suolo 0-10 cm", suolo_umidita_40: "Umidità suolo 10-40 cm" };
+  gelata: "Brina e gelate", nebbia: "Nebbia", percepita: "Temperatura percepita", tdew: "Punto di rugiada", nuvolosita: "Nuvolosità", radiazione: "Radiazione solare",
+  pbl: "Strato limite", neve_24h: "Neve 24 h", tipo_prec: "Tipo di precipitazione", quota_neve: "Quota neve", cape: "Temporali (CAPE)", et0_24h: "Evapotraspirazione 24 h", suolo_temp: "Temperatura suolo", suolo_umidita_10: "Umidità suolo 0-10 cm", suolo_umidita_40: "Umidità suolo 10-40 cm" };
 const $ = (id) => document.getElementById(id);
 let indice = null, immagini = [], posizione = 0, timer = null;
 let griglia = null, valoriParam = null, puntoScelto = null;
@@ -329,21 +336,33 @@ function riempiParametri(primo) {
   scegliParametro(primo === true);
 }
 
+const sezioniAperte = new Set(["Tempo"]);
+
 function costruisciLaterale() {
   const dom = indice.domini[$("dominio").value], box = $("lista-param");
   box.innerHTML = "";
   const sel = $("parametro");
   for (const og of sel.querySelectorAll("optgroup")) {
-    const h = document.createElement("h3");
-    h.textContent = og.label.toUpperCase();
-    box.appendChild(h);
+    const sez = document.createElement("div");
+    const attiva = [...og.querySelectorAll("option")].some((o) => o.value === sel.value);
+    if (attiva) sezioniAperte.add(og.label);
+    const h = document.createElement("button");
+    h.className = "sezione";
+    h.innerHTML = `<span>${ICONE_SEZ[og.label] || ""} ${og.label}</span><span class="freccia">▾</span>`;
+    const corpo = document.createElement("div");
+    corpo.className = "corpo-sezione";
+    const aggiorna = () => { const ap = sezioniAperte.has(og.label); corpo.classList.toggle("nascosto", !ap); h.setAttribute("aria-expanded", ap); };
+    h.onclick = () => { sezioniAperte.has(og.label) ? sezioniAperte.delete(og.label) : sezioniAperte.add(og.label); aggiorna(); };
     for (const op of og.querySelectorAll("option")) {
       const b = document.createElement("button");
       b.className = "voce"; b.dataset.id = op.value;
       b.innerHTML = `<span class="ico">${ICONE[op.value] || "•"}</span><span>${BREVE[op.value] || dom.parametri[op.value].titolo}</span>`;
       b.onclick = () => { sel.value = op.value; scegliParametro(); evidenzia(); };
-      box.appendChild(b);
+      corpo.appendChild(b);
     }
+    sez.append(h, corpo);
+    box.appendChild(sez);
+    aggiorna();
   }
   evidenzia();
 }

@@ -33,6 +33,7 @@ from matplotlib.collections import LineCollection  # noqa: E402
 from PIL import Image  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import colonna  # noqa: E402
 import sfondo as sfondo_mod  # noqa: E402
 import uscite  # noqa: E402
 
@@ -145,6 +146,86 @@ def finestra(a, i, n, f):
 CLASSI_GELO = ["nessuna", "brina", "gelata", "gelata forte"]
 
 
+# ---------------------------------------------------------------- altri campi calcolati dal modello
+
+def punto_rugiada(d):
+    e = np.maximum(d["Q2"] * (d["PSFC"] / 100.0) / (0.622 + d["Q2"]), 1e-4)
+    x = np.log(e / 6.112)
+    return 243.5 * x / (17.67 - x)
+
+
+def temperatura_percepita(d):
+    """Indice di calore (Rothfusz) quando fa caldo e umido, temperatura di vento (formula canadese/USA) quando fa freddo e c'e' vento."""
+    t = d["T2"] - 273.15
+    rh = rh2(d)
+    v = np.hypot(d["U10"], d["V10"]) * 3.6
+    tf = t * 1.8 + 32
+    hi = (-42.379 + 2.04901523 * tf + 10.14333127 * rh - 0.22475541 * tf * rh - 0.00683783 * tf ** 2 - 0.05481717 * rh ** 2
+          + 0.00122874 * tf ** 2 * rh + 0.00085282 * tf * rh ** 2 - 0.00000199 * tf ** 2 * rh ** 2)
+    hi = (hi - 32) / 1.8
+    wc = 13.12 + 0.6215 * t - 11.37 * np.maximum(v, 4.8) ** 0.16 + 0.3965 * t * np.maximum(v, 4.8) ** 0.16
+    return np.where((t >= 27) & (rh >= 40), np.maximum(hi, t), np.where((t <= 10) & (v >= 4.8), np.minimum(wc, t), t))
+
+
+_CACHE_NUV = {}
+
+
+def nuvolosita(d):
+    """Indice di nuvolosita' 0-100 % dalla radiazione a onda lunga verso il basso (GLW) confrontata con cielo sereno (Brutsaert) e coperto."""
+    k = id(d)
+    if k not in _CACHE_NUV:
+        _CACHE_NUV.clear()
+        tk = d["T2"]
+        e = d["Q2"] * (d["PSFC"] / 100.0) / (0.622 + d["Q2"])
+        eps = np.clip(1.24 * (np.maximum(e, 0.1) / tk) ** (1 / 7), 0.55, 0.95)
+        sereno = eps * SIGMA * tk ** 4
+        coperto = 0.97 * SIGMA * tk ** 4
+        n = np.clip((d["GLW"] - sereno) / (coperto - sereno), 0, 1) * 100
+        _CACHE_NUV[k] = np.where(d["GLW"] < 1.0, np.nan, n)
+    return _CACHE_NUV[k]
+
+
+_CACHE_ET0 = {}
+
+
+def et0_oraria(d):
+    """Evapotraspirazione di riferimento oraria (mm/h), formula FAO-56 Penman-Monteith con i campi del modello:
+    radiazione solare (SWDOWN), radiazione a onda lunga (GLW) e temperatura della superficie (TSK) per il bilancio radiativo."""
+    k = id(d)
+    if k not in _CACHE_ET0:
+        _CACHE_ET0.clear()
+        t = d["T2"] - 273.15
+        p = d["PSFC"] / 1000.0                                  # kPa
+        es = 0.6108 * np.exp(17.27 * t / (t + 237.3))
+        ea = d["Q2"] * p / (0.622 + d["Q2"])
+        delta = 4098 * es / (t + 237.3) ** 2
+        gamma = 0.000665 * p
+        u2 = 0.748 * np.hypot(d["U10"], d["V10"])
+        rns = 0.77 * d["SWDOWN"] * 0.0036                       # MJ/m2/h, albedo 0,23 (prato di riferimento)
+        rnl = (0.98 * SIGMA * d["TSK"] ** 4 - d["GLW"]) * 0.0036
+        rn = rns - rnl
+        g = np.where(d["SWDOWN"] > SOGLIA_NOTTE, 0.1, 0.5) * rn
+        et = (0.408 * delta * (rn - g) + gamma * 37.0 / (t + 273.0) * u2 * np.maximum(es - ea, 0)) / (delta + gamma * (1 + 0.34 * u2))
+        _CACHE_ET0[k] = np.clip(np.where(d["GLW"] < 1.0, np.nan, et), 0, 2.0)
+    return _CACHE_ET0[k]
+
+
+def tipo_precipitazione(d, i):
+    """0 nessuna, 1 pioggia, 2 mista, 3 neve, 4 gelicidio, 5 granuli di ghiaccio (colonna d'aria, vedi colonna.py), solo dove sta piovendo."""
+    pr = uscite.pioggia(d)
+    piove = (pr[i] - pr[i - 1]) >= 0.1
+    return np.where(piove, colonna.classifica(d["AFUS"][i], d["ARIG"][i], d["TW2"][i]) + 1, 0).astype("float64")
+
+
+SOGLIA_NOTTE = 15.0    # W/m2: sotto questa radiazione solare e' notte
+NEVE_COL = ["#ffffff", "#e3f0ff", "#c2dcff", "#9ec5ff", "#7aa8f5", "#8a8ae0", "#a46ad0", "#c050c0", "#d83aa0"]
+
+
+def classi_neve(soglie):
+    etichette = [f"< {soglie[0]:g}"] + [f"{a:g} - {b:g}" for a, b in zip(soglie[:-1], soglie[1:])] + [f"> {soglie[-1]:g}"]
+    return {"bordi": soglie, "colori": NEVE_COL[:len(soglie) + 1], "etichette": etichette, "nascondi": {0}}
+
+
 # ---------------------------------------------------------------- definizione dei parametri
 # Parametri a classi (colori a gradini): "bordi" sono le soglie, i colori e le etichette sono uno per classe
 # (len(bordi)+1); le classi in "nascondi" non si colorano (sono "niente da segnalare").
@@ -186,6 +267,36 @@ PARAMETRI = [
     {"id": "pressione", "titolo": "Pressione ridotta al livello del mare", "unita": "hPa",
      "calcola": lambda d, i: pressione_mare(d)[i], "cmap": "Spectral_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
     p_pioggia(1), p_pioggia(3), p_pioggia(6), p_pioggia(12), p_pioggia(24), p_pioggia(0),
+    {"id": "percepita", "titolo": "Temperatura percepita", "unita": "°C", "calcola": lambda d, i: temperatura_percepita(d)[i],
+     "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True,
+     "nota": "indice di calore con caldo umido, temperatura di vento con freddo e vento"},
+    {"id": "tdew", "titolo": "Punto di rugiada a 2 m", "unita": "°C", "calcola": lambda d, i: punto_rugiada(d)[i],
+     "cmap": "YlGnBu", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
+    {"id": "nuvolosita", "titolo": "Nuvolosità (stima)", "unita": "%", "calcola": lambda d, i: nuvolosita(d)[i],
+     "cmap": "Greys", "limiti": (0, 100), "passo": 3, "inizio": 1,
+     "nota": "stimata dalla radiazione infrarossa che arriva al suolo: 0 cielo sereno, 100 coperto"},
+    {"id": "radiazione", "titolo": "Radiazione solare al suolo", "unita": "W/m²", "calcola": lambda d, i: d["SWDOWN"][i],
+     "cmap": "YlOrRd", "limiti": (0, 900), "passo": 3, "inizio": 0},
+    {"id": "pbl", "titolo": "Altezza dello strato limite", "unita": "m", "calcola": lambda d, i: d["PBLH"][i],
+     "cmap": "viridis", "limiti": (0, 2500), "passo": 3, "inizio": 0, "serve": "PBLH",
+     "nota": "spessore dello strato d'aria rimescolato vicino al suolo: ventilazione e moti convettivi"},
+    {"id": "neve_24h", "titolo": "Neve nelle ultime 24 ore", "unita": "mm", "calcola": lambda d, i: d["SNOWNC"][i] - d["SNOWNC"][i - 24],
+     "classi": classi_neve([0.1, 0.5, 1, 2, 5, 10, 20, 40]), "passo": 3, "inizio": 24, "serve": "SNOWNC",
+     "nota": "mm di acqua equivalente: circa 10 cm di neve fresca per ogni 10 mm"},
+    {"id": "tipo_prec", "titolo": "Tipo di precipitazione", "unita": "", "calcola": tipo_precipitazione, "passo": 1, "inizio": 1,
+     "serve": "AFUS", "classi": {"bordi": [0.5, 1.5, 2.5, 3.5, 4.5],
+                                 "colori": ["#ffffff", "#2a6cc7", "#9b59d0", "#6fd3ee", "#e03c8a", "#f2a31b"],
+                                 "etichette": ["nessuna", "pioggia", "mista", "neve", "gelicidio", "granuli"], "nascondi": {0}},
+     "scala": 1, "unita_dato": "", "etichetta_dato": "Tipo di precipitazione",
+     "nota": "dalla temperatura di bulbo umido lungo tutta la colonna d'aria; mostrato dove cade almeno 0,1 mm in un'ora"},
+    {"id": "quota_neve", "titolo": "Quota neve (bulbo umido 0 °C)", "unita": "m", "calcola": lambda d, i: d["ZTW0"][i],
+     "cmap": "GnBu", "limiti": (0, 3500), "passo": 3, "inizio": 0, "serve": "ZTW0",
+     "nota": "quota sopra la quale il bulbo umido resta sotto 0 °C"},
+    {"id": "cape", "titolo": "Energia dei temporali (CAPE)", "unita": "J/kg", "calcola": lambda d, i: d["CAPE"][i],
+     "cmap": "YlOrRd", "limiti": (0, 2000), "passo": 3, "inizio": 0, "serve": "CAPE"},
+    {"id": "et0_24h", "titolo": "Evapotraspirazione di riferimento (24 h)", "unita": "mm", "calcola": lambda d, i: np.nansum(et0_oraria(d)[i - 23:i + 1], axis=0),
+     "cmap": "YlGn", "limiti": (0, 6), "passo": 3, "inizio": 24, "terra": True,
+     "nota": "acqua che un prato ben irrigato perde in 24 ore (FAO-56 Penman-Monteith con i campi del modello)"},
     {"id": "tmin24", "titolo": "Temperatura minima a 2 m nelle ultime 24 ore", "unita": "°C",
      "calcola": lambda d, i: finestra(gelo(d)[0], i, 24, np.min), "cmap": "RdYlBu_r", "limiti": "auto",
      "passo": 3, "inizio": 24, "isolinee": True},
