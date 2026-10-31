@@ -17,28 +17,16 @@ jobs:
           H = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) wrf-nerola"}
           def raw(u):
               return urllib.request.urlopen(urllib.request.Request(u, headers=H), timeout=40).read().decode("utf-8", "replace")
-          def get(u, n=900):
-              try:
-                  b = raw(u); return f"OK {len(b)} byte :: " + " ".join(b[:n].split())
-              except Exception as e:
-                  return "ERRORE " + str(e)[:200]
-          print("### livemap: script e indirizzi")
+          j = json.loads(raw("https://dati.lazio.it/api/3/action/package_search?q=meteo&rows=20"))["result"]["results"]
+          for d in j:
+              print("=== ", d["name"], "|", d["title"], "|", d.get("metadata_modified"))
+              for r in d["resources"]:
+                  print("   -", r.get("name"), "|", r.get("format"), "|", r.get("url"))
+          print("### API meteonetwork")
           try:
-              h = raw("https://www.meteonetwork.it/rete/livemap/")
-              for m in sorted(set(re.findall(r'(?:src|href)="([^"]+)"', h))): print(m)
-              for m in sorted(set(re.findall(r"['\"](/[^'\" ]*(?:json|api|data|station)[^'\" ]*)['\"]", h))): print("PERCORSO", m)
+              t = re.sub(r"<[^>]+>", " ", raw("https://www.meteonetwork.it/supporto/meteonetwork-api/"))
+              print(" ".join(t.split())[:3500])
           except Exception as e: print("ERRORE", e)
-          for u in ["https://www.meteonetwork.it/rete/livemap/stations.json", "https://www.meteonetwork.it/rete/livemap/data/",
-                    "https://www.meteonetwork.it/rete/livemap/json/"]:
-              print("###", u); print(get(u))
-          print("### CKAN Lazio")
-          print(get("https://dati.lazio.it/catalog/api/3/action/package_search?q=stazioni+meteo&rows=15", 3000))
-          print(get("https://dati.lazio.it/api/3/action/package_search?q=meteo&rows=15", 3000))
-          print("### aegis")
-          print(get("https://temporeale.regione.lazio.it/aegis", 1500))
-          print("### ogimet elenco stazioni vicine")
-          for b in ("16235","16239","16241","16243","16245","16246","16247","16248","16252","16215","16216","16217","16218","16219","16220"):
-              r = get(f"https://www.ogimet.com/cgi-bin/getsynop?block={b}&begin=202610310000&end=202610311200", 160); print(b, r[:200])
           PY
       - name: Salvo l'esito nel ramo prova
         env:
