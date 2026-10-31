@@ -298,12 +298,13 @@ def ore_rischio_funghi_24(d, i):
     return (bagnato & (t >= 10.0) & (t <= 25.0)).sum(axis=0).astype("float64")
 
 
-def favorevolezza_funghi(d, i):
-    """Indice 0-100 di quanto il tempo favorisce la comparsa di funghi spontanei (porcini e simili). Media geometrica di:
-    temperatura del suolo 0-10 cm (ideale 9-17 gradi), umidita' del suolo 0-40 cm (da secco a umido), umidita' media
-    dell'aria nelle 24 ore (ideale oltre 85 %); poi si riduce se gela nelle 24 ore e se il vento medio e' forte."""
+def favorevolezza_funghi(d, i, t=(4, 9, 17, 22)):
+    """Indice 0-100 di quanto il tempo favorisce la comparsa di funghi spontanei. Media geometrica di: temperatura del
+    suolo 0-10 cm (t = estremi della fascia ideale: 0 sotto t[0], 1 tra t[1] e t[2], 0 sopra t[3]), umidita' del suolo
+    0-40 cm (da secco a umido), umidita' media dell'aria nelle 24 ore (ideale oltre 85 %); poi si riduce se gela nelle
+    24 ore e se il vento medio e' forte."""
     ts = d["TSLB"][i, 0] - 273.15
-    f_t = np.minimum(rampa(ts, 4, 9), rampa(ts, 22, 17))
+    f_t = np.minimum(rampa(ts, t[0], t[1]), rampa(ts, t[3], t[2]))
     sm = 0.5 * (d["SMOIS"][i, 0] + d["SMOIS"][i, 1])
     f_s = rampa(sm, 0.22, 0.36)
     f_u = rampa(rh2(d)[i - 23:i + 1].mean(axis=0), 60, 85)
@@ -312,6 +313,109 @@ def favorevolezza_funghi(d, i):
     vento = (np.hypot(d["U10"][i - 23:i + 1], d["V10"][i - 23:i + 1]) * 3.6).mean(axis=0)
     f_v = np.clip(1.0 - (vento - 15.0) / 30.0, 0.6, 1.0)
     return 100.0 * np.cbrt(f_t * f_s * f_u) * f_g * f_v
+
+
+def _pioggia_oraria(d, i, n=24):
+    return np.diff(uscite.pioggia(d)[i - n:i + 1], axis=0)           # [n, y, x]: ora per ora
+
+
+def wbgt(d, i):
+    """WBGT stimato all'ombra (formula semplificata dell'ufficio meteorologico australiano): temperatura e vapore."""
+    t = d["T2"][i] - 273.15
+    e = rh2(d)[i] / 100.0 * 6.105 * np.exp(17.27 * t / (237.7 + t))
+    return 0.567 * t + 0.393 * e + 3.94
+
+
+def disagio_thom(d, i):
+    t = d["T2"][i] - 273.15
+    return t - 0.55 * (1 - 0.01 * rh2(d)[i]) * (t - 14.5)
+
+
+def ore_sole_24(d, i):
+    return (d["SWDOWN"][i - 23:i + 1] > 120.0).sum(axis=0).astype("float64")
+
+
+def energia_solare_24(d, i):
+    return d["SWDOWN"][i - 23:i + 1].sum(axis=0) / 1000.0
+
+
+def gradi_giorno_risc_24(d, i):
+    """Gradi-giorno di riscaldamento (base 18 gradi) sulla temperatura media delle 24 ore."""
+    return np.maximum(18.0 - (d["T2"][i - 23:i + 1] - 273.15).mean(axis=0), 0.0)
+
+
+def ore_ghiaccio_stradale_24(d, i):
+    """Ore nelle 24 con superficie a 0 gradi o meno e bagnata (pioggia o aria satura): rischio ghiaccio su strade e piazzali."""
+    pioggia = _pioggia_oraria(d, i) >= 0.1
+    umido = (d["TSK"][i - 23:i + 1] - 273.15) <= 0.5
+    td = punto_rugiada(d)[i - 23:i + 1]
+    bagnato = pioggia | (td >= d["TSK"][i - 23:i + 1] - 273.15 - 0.5)
+    return (umido & bagnato).sum(axis=0).astype("float64")
+
+
+def escursione_24(d, i):
+    t = d["T2"][i - 23:i + 1] - 273.15
+    return t.max(axis=0) - t.min(axis=0)
+
+
+def ore_caldo_24(d, i):
+    return ((d["T2"][i - 23:i + 1] - 273.15) > 30.0).sum(axis=0).astype("float64")
+
+
+def bilancio_idrico_24(d, i):
+    """Pioggia meno evapotraspirazione di riferimento nelle 24 ore (mm): negativo = il terreno si asciuga, serve irrigare."""
+    pr = uscite.pioggia(d)
+    return (pr[i] - pr[i - 24]) - np.nansum(et0_oraria(d)[i - 23:i + 1], axis=0)
+
+
+def ore_trattamento_24(d, i):
+    """Ore nelle 24 adatte ai trattamenti fitosanitari: vento sotto 15 km/h, nessuna pioggia nell'ora e in quella prima,
+    temperatura tra 5 e 28 gradi."""
+    p = _pioggia_oraria(d, i, 25)
+    asciutto = (p[1:] < 0.1) & (p[:-1] < 0.1)
+    vento = np.hypot(d["U10"][i - 23:i + 1], d["V10"][i - 23:i + 1]) * 3.6
+    t = d["T2"][i - 23:i + 1] - 273.15
+    return (asciutto & (vento < 15.0) & (t >= 5.0) & (t <= 28.0)).sum(axis=0).astype("float64")
+
+
+def praticabilita_suolo(d, i):
+    """0-100: terreno non troppo bagnato (0-10 cm) e senza pioggia recente. Alto = si puo' lavorare e passare con i mezzi."""
+    pr = uscite.pioggia(d)
+    pioggia = pr[i] - pr[max(i - 24, 0)]
+    return 100.0 * rampa(d["SMOIS"][i, 0], 0.40, 0.28) * (1.0 - rampa(pioggia, 2.0, 10.0))
+
+
+def peronospora(d, i):
+    """Classi 0 nessuno, 1 basso, 2 medio, 3 alto, con una versione semplificata della regola dei tre dieci
+    (temperatura sopra 10 gradi, pioggia, foglie bagnate)."""
+    pioggia = np.sum(_pioggia_oraria(d, i), axis=0)
+    ore = ore_bagnatura_24(d, i)
+    tm = (d["T2"][i - 23:i + 1] - 273.15).mean(axis=0)
+    alto = (pioggia >= 5) & (ore >= 10) & (tm >= 12) & (tm <= 25)
+    medio = (pioggia >= 1) & (ore >= 6) & (tm >= 10)
+    basso = (ore >= 4) & (tm >= 10)
+    return np.where(alto, 3, np.where(medio, 2, np.where(basso, 1, 0))).astype("float64")
+
+
+def mosca_olivo(d, i):
+    """0-100: quanto le ultime 24 ore sono adatte alla mosca dell'olivo (attiva tra 20 e 30 gradi con aria non secca,
+    ferma sopra 34 e sotto 10)."""
+    t = d["T2"][i - 23:i + 1] - 273.15
+    f_t = np.minimum(rampa(t, 10, 20), rampa(t, 34, 28))
+    f_u = rampa(rh2(d)[i - 23:i + 1], 45, 75)
+    return 100.0 * (f_t * f_u).mean(axis=0)
+
+
+def pericolo_incendi(d, i):
+    """0-100 dalle condizioni del momento: aria secca (deficit di vapore), vento, suolo asciutto, nessuna pioggia nelle 24 ore."""
+    t = d["T2"][i] - 273.15
+    es = 0.6108 * np.exp(17.27 * t / (t + 237.3))
+    ea = d["Q2"][i] * (d["PSFC"][i] / 1000.0) / (0.622 + d["Q2"][i])
+    vpd = np.maximum(es - ea, 0)
+    vento = np.hypot(d["U10"][i], d["V10"][i]) * 3.6
+    secco = rampa(d["SMOIS"][i, 0], 0.30, 0.12)
+    pioggia = np.sum(_pioggia_oraria(d, i), axis=0)
+    return 100.0 * np.cbrt(rampa(vpd, 0.8, 3.0) * (0.3 + 0.7 * rampa(vento, 5, 35)) * secco) * (1.0 - rampa(pioggia, 0.5, 5.0))
 
 
 PARAMETRI = [
@@ -413,9 +517,43 @@ PARAMETRI = [
     {"id": "rischio_funghi_colture", "titolo": "Rischio malattie fungine delle colture (ultime 24 ore)", "unita": "ore",
      "calcola": ore_rischio_funghi_24, "cmap": "YlOrRd", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
      "nota": "ore con foglie bagnate e temperatura tra 10 e 25 °C (peronospora, ticchiolatura, botrite): più ore, più rischio"},
-    {"id": "funghi", "titolo": "Meteo funghi: condizioni favorevoli", "unita": "indice 0-100", "calcola": favorevolezza_funghi,
+    {"id": "funghi", "titolo": "Meteo funghi autunnali e primaverili (porcini)", "unita": "indice 0-100", "calcola": favorevolezza_funghi,
      "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "TSLB", "terra": True,
      "nota": "temperatura e umidità del suolo, umidità dell'aria, gelo e vento: dice dove il tempo è adatto ai funghi, non dove ci sono i boschi"},
+    {"id": "wbgt", "titolo": "WBGT stimato all'ombra (stress da caldo)", "unita": "°C", "calcola": wbgt, "cmap": "YlOrRd", "limiti": (5, 32), "passo": 3, "inizio": 0,
+     "nota": "indice usato per il lavoro all'aperto: sopra 28 °C rischio alto, sopra 31 °C molto alto (formula semplificata, all'ombra)"},
+    {"id": "thom", "titolo": "Indice di disagio di Thom", "unita": "°C", "calcola": disagio_thom, "cmap": "RdYlBu_r", "limiti": (-5, 32), "passo": 3, "inizio": 0,
+     "nota": "temperatura e umidità: da 21 a 24 qualche persona soffre il caldo, oltre 29 stress forte"},
+    {"id": "escursione", "titolo": "Escursione termica nelle ultime 24 ore", "unita": "°C", "calcola": escursione_24, "cmap": "YlOrBr", "limiti": (0, 20), "passo": 3, "inizio": 24, "terra": True},
+    {"id": "ore_caldo", "titolo": "Ore sopra 30 °C (ultime 24 ore)", "unita": "ore", "calcola": ore_caldo_24, "cmap": "YlOrRd", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True},
+    {"id": "ore_sole", "titolo": "Ore di sole forte (ultime 24 ore)", "unita": "ore", "calcola": ore_sole_24, "cmap": "YlOrBr", "limiti": (0, 12), "passo": 3, "inizio": 24,
+     "nota": "ore con radiazione solare sopra 120 W/m²"},
+    {"id": "energia_solare", "titolo": "Energia solare (ultime 24 ore)", "unita": "kWh/m²", "calcola": energia_solare_24, "cmap": "YlOrRd", "limiti": (0, 8), "passo": 3, "inizio": 24,
+     "nota": "utile per il fotovoltaico: energia che arriva su un metro quadro orizzontale"},
+    {"id": "gradi_giorno_risc", "titolo": "Gradi-giorno di riscaldamento (base 18 °C)", "unita": "°C·giorno", "calcola": gradi_giorno_risc_24, "cmap": "Blues", "limiti": (0, 18), "passo": 3, "inizio": 24,
+     "nota": "quanto serve riscaldare: più alto = più freddo (consumi di gas e legna)"},
+    {"id": "ghiaccio_strade", "titolo": "Rischio ghiaccio su strade (ore, ultime 24 ore)", "unita": "ore", "calcola": ore_ghiaccio_stradale_24, "cmap": "PuBu", "limiti": (0, 12), "passo": 3, "inizio": 24, "serve": "TSK",
+     "nota": "ore con superficie a 0 °C o meno e bagnata, quindi ghiaccio probabile su asfalto e piazzali"},
+    {"id": "bilancio_idrico", "titolo": "Bilancio idrico (pioggia meno evapotraspirazione, 24 ore)", "unita": "mm", "calcola": bilancio_idrico_24, "cmap": "BrBG", "limiti": (-6, 6), "passo": 3, "inizio": 24, "terra": True,
+     "nota": "positivo: il terreno guadagna acqua; negativo: si asciuga e serve irrigare"},
+    {"id": "trattamenti", "titolo": "Ore adatte ai trattamenti (ultime 24 ore)", "unita": "ore", "calcola": ore_trattamento_24, "cmap": "YlGn", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
+     "nota": "vento sotto 15 km/h, nessuna pioggia nell'ora e in quella prima, temperatura tra 5 e 28 °C"},
+    {"id": "praticabilita", "titolo": "Praticabilità del terreno (lavorazioni e mezzi)", "unita": "indice 0-100", "calcola": praticabilita_suolo, "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 0, "serve": "SMOIS", "terra": True,
+     "nota": "alto = terreno non troppo bagnato e senza pioggia recente: si può lavorare e passare con i mezzi"},
+    {"id": "peronospora", "titolo": "Rischio peronospora (vite e altre colture)", "unita": "", "calcola": peronospora, "passo": 3, "inizio": 24, "terra": True,
+     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#ffffff", "#f6e27a", "#f08a24", "#c0392b"], "etichette": ["nullo", "basso", "medio", "alto"], "nascondi": {0}},
+     "scala": 1, "unita_dato": "", "etichetta_dato": "Rischio peronospora",
+     "nota": "versione semplificata della regola dei tre dieci: temperatura, pioggia e ore di foglie bagnate nelle 24 ore"},
+    {"id": "mosca_olivo", "titolo": "Mosca dell'olivo: condizioni favorevoli", "unita": "indice 0-100", "calcola": mosca_olivo, "cmap": "YlOrRd", "limiti": (0, 100), "passo": 3, "inizio": 24, "terra": True,
+     "nota": "temperatura e umidità delle 24 ore: la mosca è attiva tra 20 e 30 °C con aria non secca, ferma sopra 34 °C e sotto 10 °C"},
+    {"id": "incendi", "titolo": "Pericolo di incendi (condizioni del momento)", "unita": "indice 0-100", "calcola": pericolo_incendi, "cmap": "YlOrRd", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "SMOIS", "terra": True,
+     "nota": "aria secca, vento, suolo asciutto e nessuna pioggia nelle 24 ore (non conosce i mesi di siccità precedenti)"},
+    {"id": "funghi_estivi", "titolo": "Meteo funghi estivi (porcini estivi, finferli)", "unita": "indice 0-100", "calcola": lambda d, i: favorevolezza_funghi(d, i, (10, 15, 23, 28)),
+     "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "TSLB", "terra": True,
+     "nota": "come l'indice generale ma con suolo ideale tra 15 e 23 °C"},
+    {"id": "funghi_prato", "titolo": "Meteo funghi di prato (prataioli)", "unita": "indice 0-100", "calcola": lambda d, i: favorevolezza_funghi(d, i, (8, 12, 20, 25)),
+     "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "TSLB", "terra": True,
+     "nota": "come l'indice generale ma con suolo ideale tra 12 e 20 °C"},
     {"id": "vpd", "titolo": "Deficit di pressione di vapore", "unita": "kPa",
      "calcola": lambda d, i: np.maximum(0.6108 * np.exp(17.27 * (d["T2"][i] - 273.15) / (d["T2"][i] - 273.15 + 237.3))
                                         - d["Q2"][i] * (d["PSFC"][i] / 1000.0) / (0.622 + d["Q2"][i]), 0),
