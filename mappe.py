@@ -35,6 +35,7 @@ from PIL import Image  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import colonna  # noqa: E402
 import sfondo as sfondo_mod  # noqa: E402
+import sondaggi  # noqa: E402
 import uscite  # noqa: E402
 
 ROMA = ZoneInfo("Europe/Rome")
@@ -1099,6 +1100,12 @@ def main():
             "serie": {"file": f"dati/{cartella_dom}/serie.bin", "n_t": n, "tempi": [quando(t)[0].strftime("%Y-%m-%dT%H:%MZ") for t in d["tempi"]],
                       "campi": [{"id": c[0], "titolo": c[1], "unita": c[2], "scala": c[3]} for c in campi]},
             "luoghi": luoghi})
+        try:   # radiosondaggi virtuali (pagina sondaggi.html): se qualcosa va storto le mappe escono lo stesso
+            sond = sondaggi.scrivi(a.uscite, dom, d, out, cartella_dom, a.precedente)
+            if sond:
+                voce["sondaggi"] = sond
+        except Exception as e:  # noqa: BLE001
+            print("ATTENZIONE: radiosondaggi virtuali non scritti:", e)
         indice["domini"][cartella_dom] = voce
         print(dom, "parametri:", len(parametri), "immagini:", sum(len(v["immagini"]) for v in voce["parametri"].values()))
         salva = {k: v for k, v in d.items() if k != "tempi"}

@@ -62,6 +62,7 @@ jobs:
         run: |
           python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo --precedente /home/runner/vecchio/indice.json
           cp pagina/index.html /home/runner/pubblico/index.html
+          cp pagina/sondaggi.html /home/runner/pubblico/sondaggi.html
           touch /home/runner/pubblico/.nojekyll
           for f in controllo.txt LEGGIMI.md tempi_b1.txt tempi_b2.txt tempi_b3.txt; do
             [ -f "/home/runner/vecchio/$f" ] && cp "/home/runner/vecchio/$f" /home/runner/pubblico/ || true

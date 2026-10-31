@@ -255,3 +255,46 @@ def _cape(T, P, qv, zc, zw):
         b = 9.81 * (Tpar - Tj) / Tj
         cape += np.where(sopra & (b > 0) & (Pj > 150), b * dz, 0.0)
     return np.minimum(cape, 6000)
+
+
+# ------------------------------------------------------------------------------------------------- radiosondaggi virtuali
+
+# livelli di pressione (hPa) dei radiosondaggi virtuali: fitti vicino al suolo, dove succedono inversioni e nebbie
+LIVELLI_SONDAGGIO = [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 650, 600, 550, 500,
+                     450, 400, 350, 300, 250, 200, 150, 100]
+MANCANTE = -32768
+
+
+def _q16(campo, scala):
+    """Numeri decimali -> interi a 16 bit (valore x scala); i punti senza dato (sotto il suolo) diventano -32768."""
+    v = np.round(np.asarray(campo, dtype="float64") * scala)
+    v = np.where(np.isfinite(v), np.clip(v, -32767, 32767), MANCANTE)
+    return v.astype("int16")
+
+
+def profili_pressione(nc):
+    """Radiosondaggio virtuale in ogni punto: quota (m), temperatura (C), punto di rugiada (C) e vento verso est e verso
+    nord (m/s) sui LIVELLI_SONDAGGIO, interpolati in log(p) dai livelli del modello (nessuna correzione empirica).
+    Ritorna un dizionario di interi a 16 bit [livello, y, x]: SZ in metri, ST, STD, SU, SV in decimi."""
+    P = (np.array(nc["P"][0]) + np.array(nc["PB"][0])) / 100.0
+    theta = np.array(nc["T"][0]) + 300.0
+    T = theta * (P / 1000.0) ** 0.2854
+    qv = np.maximum(np.array(nc["QVAPOR"][0]), 0.0)
+    e = np.maximum(qv * P / (0.622 + qv), 1e-3)
+    td = 243.5 * np.log(e / 6.112) / (17.67 - np.log(e / 6.112))
+    td = np.minimum(td, T - 273.15)
+    U = np.array(nc["U"][0]); V = np.array(nc["V"][0])
+    u = 0.5 * (U[:, :, 1:] + U[:, :, :-1]); v = 0.5 * (V[:, 1:, :] + V[:, :-1, :])
+    c = np.array(nc["COSALPHA"][0]); s = np.array(nc["SINALPHA"][0])
+    ue = u * c - v * s
+    ve = v * c + u * s
+    zw = (np.array(nc["PH"][0]) + np.array(nc["PHB"][0])) / G
+    zc = 0.5 * (zw[1:] + zw[:-1])
+    out = {k: [] for k in ("SZ", "ST", "STD", "SU", "SV")}
+    for liv in LIVELLI_SONDAGGIO:
+        out["SZ"].append(_q16(_a_livello(zc, P, float(liv)), 1))
+        out["ST"].append(_q16(_a_livello(T, P, float(liv)) - 273.15, 10))
+        out["STD"].append(_q16(_a_livello(td, P, float(liv)), 10))
+        out["SU"].append(_q16(_a_livello(ue, P, float(liv)), 10))
+        out["SV"].append(_q16(_a_livello(ve, P, float(liv)), 10))
+    return {k: np.stack(v) for k, v in out.items()}

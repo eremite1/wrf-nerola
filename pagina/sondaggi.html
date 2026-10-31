@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radiosondaggi virtuali</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --testo: #1b2430; --muto: #5b6775; --linea: #d8dee5;
+    --accento: #1f6fb5; --accento-testo: #ffffff; --evid: #e8f1fa;
+    --g-isobara: #c9d1da; --g-isoterma: #d3d9e0; --g-zero: #4a90d9; --g-secca: #e9b28a; --g-umida: #8cc79a; --g-mesc: #b7a6dd;
+    --g-particella: #3b4550;
+    --m1: #2a78d6; --m2: #eb6834; --m3: #1baf7a; --m4: #eda100; --m5: #e87ba4; --m6: #008300; --m7: #6250d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="chiaro"]) {
+      --bg: #12171d; --card: #1b232c; --testo: #e6ebf0; --muto: #98a4b1; --linea: #2d3945;
+      --accento: #5aa9ec; --accento-testo: #0c1620; --evid: #223142;
+      --g-isobara: #34414e; --g-isoterma: #2c3844; --g-zero: #4f8fd0; --g-secca: #7a5338; --g-umida: #3f6b4b; --g-mesc: #5d5385;
+      --g-particella: #c5cdd6;
+      --m1: #3987e5; --m2: #d95926; --m3: #199e70; --m4: #c98500; --m5: #d55181; --m6: #008300; --m7: #9085e9;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--testo); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--card); border-bottom: 1px solid var(--linea); }
+  .testata { max-width: 1400px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 1.3rem; margin: 0; color: var(--accento); }
+  h1 small { font-size: .85rem; font-weight: 400; color: var(--muto); margin-left: 8px; }
+  main { max-width: 1400px; margin: 0 auto; padding: 14px 16px 28px; }
+  .griglia-pagina { display: grid; grid-template-columns: minmax(300px, 430px) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .griglia-pagina { grid-template-columns: minmax(0, 1fr); } #mappa { height: 52vh !important; } .col-mappa { position: static !important; } }
+  .card { background: var(--card); border: 1px solid var(--linea); border-radius: 12px; padding: 12px; min-width: 0; }
+  .col-mappa { position: sticky; top: 10px; }
+  #mappa { height: 70vh; min-height: 360px; border-radius: 10px; background: var(--bg); }
+  .leaflet-container { font: inherit; }
+  .suggerimento { color: var(--muto); font-size: .82rem; margin: 8px 2px 0; }
+  .legenda { display: grid; gap: 4px; margin-top: 10px; }
+  .legenda label { display: flex; align-items: center; gap: 8px; font-size: .84rem; cursor: pointer; }
+  .legenda .riq { width: 22px; height: 14px; border: 2px solid; border-radius: 3px; flex: none; }
+  .legenda small { color: var(--muto); }
+  h2 { font-size: 1.1rem; margin: 0; }
+  .sub { color: var(--muto); font-size: .84rem; }
+  .vuoto { color: var(--muto); padding: 40px 10px; text-align: center; }
+  .quando { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 10px 0 2px; }
+  .quando strong { font-size: 1.05rem; }
+  .quando span { color: var(--muto); font-size: .85rem; }
+  .comandi { display: flex; gap: 8px; align-items: center; }
+  .comandi button { min-width: 44px; height: 44px; border: 1px solid var(--linea); background: var(--card); color: var(--testo); border-radius: 10px; font-size: 1.05rem; cursor: pointer; }
+  input[type=range] { flex: 1; height: 44px; accent-color: var(--accento); min-width: 0; }
+  .schede { display: flex; gap: 6px; margin: 10px 0; }
+  .schede button { padding: 8px 18px; border: 1px solid var(--linea); background: var(--card); color: var(--testo); border-radius: 10px; font: inherit; cursor: pointer; }
+  .schede button[aria-selected="true"] { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); font-weight: 600; }
+  .modelli { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--linea); background: var(--card); color: var(--testo);
+          border-radius: 999px; font: inherit; font-size: .84rem; cursor: pointer; }
+  .chip .linea { width: 18px; height: 0; border-top: 3px solid; border-radius: 2px; flex: none; }
+  .chip[aria-pressed="false"] { opacity: .45; }
+  .chip[disabled] { cursor: default; opacity: .4; }
+  .chip small { color: var(--muto); font-size: .74rem; }
+  .riga-scelte { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: .84rem; color: var(--muto); margin-bottom: 6px; }
+  select { padding: 7px 9px; font: inherit; font-size: .88rem; color: var(--testo); background: var(--card); border: 1px solid var(--linea); border-radius: 10px; }
+  .graf-box { position: relative; }
+  #skewt { width: 100%; height: auto; display: block; touch-action: none; }
+  #skewt text { fill: var(--muto); font-size: 11px; }
+  .g-isobara { stroke: var(--g-isobara); stroke-width: 1; }
+  .g-isoterma { stroke: var(--g-isoterma); stroke-width: 1; }
+  .g-zero { stroke: var(--g-zero); stroke-width: 1.4; }
+  .g-secca { stroke: var(--g-secca); stroke-width: .8; fill: none; }
+  .g-umida { stroke: var(--g-umida); stroke-width: .8; fill: none; stroke-dasharray: 5 3; }
+  .g-mesc { stroke: var(--g-mesc); stroke-width: .8; fill: none; stroke-dasharray: 1.5 3; }
+  .g-cornice { fill: none; stroke: var(--linea); }
+  .g-particella { stroke: var(--g-particella); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .g-guida { stroke: var(--muto); stroke-width: 1; stroke-dasharray: 3 3; }
+  .tip { position: absolute; z-index: 5; pointer-events: none; background: rgba(20,28,38,.95); color: #fff; padding: 7px 9px; border-radius: 8px;
+         font-size: .78rem; line-height: 1.35; box-shadow: 0 2px 10px rgba(0,0,0,.35); white-space: nowrap; }
+  .tip b { font-size: .86rem; }
+  .tip i { display: inline-block; width: 10px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+  .nascosto { display: none !important; }
+  .tabella-box { overflow-x: auto; margin-top: 12px; }
+  table.tab { border-collapse: collapse; width: 100%; font-size: .84rem; font-variant-numeric: tabular-nums; }
+  table.tab th, table.tab td { border-bottom: 1px solid var(--linea); padding: 5px 7px; text-align: right; white-space: nowrap; }
+  table.tab th:first-child, table.tab td:first-child { text-align: left; }
+  table.tab thead th { color: var(--muto); font-weight: 600; font-size: .74rem; vertical-align: bottom; white-space: normal; min-width: 48px; }
+  table.tab td .linea { display: inline-block; width: 14px; border-top: 3px solid; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+  pre.testo { background: var(--bg); border: 1px solid var(--linea); border-radius: 10px; padding: 12px; overflow-x: auto; font-size: .78rem; line-height: 1.4;
+              font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; margin: 8px 0 0; }
+  .bottone { padding: 7px 12px; border: 1px solid var(--linea); background: var(--card); color: var(--testo); border-radius: 10px; font: inherit; font-size: .86rem; cursor: pointer; }
+  details.info { margin-top: 14px; }
+  details.info summary { cursor: pointer; font-weight: 600; }
+  details.info p, details.info li { font-size: .86rem; color: var(--muto); margin: 4px 0; }
+  details.info ul { margin: 4px 0 4px 18px; padding: 0; }
+  footer { max-width: 1400px; margin: 0 auto; padding: 0 16px 30px; color: var(--muto); font-size: .78rem; }
+  footer a { color: var(--accento); }
+  .avviso { font-size: .82rem; color: var(--muto); margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="testata">
+    <h1>Radiosondaggi virtuali <small>WRF Nerola e modelli di Mappe Lazio</small></h1>
+  </div>
+</header>
+<main>
+  <div class="griglia-pagina">
+    <div class="col-mappa">
+      <div class="card">
+        <div id="mappa" role="application" aria-label="Mappa del Lazio: clicca un punto per il radiosondaggio"></div>
+        <p class="suggerimento">Clicca un punto qualsiasi della mappa: compare il radiosondaggio virtuale di tutti i modelli che coprono quel punto.</p>
+        <div class="legenda" id="legenda"></div>
+      </div>
+    </div>
+    <div class="card" id="pannello">
+      <div id="intestazione"><h2>Nessun punto scelto</h2><div class="sub">Clicca sulla mappa.</div></div>
+      <div class="quando">
+        <strong id="quando-testo">–</strong>
+        <span id="quando-dopo"></span>
+      </div>
+      <div class="comandi">
+        <button id="prima" type="button" aria-label="Ora precedente">‹</button>
+        <input id="cursore" type="range" min="0" max="0" value="0" step="1" aria-label="Ora della previsione">
+        <button id="dopo" type="button" aria-label="Ora successiva">›</button>
+      </div>
+      <div class="schede" role="tablist">
+        <button type="button" role="tab" id="sch-grafico" aria-selected="true">Grafico</button>
+        <button type="button" role="tab" id="sch-testo" aria-selected="false">Testo</button>
+      </div>
+      <div class="modelli" id="modelli" aria-label="Modelli da mostrare"></div>
+
+      <section id="vista-grafico">
+        <div class="riga-scelte">
+          <label>Particella e vento disegnati per
+            <select id="riferimento"></select></label>
+        </div>
+        <div class="graf-box" id="graf-box">
+          <svg id="skewt" viewBox="0 0 640 600" role="img" aria-label="Diagramma Skew-T del radiosondaggio"></svg>
+          <div class="tip nascosto" id="tip"></div>
+        </div>
+        <p class="avviso">Linee continue: temperatura. Tratteggiate: punto di rugiada. Puntinata grigia: percorso della particella che sale dal suolo (modello scelto sopra). Barbe del vento in nodi. Tocca o passa sul grafico per leggere i valori.</p>
+        <div class="tabella-box"><table class="tab" id="tab-indici"></table></div>
+      </section>
+
+      <section id="vista-testo" class="nascosto">
+        <div class="riga-scelte">
+          <label>Modello <select id="modello-testo"></select></label>
+          <button type="button" class="bottone" id="copia">Copia il testo</button>
+        </div>
+        <pre class="testo" id="testo"></pre>
+      </section>
+
+      <details class="info">
+        <summary>Come si legge e come è calcolato</summary>
+        <ul>
+          <li><b>Skew-T log-p</b>: la pressione scende verso l'alto in scala logaritmica, le linee della temperatura (isoterme) sono inclinate a 45°. Linee arancioni: adiabatiche secche; verdi tratteggiate: adiabatiche sature; viola puntinate: rapporto di mescolanza (g/kg).</li>
+          <li><b>WRF 1 km e 3 km</b> (Nerola): profili calcolati dal nostro modello sui livelli di pressione, ogni 3 ore, interpolando in log(p) dai livelli del modello.</li>
+          <li><b>ICON-2I, AROME, ECMWF IFS, UKMO, ICON-EU</b> (gli stessi di Mappe Lazio): valori della cella del modello (senza correzioni con la quota), dall'ultima corsa disponibile su Open-Meteo. ICON-2I fornisce solo 6 livelli in quota (1000, 925, 850, 700, 500, 250 hPa); per AROME si usa la versione a 2,5 km, perché quella a 1,3 km non ha dati in quota.</li>
+          <li>Tutti gli indici sono calcolati dalla pagina con le stesse formule per tutti i modelli: particella dal suolo (CAPE, CIN, LI), particella più instabile nei 300 hPa più bassi (MUCAPE), sollevamento adiabatico secco fino alla condensazione (Bolton 1980) e poi saturo; Showalter, indice K, Total Totals, acqua precipitabile fino a 300 hPa, zero termico, zero del bulbo umido (equazione psicrometrica alla pressione del livello), gradiente 850-500 hPa, differenza di vento tra suolo e 6 km.</li>
+          <li>Previsione sperimentale: non usare per decisioni importanti o di sicurezza.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+</main>
+<footer id="piede">Dati: modello WRF Nerola (condizioni iniziali ECMWF IFS open data, CC BY 4.0); <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0) per ICON-2I (ItaliaMeteo-ARPAE), AROME (Météo-France), ECMWF IFS, UKMO (Met Office), ICON-EU (DWD). Mappa © OpenStreetMap.</footer>
+
+<script>
+"use strict";
+// ------------------------------------------------------------------------------------------------ impostazioni
+const NEROLA = { lat: 42.1606, lon: 12.7856 };
+const LAZIO = [11.3, 14.1, 41.0, 42.8];                // area di Mappe Lazio: lon0, lon1, lat0, lat1
+const RAW_WRF = "https://raw.githubusercontent.com/eremite1/wrf-nerola/risultati/";
+const LIVELLI_OM = [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 250, 200, 150, 100];
+// AROME: bordo orientale del territorio coperto (indicativo; dove non ci sono dati il modello risulta "fuori area")
+const AROME_BORDO = [[43.3, 13.29], [42.8, 13.14], [41.0, 12.81], [40.6, 12.74]];
+
+const MODELLI = [
+  { id: "wrf1",   nome: "WRF 1 km",  ris: "1 km",   col: "--m1", tipo: "wrf", dom: "1km", passo_km: 1 },
+  { id: "wrf3",   nome: "WRF 3 km",  ris: "3 km",   col: "--m2", tipo: "wrf", dom: "3km", passo_km: 3 },
+  { id: "icon2i", nome: "ICON-2I",   ris: "2,2 km", col: "--m3", tipo: "om", api: ["italia_meteo_arpae_icon_2i"] },
+  { id: "arome",  nome: "AROME",     ris: "2,5 km", col: "--m4", tipo: "om", api: ["meteofrance_arome_france"] },
+  { id: "ecmwf",  nome: "ECMWF IFS", ris: "9 km",   col: "--m5", tipo: "om", api: ["ecmwf_ifs", "ecmwf_ifs025"] },
+  { id: "ukmo",   nome: "UKMO",      ris: "10 km",  col: "--m6", tipo: "om", api: ["ukmo_global_deterministic_10km"] },
+  { id: "iconeu", nome: "ICON-EU",   ris: "7 km",   col: "--m7", tipo: "om", api: ["dwd_icon_eu"] },
+];
+
+const $ = (id) => document.getElementById(id);
+const nf0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const colore = (m) => getComputedStyle(document.documentElement).getPropertyValue(m.col).trim();
+const fmt = (v, f = nf0, u = "") => (v == null || !isFinite(v)) ? "–" : f.format(v) + u;
+
+// ------------------------------------------------------------------------------------------------ fisica
+// Costanti e formule standard; nessuna correzione empirica.
+const RD = 287.04, CP = 1005.7, LV = 2.501e6, EPS = 0.622, G = 9.80665, KAP = RD / CP;
+const es = (tc) => 6.112 * Math.exp(17.67 * tc / (tc + 243.5));                     // hPa (Bolton 1980)
+const mescolanza = (p, tc) => EPS * es(tc) / Math.max(p - es(tc), 1e-3);              // kg/kg, saturazione a tc
+const rugiadaDaE = (e) => { const l = Math.log(Math.max(e, 1e-4) / 6.112); return 243.5 * l / (17.67 - l); };
+const rugiadaDaUR = (tc, ur) => rugiadaDaE(es(tc) * Math.max(ur, 0.5) / 100);
+const theta = (tc, p) => (tc + 273.15) * Math.pow(1000 / p, KAP);
+function thetaE(tc, tdc, p) {                                                         // Bolton (1980), eq. 43
+  const T = tc + 273.15, Td = tdc + 273.15, r = mescolanza(p, tdc);
+  const TL = 1 / (1 / (Td - 56) + Math.log(T / Td) / 800) + 56;
+  return T * Math.pow(1000 / p, 0.2854 * (1 - 0.28 * r)) * Math.exp((3.376 / TL - 0.00254) * r * 1000 * (1 + 0.81 * r));
+}
+function bulboUmido(tc, tdc, p) {                       // equazione psicrometrica alla pressione p (come colonna.py)
+  const e = Math.min(es(tdc), es(tc));
+  let tw = tc - (tc - tdc) / 3;
+  for (let i = 0; i < 10; i++) {
+    const gam = 0.00066 * (1 + 0.00115 * tw), est = es(tw);
+    const f = est - e - gam * p * (tc - tw);
+    const df = est * 17.67 * 243.5 / Math.pow(tw + 243.5, 2) + gam * p - 0.00066 * 0.00115 * p * (tc - tw);
+    tw -= f / df;
+  }
+  return Math.min(tw, tc);
+}
+function lcl(tc, tdc, p) {                              // Bolton (1980), eq. 15: temperatura e pressione di condensazione
+  const T = tc + 273.15, Td = Math.min(tdc, tc) + 273.15;
+  const TL = 1 / (1 / (Td - 56) + Math.log(T / Td) / 800) + 56;
+  return { t: TL - 273.15, p: p * Math.pow(TL / T, 1 / KAP) };
+}
+function dTdlnp(T, p) {                                 // adiabatica satura (pseudo-adiabatica), T in K, p in hPa
+  const rs = mescolanza(p, T - 273.15);
+  return (RD * T + LV * rs) / (CP + LV * LV * rs * EPS / (RD * T * T));
+}
+function satura(T0c, p0, p1) {                          // integra l'adiabatica satura da p0 a p1 (Runge-Kutta 4)
+  let T = T0c + 273.15, lp = Math.log(p0);
+  const lp1 = Math.log(p1), n = Math.max(2, Math.ceil(Math.abs(lp1 - lp) / 0.01)), h = (lp1 - lp) / n;
+  for (let i = 0; i < n; i++) {
+    const p = Math.exp(lp);
+    const k1 = dTdlnp(T, p), k2 = dTdlnp(T + h * k1 / 2, Math.exp(lp + h / 2));
+    const k3 = dTdlnp(T + h * k2 / 2, Math.exp(lp + h / 2)), k4 = dTdlnp(T + h * k3, Math.exp(lp + h));
+    T += h * (k1 + 2 * k2 + 2 * k3 + k4) / 6; lp += h;
+  }
+  return T - 273.15;
+}
+function particella(tc, tdc, p0, pressioni) {           // temperatura della particella sollevata alle pressioni date
+  const c = lcl(tc, tdc, p0);
+  let pPrec = c.p, tPrec = c.t;
+  return pressioni.map((p) => {
+    if (p >= c.p) return (tc + 273.15) * Math.pow(p / p0, KAP) - 273.15;
+    const t = satura(tPrec, pPrec, p); pPrec = p; tPrec = t; return t;
+  });
+}
+
+// ------------------------------------------------------------------------------------------------ profili
+// Un profilo e' una lista di livelli {p, z, t, td, u, v} dal suolo verso l'alto (p decrescente); il primo e' il suolo.
+function interp(prof, p, k) {
+  if (!prof || prof.length < 2 || p > prof[0].p + 0.01) return null;
+  const lp = Math.log(p);
+  for (let i = 0; i < prof.length - 1; i++) {
+    const a = prof[i], b = prof[i + 1];
+    if (p <= a.p && p >= b.p) {
+      if (a[k] == null || b[k] == null) return null;
+      const w = (Math.log(a.p) - lp) / (Math.log(a.p) - Math.log(b.p) || 1);
+      return a[k] + w * (b[k] - a[k]);
+    }
+  }
+  return null;
+}
+function interpZ(prof, z, k) {
+  for (let i = 0; i < prof.length - 1; i++) {
+    const a = prof[i], b = prof[i + 1];
+    if (z >= a.z && z <= b.z && a[k] != null && b[k] != null) return a[k] + (z - a.z) / ((b.z - a.z) || 1) * (b[k] - a[k]);
+  }
+  return null;
+}
+function quotaDiCambio(prof, valore) {                  // quota piu' alta in cui il valore passa da >0 a <=0
+  const v = prof.map(valore);
+  if (v.every((x) => x <= 0)) return { z: prof[0].z, alSuolo: true };
+  for (let i = prof.length - 2; i >= 0; i--) {
+    if (v[i] > 0 && v[i + 1] <= 0) return { z: prof[i].z + v[i] / (v[i] - v[i + 1]) * (prof[i + 1].z - prof[i].z) };
+    if (v[i + 1] > 0) return null;
+  }
+  return null;
+}
+function areeParticella(prof, t0, td0, p0) {            // CAPE e CIN (J/kg) di una particella che parte da p0
+  const passi = [];
+  for (let p = p0; p >= Math.max(prof[prof.length - 1].p, 100); p -= 5) passi.push(p);
+  const tp = particella(t0, td0, p0, passi);
+  let cape = 0, cin = 0, sopraLfc = false, negativa = 0;
+  for (let i = 0; i < passi.length - 1; i++) {
+    const te1 = interp(prof, passi[i], "t"), te2 = interp(prof, passi[i + 1], "t");
+    if (te1 == null || te2 == null) continue;
+    const b = 0.5 * ((tp[i] - te1) / (te1 + 273.15) + (tp[i + 1] - te2) / (te2 + 273.15));
+    const area = RD * 0.5 * ((te1 + 273.15) + (te2 + 273.15)) * b * Math.log(passi[i] / passi[i + 1]);
+    if (area > 0) { cape += area; if (!sopraLfc) { sopraLfc = true; cin = negativa; } }
+    else if (!sopraLfc) negativa += area;
+  }
+  return { cape, cin: sopraLfc ? cin : null };
+}
+function indici(prof) {
+  const s = prof[0], T = (p) => interp(prof, p, "t"), Td = (p) => interp(prof, p, "td"), Z = (p) => interp(prof, p, "z");
+  const out = {};
+  const c = lcl(s.t, s.td, s.p);
+  out.lclP = c.p; out.lclZ = (() => { const z = Z(c.p); return z == null ? null : z - s.z; })();
+  const sb = areeParticella(prof, s.t, s.td, s.p);
+  out.cape = sb.cape; out.cin = sb.cin;
+  let mu = 0;                                             // particella piu' instabile nei 300 hPa piu' bassi
+  for (const l of prof) if (l.p >= s.p - 300 && l.td != null) mu = Math.max(mu, areeParticella(prof, l.t, l.td, l.p).cape);
+  out.mucape = mu;
+  const t500 = T(500), t850 = T(850), td850 = Td(850), t700 = T(700), td700 = Td(700);
+  out.li = t500 == null ? null : t500 - particella(s.t, s.td, s.p, [500])[0];
+  out.si = (t500 == null || t850 == null || td850 == null) ? null : t500 - particella(t850, td850, 850, [500])[0];
+  out.k = [t850, t500, td850, t700, td700].some((x) => x == null) ? null : (t850 - t500) + td850 - (t700 - td700);
+  out.tt = [t850, td850, t500].some((x) => x == null) ? null : t850 + td850 - 2 * t500;
+  out.gradiente = (t850 == null || t500 == null || Z(500) == null || Z(850) == null) ? null : (t850 - t500) / (Z(500) - Z(850)) * 1000;
+  let pw = 0;                                             // acqua precipitabile fino a 300 hPa (mm)
+  for (let i = 0; i < prof.length - 1; i++) {
+    const a = prof[i], b = prof[i + 1];
+    if (b.p < 300 || a.td == null || b.td == null) break;
+    pw += 0.5 * (mescolanza(a.p, a.td) + mescolanza(b.p, b.td)) * (a.p - b.p) * 100 / G;
+  }
+  out.pw = pw;
+  out.zero = quotaDiCambio(prof, (l) => l.t);
+  out.zeroTw = quotaDiCambio(prof, (l) => l.td == null ? l.t : bulboUmido(l.t, l.td, l.p));
+  const u6 = interpZ(prof, s.z + 6000, "u"), v6 = interpZ(prof, s.z + 6000, "v");
+  out.shear = (u6 == null || s.u == null) ? null : Math.hypot(u6 - s.u, v6 - s.v);
+  return out;
+}
+
+// ------------------------------------------------------------------------------------------------ dati WRF
+let baseWrf = null, indiceWrf = null;
+const griglie = {};
+async function caricaIndiceWrf() {
+  for (const base of ["", RAW_WRF]) {
+    try {
+      const r = await fetch(base + "indice.json?t=" + Date.now());
+      if (!r.ok) continue;
+      indiceWrf = await r.json(); baseWrf = base; return;
+    } catch (e) { /* provo l'altro indirizzo */ }
+  }
+}
+async function griglia(dom) {
+  if (griglie[dom]) return griglie[dom];
+  const D = indiceWrf.domini[dom];
+  const r = await fetch(baseWrf + D.griglia + "?v=" + encodeURIComponent(indiceWrf.creato));
+  const a = new Float32Array(await r.arrayBuffer());
+  const n = D.layout.ny * D.layout.nx;
+  griglie[dom] = { n, ny: D.layout.ny, nx: D.layout.nx, lat: a.subarray(0, n), lon: a.subarray(n, 2 * n), hgt: a.subarray(2 * n, 3 * n) };
+  return griglie[dom];
+}
+function vicino(g, lat, lon) {
+  const c = Math.cos(lat * Math.PI / 180);
+  let m = Infinity, k = -1;
+  for (let i = 0; i < g.n; i++) {
+    const dy = g.lat[i] - lat, dx = (g.lon[i] - lon) * c, d = dy * dy + dx * dx;
+    if (d < m) { m = d; k = i; }
+  }
+  return { k, km: 111.2 * Math.sqrt(m) };
+}
+async function datiWrf(m, lat, lon) {
+  if (!indiceWrf) return { stato: "WRF non disponibile" };
+  const D = indiceWrf.domini[m.dom];
+  if (!D) return { stato: "dominio non pubblicato" };
+  const g = await griglia(m.dom);
+  const v = vicino(g, lat, lon);
+  if (v.km > m.passo_km * 0.75) return { stato: "fuori area" };
+  const S = D.sondaggi;
+  if (!S) return { stato: "dalla prossima corsa" };
+  const nv = S.n_suolo + S.livelli.length * S.n_livello, nt = S.tempi.length;
+  const inizio = v.k * nt * nv * 2, fine = inizio + nt * nv * 2 - 1;
+  const r = await fetch(baseWrf + S.file + "?v=" + encodeURIComponent(indiceWrf.creato), { headers: { Range: `bytes=${inizio}-${fine}` } });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  let buf = await r.arrayBuffer();
+  if (r.status !== 206) buf = buf.slice(inizio, fine + 1);
+  const a = new Int16Array(buf), M = -32768;
+  const profili = {};
+  S.tempi.forEach((t, it) => {
+    const o = it * nv;
+    if (a[o] === M) return;
+    const prof = [{ p: a[o] / 10, z: a[o + 1], t: a[o + 2] / 10, td: a[o + 3] / 10, u: a[o + 4] / 10, v: a[o + 5] / 10 }];
+    S.livelli.forEach((p, j) => {
+      const b = o + S.n_suolo + j * S.n_livello;
+      if (a[b] === M || a[b + 1] === M || p >= prof[0].p) return;
+      prof.push({ p, z: a[b], t: a[b + 1] / 10, td: a[b + 2] === M ? null : a[b + 2] / 10,
+                  u: a[b + 3] === M ? null : a[b + 3] / 10, v: a[b + 4] === M ? null : a[b + 4] / 10 });
+    });
+    if (prof.length > 3) profili[t] = prof;
+  });
+  const c = indiceWrf.corsa;
+  return { profili, quotaModello: g.hgt[v.k], distanza: v.km,
+           corsa: `${c.slice(6, 8)}/${c.slice(4, 6)} ${c.slice(8, 10)} UTC` };
+}
+
+// ------------------------------------------------------------------------------------------------ dati Open-Meteo
+function urlOm(api, lat, lon) {
+  const v = ["temperature_2m", "dew_point_2m", "surface_pressure", "wind_speed_10m", "wind_direction_10m"];
+  for (const p of LIVELLI_OM) for (const k of ["temperature", "relative_humidity", "geopotential_height", "wind_speed", "wind_direction"]) v.push(`${k}_${p}hPa`);
+  return "https://api.open-meteo.com/v1/forecast?latitude=" + lat.toFixed(4) + "&longitude=" + lon.toFixed(4) +
+         "&hourly=" + v.join(",") + "&models=" + api + "&wind_speed_unit=ms&timezone=GMT&forecast_days=4" +
+         "&cell_selection=nearest&elevation=nan";
+}
+function venti(vel, dir) {
+  if (vel == null || dir == null) return [null, null];
+  const r = dir * Math.PI / 180;
+  return [-vel * Math.sin(r), -vel * Math.cos(r)];
+}
+async function datiOm(m, lat, lon) {
+  let j = null, ultimoErr = null;
+  for (const api of m.api) {
+    try {
+      const r = await fetch(urlOm(api, lat, lon));
+      if (!r.ok) { ultimoErr = new Error("HTTP " + r.status); continue; }
+      j = await r.json(); break;
+    } catch (e) { ultimoErr = e; }
+  }
+  if (!j) throw ultimoErr || new Error("nessuna risposta");
+  const H = j.hourly, profili = {};
+  H.time.forEach((t, i) => {
+    const ps = H.surface_pressure[i], t2 = H.temperature_2m[i];
+    if (ps == null || t2 == null) return;
+    const td2 = H.dew_point_2m[i];
+    const [u, v] = venti(H.wind_speed_10m[i], H.wind_direction_10m[i]);
+    const liv = [];
+    for (const p of LIVELLI_OM) {
+      const tt = H[`temperature_${p}hPa`]?.[i], z = H[`geopotential_height_${p}hPa`]?.[i];
+      if (tt == null || z == null || p >= ps - 0.5) continue;
+      const ur = H[`relative_humidity_${p}hPa`]?.[i];
+      const [lu, lv] = venti(H[`wind_speed_${p}hPa`]?.[i], H[`wind_direction_${p}hPa`]?.[i]);
+      liv.push({ p, z, t: tt, td: ur == null ? null : Math.min(rugiadaDaUR(tt, ur), tt), u: lu, v: lv });
+    }
+    if (liv.length < 3) return;
+    // quota del suolo del modello: equazione ipsometrica dal primo livello sopra il suolo
+    const a = liv[0], tm = 0.5 * (t2 + a.t) + 273.15;
+    const zs = a.z - RD * tm / G * Math.log(ps / a.p);
+    profili[t + "Z"] = [{ p: ps, z: zs, t: t2, td: td2 == null ? null : Math.min(td2, t2), u, v }, ...liv];
+  });
+  if (!Object.keys(profili).length) return { stato: "fuori area" };
+  const primo = Object.values(profili)[0][0];
+  return { profili, quotaModello: primo.z };
+}
+
+// ------------------------------------------------------------------------------------------------ stato della pagina
+const stato = { punto: null, risultati: {}, tempi: [], i: 0, visibili: new Set(MODELLI.map((m) => m.id)), rif: null, vista: "grafico", gen: 0 };
+
+function etichettaTempo(iso) {
+  const d = new Date(iso);
+  const s = d.toLocaleString("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function aggiornaTempi() {
+  const adesso = Date.now() - 3 * 3600e3, tutti = new Set();
+  for (const r of Object.values(stato.risultati)) if (r && r.profili) for (const t of Object.keys(r.profili)) if (Date.parse(t) >= adesso) tutti.add(t);
+  const vecchio = stato.tempi[stato.i];
+  stato.tempi = [...tutti].sort();
+  let i = vecchio ? stato.tempi.indexOf(vecchio) : -1;
+  if (i < 0) {                       // l'ora piu' vicina a adesso tra quelle ogni 3 ore (ci sono anche i WRF)
+    let m = Infinity;
+    stato.tempi.forEach((t, j) => { const d = Math.abs(Date.parse(t) - Date.now()) + (new Date(t).getUTCHours() % 3 ? 1e9 : 0); if (d < m) { m = d; i = j; } });
+  }
+  stato.i = Math.max(0, i);
+  $("cursore").max = Math.max(0, stato.tempi.length - 1);
+  $("cursore").value = stato.i;
+}
+function profiloDi(id) {
+  const r = stato.risultati[id];
+  return r && r.profili ? r.profili[stato.tempi[stato.i]] || null : null;
+}
+function statoModello(m) {
+  const r = stato.risultati[m.id];
+  if (r === undefined) return "caricamento…";
+  if (r.errore) return "errore";
+  if (r.stato) return r.stato;
+  if (!profiloDi(m.id)) return m.tipo === "wrf" ? "solo ogni 3 ore" : "nessun dato a quest'ora";
+  return "";
+}
+const disponibili = () => MODELLI.filter((m) => profiloDi(m.id));
+const mostrati = () => disponibili().filter((m) => stato.visibili.has(m.id));
+
+// ------------------------------------------------------------------------------------------------ mappa
+let mappa, marcatore;
+function riquadro(lat0, lat1, lon0, lon1) { return [[lat0, lon0], [lat0, lon1], [lat1, lon1], [lat1, lon0]]; }
+async function preparaMappa() {
+  mappa = L.map("mappa", { zoomSnap: 0.25 }).fitBounds([[LAZIO[2], LAZIO[0]], [LAZIO[3], LAZIO[1]]]);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 13, attribution: "© OpenStreetMap" }).addTo(mappa);
+  const voci = [];
+  const aggiungi = (nome, nota, col, forma, tratt) => {
+    const strato = L.polygon(forma, { color: col, weight: 2, fillOpacity: 0.04, dashArray: tratt, interactive: false }).addTo(mappa);
+    voci.push({ nome, nota, col, strato, tratt });
+  };
+  const cv = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  aggiungi("ICON-2I · ECMWF · UKMO · ICON-EU", "tutto il Lazio (e oltre)", cv("--m5"), riquadro(LAZIO[2], LAZIO[3], LAZIO[0], LAZIO[1]), "6 4");
+  aggiungi("AROME", "solo a ovest della linea (indicativo)", cv("--m4"),
+           [[43.3, 10.9], ...AROME_BORDO, [40.6, 10.9]], "2 4");
+  await caricaIndiceWrf();
+  if (indiceWrf) {
+    for (const [dom, nome, col] of [["3km", "WRF 3 km", cv("--m2")], ["1km", "WRF 1 km", cv("--m1")]]) {
+      if (!indiceWrf.domini[dom]) continue;
+      const g = await griglia(dom), b = [];
+      const P = (y, x) => [g.lat[y * g.nx + x], g.lon[y * g.nx + x]];
+      for (let x = 0; x < g.nx; x++) b.push(P(0, x));
+      for (let y = 0; y < g.ny; y++) b.push(P(y, g.nx - 1));
+      for (let x = g.nx - 1; x >= 0; x--) b.push(P(g.ny - 1, x));
+      for (let y = g.ny - 1; y >= 0; y--) b.push(P(y, 0));
+      aggiungi(nome, dom === "1km" ? "Nerola, alta risoluzione" : "Lazio centrale", col, b, null);
+    }
+  }
+  const leg = $("legenda");
+  voci.reverse().forEach((v) => {
+    const l = document.createElement("label");
+    l.innerHTML = `<input type="checkbox" checked><span class="riq" style="border-color:${v.col};border-style:${v.tratt ? "dashed" : "solid"}"></span><span>${v.nome} <small>${v.nota}</small></span>`;
+    l.querySelector("input").addEventListener("change", (e) => e.target.checked ? v.strato.addTo(mappa) : v.strato.remove());
+    leg.appendChild(l);
+  });
+  mappa.on("click", (e) => scegli(e.latlng.lat, e.latlng.lng));
+}
+
+async function scegli(lat, lon) {
+  const gen = ++stato.gen;
+  stato.punto = { lat, lon };
+  stato.risultati = {};
+  history.replaceState(null, "", "#" + lat.toFixed(4) + "," + lon.toFixed(4));
+  if (!marcatore) marcatore = L.circleMarker([lat, lon], { radius: 7, color: "#fff", weight: 2, fillColor: "#d6341f", fillOpacity: 1 }).addTo(mappa);
+  else marcatore.setLatLng([lat, lon]);
+  $("intestazione").innerHTML = `<h2>${lat.toFixed(3)}° N, ${lon.toFixed(3)}° E</h2><div class="sub">Carico i dati dei modelli…</div>`;
+  disegnaTutto();
+  await Promise.all(MODELLI.map(async (m) => {
+    let r;
+    try { r = m.tipo === "wrf" ? await datiWrf(m, lat, lon) : await datiOm(m, lat, lon); }
+    catch (e) { r = { errore: String(e.message || e) }; }
+    if (gen !== stato.gen) return;
+    stato.risultati[m.id] = r;
+    aggiornaTempi(); disegnaTutto();
+  }));
+}
+
+// ------------------------------------------------------------------------------------------------ disegno
+function disegnaIntestazione() {
+  if (!stato.punto) return;
+  const { lat, lon } = stato.punto;
+  const quote = MODELLI.filter((m) => stato.risultati[m.id]?.quotaModello != null)
+    .map((m) => `${m.nome} ${nf0.format(stato.risultati[m.id].quotaModello)} m`);
+  $("intestazione").innerHTML = `<h2>${lat.toFixed(3)}° N, ${lon.toFixed(3)}° E</h2>` +
+    `<div class="sub">${quote.length ? "Quota del suolo nei modelli: " + quote.join(" · ") : "Carico i dati dei modelli…"}</div>`;
+  const t = stato.tempi[stato.i];
+  $("quando-testo").textContent = t ? etichettaTempo(t) : "–";
+  if (t) {
+    const h = Math.round((Date.parse(t) - Date.now()) / 3600e3);
+    $("quando-dopo").textContent = h === 0 ? "adesso" : (h > 0 ? `fra ${h} ore` : `${-h} ore fa`) + " · ora italiana";
+  } else $("quando-dopo").textContent = "";
+}
+function disegnaChip() {
+  const box = $("modelli"); box.innerHTML = "";
+  for (const m of MODELLI) {
+    const s = statoModello(m), b = document.createElement("button");
+    b.type = "button"; b.className = "chip";
+    b.disabled = !!s;
+    b.setAttribute("aria-pressed", String(!s && stato.visibili.has(m.id)));
+    b.innerHTML = `<span class="linea" style="border-color:${colore(m)}"></span>${m.nome}${s ? ` <small>${s}</small>` : ` <small>${m.ris}</small>`}`;
+    b.title = stato.risultati[m.id]?.errore || "";
+    b.addEventListener("click", () => { stato.visibili.has(m.id) ? stato.visibili.delete(m.id) : stato.visibili.add(m.id); disegnaTutto(); });
+    box.appendChild(b);
+  }
+  const disp = disponibili();
+  for (const sel of [$("riferimento"), $("modello-testo")]) {
+    const prima = sel.value;
+    sel.innerHTML = (sel.id === "modello-testo" ? '<option value="tutti">Tutti i modelli</option>' : "") +
+      disp.map((m) => `<option value="${m.id}">${m.nome}</option>`).join("");
+    if ([...sel.options].some((o) => o.value === prima)) sel.value = prima;
+    else if (sel.id === "riferimento" && disp.length) sel.value = (disp.find((m) => stato.visibili.has(m.id)) || disp[0]).id;
+  }
+}
+
+// Skew-T
+const W = 640, H = 600, X0 = 44, X1 = 556, Y0 = 14, Y1 = 574, PB = 1050, PT = 100, TMIN = -40, TMAX = 45, INCL = 35;
+const yP = (p) => Y1 - (Y1 - Y0) * (Math.log(PB) - Math.log(p)) / (Math.log(PB) - Math.log(PT));     // 1050 hPa in basso
+const pY = (y) => Math.exp(Math.log(PB) - (Y1 - y) / (Y1 - Y0) * (Math.log(PB) - Math.log(PT)));
+// le isoterme sono inclinate: ogni volta che la pressione si divide per e (circa 2,7) si spostano di INCL gradi
+const xT = (t, y) => X0 + (t - TMIN + INCL * (Math.log(PB) - Math.log(pY(y)))) / (TMAX - TMIN) * (X1 - X0);
+const NS = "http://www.w3.org/2000/svg";
+function el(nome, attr, figlio) {
+  const e = document.createElementNS(NS, nome);
+  for (const k in attr) e.setAttribute(k, attr[k]);
+  if (figlio) e.textContent = figlio;
+  return e;
+}
+function percorso(punti) {
+  let d = "", su = false;
+  for (const [x, y] of punti) {
+    if (x == null || !isFinite(x)) { su = false; continue; }
+    d += (su ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1); su = true;
+  }
+  return d;
+}
+let sfondoSkewT = null;
+function sfondo() {
+  if (sfondoSkewT) return sfondoSkewT.cloneNode(true);
+  const g = el("g", {});
+  const clip = el("clipPath", { id: "area" }); clip.appendChild(el("rect", { x: X0, y: Y0, width: X1 - X0, height: Y1 - Y0 }));
+  g.appendChild(clip);
+  const dentro = el("g", { "clip-path": "url(#area)" });
+  const pp = []; for (let p = PB; p >= PT; p -= 10) pp.push(p);
+  for (let th = -30; th <= 200; th += 10) dentro.appendChild(el("path", { class: "g-secca", d: percorso(pp.map((p) => [xT((th + 273.15) * Math.pow(p / 1000, KAP) - 273.15, yP(p)), yP(p)])) }));
+  for (let tw = -20; tw <= 36; tw += 4) {
+    const pts = []; let t = tw, pr = 1000;
+    for (let p = 1000; p >= 200; p -= 20) { t = satura(t, pr, p); pr = p; pts.push([xT(t, yP(p)), yP(p)]); }
+    const giu = []; t = tw; pr = 1000;
+    for (let p = 1020; p <= PB; p += 20) { t = satura(t, pr, p); pr = p; giu.push([xT(t, yP(p)), yP(p)]); }
+    dentro.appendChild(el("path", { class: "g-umida", d: percorso([...giu.reverse(), [xT(tw, yP(1000)), yP(1000)], ...pts]) }));
+  }
+  for (const w of [1, 2, 4, 7, 10, 16, 24]) {
+    const pts = [];
+    for (let p = PB; p >= 600; p -= 25) pts.push([xT(rugiadaDaE(w / 1000 * p / (EPS + w / 1000)), yP(p)), yP(p)]);
+    dentro.appendChild(el("path", { class: "g-mesc", d: percorso(pts) }));
+    dentro.appendChild(el("text", { x: pts[pts.length - 1][0] + 2, y: yP(600) - 3, "font-size": 9 }, String(w)));
+  }
+  for (let t = -120; t <= 50; t += 10) dentro.appendChild(el("line", { class: t === 0 ? "g-zero" : "g-isoterma", x1: xT(t, Y1), y1: Y1, x2: xT(t, Y0), y2: Y0 }));
+  g.appendChild(dentro);
+  for (const p of [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100]) {
+    g.appendChild(el("line", { class: "g-isobara", x1: X0, y1: yP(p), x2: X1, y2: yP(p) }));
+    g.appendChild(el("text", { x: X0 - 5, y: yP(p) + 4, "text-anchor": "end" }, String(p)));
+  }
+  for (let t = -30; t <= 40; t += 10) g.appendChild(el("text", { x: xT(t, Y1), y: Y1 + 14, "text-anchor": "middle" }, t + "°"));
+  g.appendChild(el("text", { x: X1 + 42, y: Y0 + 8, "text-anchor": "middle" }, "nodi"));
+  g.appendChild(el("text", { x: X0 - 5, y: Y1 + 14, "text-anchor": "end" }, "hPa"));
+  g.appendChild(el("rect", { class: "g-cornice", x: X0, y: Y0, width: X1 - X0, height: Y1 - Y0 }));
+  sfondoSkewT = g;
+  return g.cloneNode(true);
+}
+function barba(x, y, u, v, col) {                        // barba del vento (nodi), la punta indica da dove viene
+  const g = el("g", {}), kt = Math.hypot(u, v) * 1.943844;
+  if (kt < 2.5) { g.appendChild(el("circle", { cx: x, cy: y, r: 3.5, fill: "none", stroke: col, "stroke-width": 1.4 })); return g; }
+  const ang = Math.atan2(-u, -v), L = 26;                 // direzione da cui soffia (0 = da nord)
+  const dx = Math.sin(ang), dy = -Math.cos(ang), px = -dy, py = dx;
+  const x2 = x + dx * L, y2 = y + dy * L;
+  g.appendChild(el("line", { x1: x, y1: y, x2, y2, stroke: col, "stroke-width": 1.4 }));
+  let resto = Math.round(kt / 5) * 5, pos = 0;
+  const a = (d) => [x2 - dx * d, y2 - dy * d];
+  while (resto >= 50) { const [ax, ay] = a(pos), [bx, by] = a(pos + 6);
+    g.appendChild(el("path", { d: `M${ax} ${ay}L${ax + px * 11} ${ay + py * 11}L${bx} ${by}Z`, fill: col })); pos += 8; resto -= 50; }
+  while (resto >= 10) { const [ax, ay] = a(pos); g.appendChild(el("line", { x1: ax, y1: ay, x2: ax + px * 11, y2: ay + py * 11, stroke: col, "stroke-width": 1.4 })); pos += 4; resto -= 10; }
+  if (resto >= 5) { const [ax, ay] = a(pos === 0 ? 4 : pos); g.appendChild(el("line", { x1: ax, y1: ay, x2: ax + px * 6, y2: ay + py * 6, stroke: col, "stroke-width": 1.4 })); }
+  return g;
+}
+function disegnaSkewT() {
+  const svg = $("skewt"); svg.innerHTML = "";
+  svg.appendChild(sfondo());
+  const dati = el("g", { "clip-path": "url(#area)" });
+  const rif = $("riferimento").value, pr = profiloDi(rif);
+  if (pr && pr[0].td != null) {                           // particella dal suolo del modello scelto
+    const pp = []; for (let p = pr[0].p; p >= PT; p -= 5) pp.push(p);
+    const tp = particella(pr[0].t, pr[0].td, pr[0].p, pp);
+    dati.appendChild(el("path", { class: "g-particella", d: percorso(pp.map((p, i) => [xT(tp[i], yP(p)), yP(p)])) }));
+  }
+  for (const m of mostrati()) {
+    const pr2 = profiloDi(m.id), col = colore(m), spessa = m.id === rif ? 2.6 : 1.8;
+    const halo = (d, extra) => { dati.appendChild(el("path", { d, fill: "none", stroke: "var(--card)", "stroke-width": spessa + 2.2, ...extra }));
+                                 dati.appendChild(el("path", { d, fill: "none", stroke: col, "stroke-width": spessa, ...extra })); };
+    halo(percorso(pr2.map((l) => [l.td == null ? null : xT(l.td, yP(l.p)), yP(l.p)])), { "stroke-dasharray": "6 4" });
+    halo(percorso(pr2.map((l) => [xT(l.t, yP(l.p)), yP(l.p)])), {});
+  }
+  svg.appendChild(dati);
+  if (pr) {
+    const col = colore(MODELLI.find((m) => m.id === rif));
+    let ultimoY = -99;
+    for (const l of pr) {
+      const y = yP(l.p);
+      if (l.u == null || l.p < PT) continue;
+      if (Math.abs(y - ultimoY) < 16) continue;
+      ultimoY = y;
+      svg.appendChild(barba(X1 + 42, y, l.u, l.v, col));
+    }
+  }
+  svg.appendChild(el("line", { id: "guida", class: "g-guida nascosto", x1: X0, x2: X1, y1: 0, y2: 0 }));
+}
+function sulGrafico(ev) {
+  const svg = $("skewt"), r = svg.getBoundingClientRect();
+  const y = (ev.clientY - r.top) / r.height * H, tip = $("tip"), guida = $("guida");
+  if (y < Y0 || y > Y1 || !mostrati().length) { tip.classList.add("nascosto"); guida?.classList.add("nascosto"); return; }
+  const p = pY(y);
+  guida.setAttribute("y1", y); guida.setAttribute("y2", y); guida.classList.remove("nascosto");
+  let righe = `<b>${nf0.format(p)} hPa</b>`;
+  for (const m of mostrati()) {
+    const pr = profiloDi(m.id), t = interp(pr, p, "t");
+    if (t == null) { righe += `<br><i style="background:${colore(m)}"></i>${m.nome}: sotto il suolo`; continue; }
+    const td = interp(pr, p, "td"), z = interp(pr, p, "z"), u = interp(pr, p, "u"), v = interp(pr, p, "v");
+    const vento = u == null ? "" : ` · ${direzione(u, v)} ${nf0.format(Math.hypot(u, v) * 3.6)} km/h`;
+    righe += `<br><i style="background:${colore(m)}"></i>${m.nome}: ${nf1.format(t)}° / ${fmt(td, nf1, "°")} · ${fmt(z, nf0, " m")}${vento}`;
+  }
+  tip.innerHTML = righe; tip.classList.remove("nascosto");
+  const box = $("graf-box").getBoundingClientRect(), w = tip.offsetWidth;
+  let x = ev.clientX - box.left + 14;
+  if (x + w > box.width) x = Math.max(0, ev.clientX - box.left - w - 14);
+  tip.style.left = x + "px"; tip.style.top = Math.max(0, ev.clientY - box.top - tip.offsetHeight - 10) + "px";
+}
+function direzione(u, v) {
+  const d = (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360;
+  return ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"][Math.round(d / 22.5) % 16];
+}
+
+// tabella degli indici
+const VOCI_INDICI = [
+  ["cape", "CAPE<br>J/kg", (x) => fmt(x.cape)], ["cin", "CIN<br>J/kg", (x) => fmt(x.cin)], ["mucape", "MUCAPE<br>J/kg", (x) => fmt(x.mucape)],
+  ["li", "LI<br>°C", (x) => fmt(x.li, nf1)], ["si", "Showalter<br>°C", (x) => fmt(x.si, nf1)], ["k", "K<br>°C", (x) => fmt(x.k, nf0)],
+  ["tt", "TT<br>°C", (x) => fmt(x.tt, nf0)], ["pw", "Acqua prec.<br>mm", (x) => fmt(x.pw, nf0)],
+  ["lcl", "Base nubi (LCL)<br>m dal suolo", (x) => fmt(x.lclZ, nf0)],
+  ["zero", "Zero termico<br>m", (x) => x.zero ? (x.zero.alSuolo ? "al suolo" : fmt(x.zero.z, nf0)) : "–"],
+  ["zerotw", "Zero bulbo umido<br>m", (x) => x.zeroTw ? (x.zeroTw.alSuolo ? "al suolo" : fmt(x.zeroTw.z, nf0)) : "–"],
+  ["grad", "Gradiente 850-500<br>°C/km", (x) => fmt(x.gradiente, nf1)], ["shear", "Vento 0-6 km<br>km/h", (x) => fmt(x.shear == null ? null : x.shear * 3.6, nf0)],
+];
+const cacheIndici = new Map();
+function indiciDi(id) {
+  const pr = profiloDi(id); if (!pr) return null;
+  const k = id + stato.tempi[stato.i] + (stato.punto ? stato.punto.lat + "," + stato.punto.lon : "");
+  if (!cacheIndici.has(k)) cacheIndici.set(k, indici(pr));
+  return cacheIndici.get(k);
+}
+function disegnaTabella() {
+  const t = $("tab-indici"), ms = mostrati();
+  if (!ms.length) { t.innerHTML = ""; return; }
+  t.innerHTML = `<caption class="sub" style="text-align:left;padding-bottom:4px">Indici calcolati allo stesso modo per tutti i modelli</caption>` +
+    "<thead><tr><th>Modello</th>" + VOCI_INDICI.map((v) => `<th>${v[1]}</th>`).join("") + "</tr></thead><tbody>" +
+    ms.map((m) => { const x = indiciDi(m.id);
+      return `<tr><td><span class="linea" style="border-color:${colore(m)}"></span>${m.nome}</td>` + VOCI_INDICI.map((v) => `<td>${v[2](x)}</td>`).join("") + "</tr>"; }).join("") +
+    "</tbody>";
+}
+
+// vista testo
+function pad(s, n) { s = String(s); return s.length >= n ? s : " ".repeat(n - s.length) + s; }
+function testoModello(m) {
+  const pr = profiloDi(m.id), r = stato.risultati[m.id], x = indiciDi(m.id), t = stato.tempi[stato.i];
+  const f1 = (v) => v == null ? "" : v.toFixed(1), f0 = (v) => v == null ? "" : String(Math.round(v));
+  let s = `${m.nome} (${m.ris})${r.corsa ? " · corsa " + r.corsa : ""}\n`;
+  s += `Punto ${stato.punto.lat.toFixed(3)} N ${stato.punto.lon.toFixed(3)} E · quota del suolo nel modello ${Math.round(pr[0].z)} m\n`;
+  s += `Valido ${etichettaTempo(t)} (ora italiana) · ${t.replace("T", " ").replace("Z", " UTC")}\n\n`;
+  s += "  PRES   QUOTA   TEMP   RUGI    UR   MESC   DIR  VENTO  THETA THETA-E   BULBO\n";
+  s += "   hPa       m     °C     °C     %   g/kg     °   km/h      K       K   UM.°C\n";
+  s += "-".repeat(78) + "\n";
+  pr.forEach((l, i) => {
+    const ur = l.td == null ? null : 100 * es(l.td) / es(l.t);
+    const vel = l.u == null ? null : Math.hypot(l.u, l.v) * 3.6;
+    const dir = l.u == null ? null : (Math.atan2(-l.u, -l.v) * 180 / Math.PI + 360) % 360;
+    s += pad(f1(l.p), 6) + pad(f0(l.z), 8) + pad(f1(l.t), 7) + pad(f1(l.td), 7) + pad(f0(ur), 6) +
+         pad(l.td == null ? "" : (mescolanza(l.p, l.td) * 1000).toFixed(1), 7) + pad(f0(dir), 6) + pad(f0(vel), 7) +
+         pad(f1(theta(l.t, l.p)), 7) + pad(l.td == null ? "" : thetaE(l.t, l.td, l.p).toFixed(1), 8) +
+         pad(l.td == null ? "" : bulboUmido(l.t, l.td, l.p).toFixed(1), 8) + (i === 0 ? "  suolo" : "") + "\n";
+  });
+  s += "\nINDICI\n";
+  const righe = [
+    ["CAPE dal suolo", fmt(x.cape, nf0, " J/kg")], ["CIN dal suolo", fmt(x.cin, nf0, " J/kg")], ["MUCAPE (300 hPa più bassi)", fmt(x.mucape, nf0, " J/kg")],
+    ["Lifted index", fmt(x.li, nf1, " °C")], ["Showalter", fmt(x.si, nf1, " °C")], ["Indice K", fmt(x.k, nf0, " °C")], ["Total Totals", fmt(x.tt, nf0, " °C")],
+    ["Acqua precipitabile", fmt(x.pw, nf1, " mm")], ["Condensazione (LCL)", `${fmt(x.lclP, nf0, " hPa")}, ${fmt(x.lclZ, nf0, " m dal suolo")}`],
+    ["Zero termico", x.zero ? (x.zero.alSuolo ? "al suolo" : fmt(x.zero.z, nf0, " m")) : "–"],
+    ["Zero del bulbo umido", x.zeroTw ? (x.zeroTw.alSuolo ? "al suolo" : fmt(x.zeroTw.z, nf0, " m")) : "–"],
+    ["Gradiente 850-500 hPa", fmt(x.gradiente, nf1, " °C/km")], ["Differenza di vento 0-6 km", fmt(x.shear == null ? null : x.shear * 3.6, nf0, " km/h")],
+  ];
+  for (const [a, b] of righe) s += "  " + a.padEnd(30, ".") + " " + b + "\n";
+  return s;
+}
+function disegnaTesto() {
+  const scelta = $("modello-testo").value, ms = scelta === "tutti" ? disponibili() : disponibili().filter((m) => m.id === scelta);
+  $("testo").textContent = ms.length ? ms.map(testoModello).join("\n" + "=".repeat(78) + "\n\n") : "Nessun modello ha dati per quest'ora.";
+}
+
+function disegnaTutto() {
+  disegnaIntestazione();
+  disegnaChip();
+  if (stato.vista === "grafico") { disegnaSkewT(); disegnaTabella(); } else disegnaTesto();
+}
+
+// ------------------------------------------------------------------------------------------------ comandi
+function vaiA(i) { stato.i = Math.max(0, Math.min(stato.tempi.length - 1, i)); $("cursore").value = stato.i; disegnaTutto(); }
+$("cursore").addEventListener("input", (e) => vaiA(+e.target.value));
+$("prima").addEventListener("click", () => vaiA(stato.i - 1));
+$("dopo").addEventListener("click", () => vaiA(stato.i + 1));
+for (const [id, vista] of [["sch-grafico", "grafico"], ["sch-testo", "testo"]]) {
+  $(id).addEventListener("click", () => {
+    stato.vista = vista;
+    $("sch-grafico").setAttribute("aria-selected", String(vista === "grafico"));
+    $("sch-testo").setAttribute("aria-selected", String(vista === "testo"));
+    $("vista-grafico").classList.toggle("nascosto", vista !== "grafico");
+    $("vista-testo").classList.toggle("nascosto", vista !== "testo");
+    disegnaTutto();
+  });
+}
+$("riferimento").addEventListener("change", disegnaTutto);
+$("modello-testo").addEventListener("change", disegnaTesto);
+$("copia").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("testo").textContent); $("copia").textContent = "Copiato"; setTimeout(() => $("copia").textContent = "Copia il testo", 1500); } catch (e) { /* niente */ }
+});
+$("skewt").addEventListener("pointermove", sulGrafico);
+$("skewt").addEventListener("pointerdown", sulGrafico);
+$("skewt").addEventListener("pointerleave", () => { $("tip").classList.add("nascosto"); $("guida")?.classList.add("nascosto"); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { sfondoSkewT = null; disegnaTutto(); });
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowLeft") vaiA(stato.i - 1);
+  if (e.key === "ArrowRight") vaiA(stato.i + 1);
+});
+
+(async () => {
+  disegnaTutto();
+  await preparaMappa();
+  const h = location.hash.slice(1).split(",").map(Number);
+  if (h.length === 2 && h.every(isFinite)) scegli(h[0], h[1]);
+  else scegli(NEROLA.lat, NEROLA.lon);
+})();
+</script>
+</body>
+</html>

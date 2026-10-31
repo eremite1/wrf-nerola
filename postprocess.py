@@ -6,6 +6,8 @@
 Scrive d01_b1.npz e d02_b1.npz. Il vento e' ruotato verso nord/est (WRF lo da' lungo gli assi della griglia).
 Dalla colonna d'aria (tutti i livelli) calcola anche il bulbo umido e gli indici per il tipo di precipitazione
 (TW2, AFUS, ARIG, ZTW0: vedi colonna.py), usati dal nowcasting per distinguere neve, mista, pioggia e gelicidio.
+Ogni 3 ore scrive anche d01_sond_b1.npz e d02_sond_b1.npz: il radiosondaggio virtuale di ogni punto della griglia
+(quota, temperatura, punto di rugiada e vento sui livelli di pressione, vedi colonna.profili_pressione).
 """
 import argparse
 import glob
@@ -42,6 +44,7 @@ def main():
         if not files:
             sys.exit(f"nessun file wrfout_{dom}_* in {a.run}")
         tempi, dati, stat = [], {}, {}
+        tempi_sond, sond = [], {}          # radiosondaggi virtuali: solo ogni 3 ore (file a parte, vedi colonna.py)
         for f in files:
             nc = Dataset(f)
             tempi.append(istante(nc))
@@ -68,6 +71,15 @@ def main():
                             dati.setdefault(k, []).append(v)
                 except Exception as e:  # noqa: BLE001
                     print("ATTENZIONE: colonna d'aria non calcolata:", e, file=sys.stderr)
+            if int(tempi[-1][11:13]) % 3 == 0 and all(x in nc.variables for x in
+                                                      ("P", "PB", "T", "QVAPOR", "PH", "PHB", "U", "V", "COSALPHA", "SINALPHA")):
+                try:
+                    prof = colonna.profili_pressione(nc)
+                    for k, v in prof.items():
+                        sond.setdefault(k, []).append(v)
+                    tempi_sond.append(tempi[-1])
+                except Exception as e:  # noqa: BLE001
+                    print("ATTENZIONE: radiosondaggio virtuale non calcolato:", e, file=sys.stderr)
             c, s = np.array(nc["COSALPHA"][0]), np.array(nc["SINALPHA"][0])
             u, v = np.array(nc["U10"][0]), np.array(nc["V10"][0])
             dati.setdefault("U10", []).append((u * c - v * s).astype("float32"))
@@ -76,6 +88,11 @@ def main():
         np.savez_compressed(out / f"{dom}_b{a.blocco}.npz", tempi=np.array(tempi), **stat,
                             **{k: np.stack(v) for k, v in dati.items()})
         print(dom, "istanti:", len(tempi), tempi[0], "->", tempi[-1], "campi:", sorted(dati))
+        if tempi_sond and all(len(v) == len(tempi_sond) for v in sond.values()):
+            np.savez_compressed(out / f"{dom}_sond_b{a.blocco}.npz", tempi=np.array(tempi_sond),
+                                livelli=np.array(colonna.LIVELLI_SONDAGGIO, dtype="int16"),
+                                **{k: np.stack(v) for k, v in sond.items()})
+            print(dom, "radiosondaggi virtuali:", len(tempi_sond), "istanti")
 
 
 if __name__ == "__main__":
