@@ -32,10 +32,12 @@
   h1 small { font-size: .85rem; font-weight: 400; color: var(--muto); margin-left: 8px; }
   main { max-width: 1400px; margin: 0 auto; padding: 14px 16px 28px; }
   .griglia-pagina { display: grid; grid-template-columns: minmax(300px, 430px) minmax(0, 1fr); gap: 16px; align-items: start; }
-  @media (max-width: 900px) { .griglia-pagina { grid-template-columns: minmax(0, 1fr); } #mappa { height: 52vh !important; } .col-mappa { position: static !important; } }
+  @media (max-width: 900px) { .griglia-pagina { grid-template-columns: minmax(0, 1fr); } #mappa { height: calc(var(--vhp, 1vh) * 52) !important; } .col-mappa { position: static !important; } }
   .card { background: var(--card); border: 1px solid var(--linea); border-radius: 12px; padding: 12px; min-width: 0; }
   .col-mappa { position: sticky; top: 10px; }
-  #mappa { height: 70vh; min-height: 360px; border-radius: 10px; background: var(--bg); }
+  .incorporata nav { display: none !important; }
+  .incorporata .col-mappa { position: static; }
+  #mappa { height: calc(var(--vhp, 1vh) * 70); min-height: 360px; border-radius: 10px; background: var(--bg); }
   .leaflet-container { font: inherit; }
   .suggerimento { color: var(--muto); font-size: .82rem; margin: 8px 2px 0; }
   .legenda { display: grid; gap: 4px; margin-top: 10px; }
@@ -173,6 +175,7 @@
 <script src="comune.js"></script>
 <script>
 "use strict";
+const PAGINA = "sondaggi";
 // ------------------------------------------------------------------------------------------------ disegno
 function disegnaIntestazione() {
   if (!stato.punto) return;
@@ -180,7 +183,8 @@ function disegnaIntestazione() {
   const quote = MODELLI.filter((m) => stato.risultati[m.id]?.quotaModello != null)
     .map((m) => `${m.nome} ${nf0.format(stato.risultati[m.id].quotaModello)} m`);
   $("intestazione").innerHTML = `<h2>${lat.toFixed(3)}° N, ${lon.toFixed(3)}° E</h2>` +
-    `<div class="sub">${quote.length ? "Quota del suolo nei modelli: " + quote.join(" · ") : "Carico i dati dei modelli…"}</div>`;
+    `<div class="sub">${quote.length ? "Quota del suolo nei modelli: " + quote.join(" · ") : "Carico i dati dei modelli…"}</div>` +
+    `<div class="sub"><a href="${linkPagina("colonna", lat, lon).href}" target="${linkPagina("colonna", lat, lon).target}">Confronta la temperatura di tutta la colonna d'aria</a></div>`;
   const t = stato.tempi[stato.i];
   $("quando-testo").textContent = t ? etichettaTempo(t) : "–";
   if (t) {

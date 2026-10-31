@@ -1,6 +1,21 @@
 // Codice comune alle pagine sondaggi.html e colonna.html (WRF Nerola + modelli di Mappe Lazio).
 // Ogni pagina definisce la funzione disegnaTutto(), chiamata quando arrivano i dati o cambia l'ora.
 "use strict";
+// ------------------------------------------------------------------------------------------------ dentro il sito
+// Quando la pagina e' incorporata in meteonerola.it (scheda "Modelli meteo"), il menu tra le due pagine lo fa il sito:
+// i collegamenti portano alla scheda giusta della pagina del sito e il punto scelto finisce nell'indirizzo del sito.
+const INCORPORATA = (() => { try { return window.parent !== window; } catch (e) { return true; } })();
+if (INCORPORATA) document.documentElement.classList.add("incorporata");
+function linkPagina(pagina, lat, lon) {                 // pagina: "sondaggi" o "colonna"
+  const punto = lat.toFixed(4) + "," + lon.toFixed(4);
+  if (INCORPORATA) { try { return { href: window.top.location.pathname + "#" + pagina + "/" + punto, target: "_top" }; } catch (e) { /* altro sito */ } }
+  return { href: pagina + ".html#" + punto, target: "" };
+}
+function segnaPuntoNelSito(pagina, lat, lon) {
+  if (!INCORPORATA) return;
+  try { window.top.history.replaceState(null, "", "#" + pagina + "/" + lat.toFixed(4) + "," + lon.toFixed(4)); } catch (e) { /* niente */ }
+}
+
 // ------------------------------------------------------------------------------------------------ impostazioni
 const NEROLA = { lat: 42.1606, lon: 12.7856 };
 const LAZIO = [11.3, 14.1, 41.0, 42.8];                // area di Mappe Lazio: lon0, lon1, lat0, lat1
@@ -347,6 +362,7 @@ async function scegli(lat, lon) {
   stato.risultati = {};
   history.replaceState(null, "", "#" + lat.toFixed(4) + "," + lon.toFixed(4));
   for (const id of ["link-sondaggi", "link-colonna"]) { const l = document.getElementById(id); if (l) l.hash = lat.toFixed(4) + "," + lon.toFixed(4); }
+  segnaPuntoNelSito(PAGINA, lat, lon);
   if (!marcatore) marcatore = L.circleMarker([lat, lon], { radius: 7, color: "#fff", weight: 2, fillColor: "#d6341f", fillOpacity: 1 }).addTo(mappa);
   else marcatore.setLatLng([lat, lon]);
   $("intestazione").innerHTML = `<h2>${lat.toFixed(3)}° N, ${lon.toFixed(3)}° E</h2><div class="sub">Carico i dati dei modelli…</div>`;
