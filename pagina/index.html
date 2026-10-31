@@ -221,21 +221,22 @@
 "use strict";
 const GRUPPI = [
   ["Tempo", ["temperatura", "percepita", "umidita", "tdew", "pressione", "nuvolosita", "radiazione"]],
-  ["Vento", ["vento", "pbl"]],
-  ["Precipitazioni", ["pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale", "tipo_prec", "neve_24h", "quota_neve", "zero_tw", "cape"]],
+  ["Vento", ["vento", "vento_max24", "pbl"]],
+  ["Precipitazioni", ["pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale", "pioggia_intensita24", "tipo_prec", "neve_24h", "quota_neve", "zero_tw", "cape"]],
+  ["Alta quota", ["zero_termico", "t850", "t500", "z500", "vento_850", "vento_700", "vento_500", "vento_guida", "rh700", "w700"]],
   ["Gelo e nebbia", ["gelata_ora", "gelata", "tmin24", "tmax24", "twmin24", "tprato24", "nebbia"]],
-  ["Suolo e agricoltura", ["suolo_temp", "suolo_umidita_10", "suolo_umidita_40", "et0_24h"]],
+  ["Suolo e agricoltura", ["suolo_temp", "suolo_umidita_10", "suolo_umidita_40", "et0_24h", "vpd", "flusso_sensibile", "flusso_latente"]],
 ];
-const ICONE_SEZ = { "Tempo": "⛅", "Vento": "🌬️", "Precipitazioni": "🌧️", "Gelo e nebbia": "❄️", "Suolo e agricoltura": "🌱" };
+const ICONE_SEZ = { "Tempo": "⛅", "Vento": "🌬️", "Precipitazioni": "🌧️", "Gelo e nebbia": "❄️", "Alta quota": "🏔️", "Suolo e agricoltura": "🌱" };
 const ICONE = { temperatura: "🌡️", vento: "🧭", umidita: "💧", pressione: "🎯", pioggia_1h: "🌧️", pioggia_3h: "🌧️", pioggia_6h: "🌧️", pioggia_12h: "🌧️",
   pioggia_24h: "🌧️", pioggia_totale: "☔", tmin24: "❄️", tmax24: "🔥", twmin24: "💧", tprato24: "🌱", gelata: "🧊", gelata_ora: "🧊", nebbia: "🌫️",
   suolo_temp: "🌍", suolo_umidita_10: "🌱", suolo_umidita_40: "🌱", percepita: "🥵", tdew: "💦", nuvolosita: "☁️", radiazione: "☀️", pbl: "🌀",
-  neve_24h: "🌨️", tipo_prec: "🌦️", quota_neve: "🏔️", zero_tw: "📏", cape: "⚡", et0_24h: "🚿" };
+  neve_24h: "🌨️", tipo_prec: "🌦️", quota_neve: "🏔️", zero_tw: "📏", cape: "⚡", et0_24h: "🚿", vento_max24: "💨", pioggia_intensita24: "⛈️", zero_termico: "📏", t850: "🌡️", t500: "🌡️", z500: "🌐", vento_850: "🧭", vento_700: "🧭", vento_500: "🧭", vento_guida: "🌪️", rh700: "💧", w700: "↕️", vpd: "🥀", flusso_sensibile: "♨️", flusso_latente: "💦" };
 const BREVE = { temperatura: "Temperatura", vento: "Vento", umidita: "Umidità", pressione: "Pressione",
   pioggia_1h: "Pioggia 1 h", pioggia_3h: "Pioggia 3 h", pioggia_6h: "Pioggia 6 h", pioggia_12h: "Pioggia 12 h", pioggia_24h: "Pioggia 24 h",
   pioggia_totale: "Pioggia totale", tmin24: "Minima 24 h", tmax24: "Massima 24 h", twmin24: "Bulbo umido min. 24 h", tprato24: "Suolo min. 24 h",
   gelata: "Brina e gelate (max 24 h)", gelata_ora: "Brina e gelate adesso", nebbia: "Nebbia", percepita: "Temperatura percepita", tdew: "Punto di rugiada", nuvolosita: "Nuvolosità", radiazione: "Radiazione solare",
-  pbl: "Strato limite", neve_24h: "Neve 24 h", tipo_prec: "Tipo di precipitazione", quota_neve: "Quota neve", zero_tw: "Bulbo umido 0 °C", cape: "Temporali (CAPE)", et0_24h: "Evapotraspirazione 24 h", suolo_temp: "Temperatura suolo", suolo_umidita_10: "Umidità suolo 0-10 cm", suolo_umidita_40: "Umidità suolo 10-40 cm" };
+  pbl: "Strato limite", neve_24h: "Neve 24 h", tipo_prec: "Tipo di precipitazione", quota_neve: "Quota neve", zero_tw: "Bulbo umido 0 °C", cape: "Temporali (CAPE)", et0_24h: "Evapotraspirazione 24 h", suolo_temp: "Temperatura suolo", suolo_umidita_10: "Umidità suolo 0-10 cm", suolo_umidita_40: "Umidità suolo 10-40 cm", vento_max24: "Vento massimo 24 h", pioggia_intensita24: "Intensità pioggia max 24 h", zero_termico: "Zero termico", t850: "Temperatura 850 hPa", t500: "Temperatura 500 hPa", z500: "Geopotenziale 500 hPa", vento_850: "Vento 850 hPa", vento_700: "Vento 700 hPa", vento_500: "Vento 500 hPa", vento_guida: "Vento guida temporali", rh700: "Umidità 700 hPa", w700: "Moto verticale 700 hPa", vpd: "Deficit di vapore", flusso_sensibile: "Calore sensibile", flusso_latente: "Calore latente" };
 const $ = (id) => document.getElementById(id);
 let indice = null, immagini = [], posizione = 0, timer = null;
 let griglia = null, valoriParam = null, puntoScelto = null;

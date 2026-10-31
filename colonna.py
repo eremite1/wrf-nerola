@@ -82,8 +82,11 @@ def indici(T_k, p_pa, qv, z_w, hgt, p_cima=500.0):
     neve = (tw <= 2.0) & dentro & (sopra < A_NEVE)
     k_neve = np.where(neve, k, nz).min(axis=0)
     zneve = np.where(k_neve >= nz, np.nan, np.take_along_axis(zc, np.clip(k_neve, 0, nz - 1)[None], axis=0)[0])
+    # zero termico: quota sopra la quale la temperatura dell'aria (non il bulbo umido) resta sotto 0 fino a 500 hPa
+    k_t0 = np.where((tc > 0.0) & dentro, k, -1).max(axis=0)
+    zt0 = np.where(k_t0 < 0, hgt, np.take_along_axis(z_w, np.clip(k_t0 + 1, 0, nz)[None], axis=0)[0])
     return {"TW2": tw[0].astype("float32"), "AFUS": afus.astype("float32"), "ARIG": arig.astype("float32"),
-            "ZTW0": ztw0.astype("float32"), "ZNEVE": zneve.astype("float32")}
+            "ZTW0": ztw0.astype("float32"), "ZNEVE": zneve.astype("float32"), "ZT0": zt0.astype("float32")}
 
 
 def da_wrfout(nc):
@@ -189,6 +192,13 @@ def parametri_nowcasting(nc):
     z = (np.array(nc["PH"][0]) + np.array(nc["PHB"][0])) / G
     zc = 0.5 * (z[1:] + z[:-1])
     out["CAPE"] = _cape(T, P, qv, zc, z)
+    # alta quota: temperatura e vento a 850 e 500 hPa, geopotenziale a 500 hPa
+    out["T850"] = _a_livello(T, P, 850.0) - 273.15
+    out["T500"] = _a_livello(T, P, 500.0) - 273.15
+    out["Z500"] = _a_livello(zc, P, 500.0) / 10.0
+    for liv in (850, 500):
+        out[f"U{liv}"] = _a_livello(ue, P, float(liv))
+        out[f"V{liv}"] = _a_livello(ve, P, float(liv))
     return {k: np.asarray(v, dtype="float32") for k, v in out.items()}
 
 
