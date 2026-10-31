@@ -202,6 +202,22 @@ def parametri_nowcasting(nc):
     return {k: np.asarray(v, dtype="float32") for k, v in out.items()}
 
 
+def nuvolosita_strati(nc):
+    """Copertura nuvolosa dal contenuto di acqua e ghiaccio delle nuvole (QCLOUD + QICE) lungo la colonna, in percentuale,
+    per strato: bassi (sotto 700 hPa), medi (700-400 hPa), alti (sopra 400 hPa) e totale. In ogni livello la frazione di
+    nuvola cresce da 0 a 1 tra 0 e 0,01 g/kg di condensato; nello strato si prende il livello piu' nuvoloso
+    (sovrapposizione massima) e gli strati si combinano come se fossero indipendenti."""
+    P = (np.array(nc["P"][0]) + np.array(nc["PB"][0])) / 100.0
+    qc = np.maximum(np.array(nc["QCLOUD"][0]), 0.0)
+    qi = np.maximum(np.array(nc["QICE"][0]), 0.0) if "QICE" in nc.variables else 0.0
+    f = np.clip((qc + qi) / 1e-5, 0.0, 1.0)
+    bassa = np.where(P >= 700.0, f, 0.0).max(axis=0)
+    media = np.where((P < 700.0) & (P >= 400.0), f, 0.0).max(axis=0)
+    alta = np.where(P < 400.0, f, 0.0).max(axis=0)
+    tot = 1.0 - (1.0 - bassa) * (1.0 - media) * (1.0 - alta)
+    return {"NUVB": 100 * bassa, "NUVM": 100 * media, "NUVA": 100 * alta, "NUVT": 100 * tot}
+
+
 def _cape(T, P, qv, zc, zw):
     Rd, cp, Lv, eps = 287.04, 1004.0, 2.5e6, 0.622
     nz = T.shape[0]

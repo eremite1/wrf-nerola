@@ -60,6 +60,9 @@ def main():
                 try:
                     for k, v in colonna.da_wrfout(nc).items():
                         dati.setdefault(k, []).append(v)
+                    if "QCLOUD" in nc.variables:
+                        for k, v in colonna.nuvolosita_strati(nc).items():
+                            dati.setdefault(k, []).append(v.astype("float32"))
                     if all(x in nc.variables for x in ("U", "V", "W", "COSALPHA", "SINALPHA")):
                         for k, v in colonna.parametri_nowcasting(nc).items():
                             dati.setdefault(k, []).append(v)
