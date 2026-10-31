@@ -314,11 +314,16 @@ PARAMETRI = [
      "calcola": lambda d, i: finestra(gelo(d)[2], i, 24, np.min), "cmap": "RdYlBu_r", "limiti": "auto",
      "passo": 3, "inizio": 24, "isolinee": True,
      "nota": "temperatura della superficie del suolo calcolata dal modello (WRF, campo TSK)"},
-    {"id": "gelata", "titolo": "Brina e gelate (ultime 24 ore)", "unita": "",
+    {"id": "gelata_ora", "titolo": "Brina e gelate in questo momento", "unita": "",
+     "calcola": lambda d, i: gelo(d)[3][i], "passo": 3, "inizio": 0,
+     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#ffffff", "#8fd8f2", "#2f6fd6", "#6a2c91"],
+                "etichette": CLASSI_GELO, "nascondi": {0}},
+     "scala": 1, "etichetta_dato": "Brina / gelata in questo momento", "nota": "situazione all'ora indicata, da temperatura a 2 m, bulbo umido, suolo, cielo e vento"},
+    {"id": "gelata", "titolo": "Brina e gelate (massima nelle 24 ore)", "unita": "",
      "calcola": lambda d, i: finestra(gelo(d)[3], i, 24, np.max), "passo": 3, "inizio": 24,
      "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#ffffff", "#8fd8f2", "#2f6fd6", "#6a2c91"],
                 "etichette": CLASSI_GELO, "nascondi": {0}},
-     "scala": 1, "etichetta_dato": "Brina / gelata", "nota": "classe peggiore nelle 24 ore, da temperatura a 2 m, bulbo umido, suolo, cielo e vento"},
+     "scala": 1, "etichetta_dato": "Brina / gelata (massima nelle 24 ore)", "nota": "classe peggiore nelle 24 ore, da temperatura a 2 m, bulbo umido, suolo, cielo e vento"},
     {"id": "nebbia", "titolo": "Nebbia: visibilità stimata", "unita": "",
      "calcola": lambda d, i: visibilita(d)[i], "passo": 3, "inizio": 3, "serve": "QCLOUD1",
      "classi": {"bordi": [200, 500, 1000, 5000], "colori": ["#4b4b4b", "#7d7d7d", "#b0b0b0", "#dcdcdc", "#ffffff"],
@@ -612,7 +617,7 @@ def disegna(d, p, i, dom, etichetta, corsa, ctx, cartella, lim):
     fig.text(xr, 1 - 0.36 / Fh, f"WRF {etichetta}", fontsize=16, fontweight="bold", ha="right", va="center", color="#1d4e89")
     fig.text(xr, 1 - 0.80 / Fh, f"+{ore}h", fontsize=13, fontweight="bold", ha="right", va="center", color="#555555")
     nota = p.get("nota", "")
-    fig.text(x0, 0.08 / Fh, (nota + "\n" if nota else "") + f"{FONTE} · corsa {c:%d/%m %H} UTC · ora italiana ({utc:%H} UTC)\n" + CREDITI,
+    fig.text(x0, 0.08 / Fh, (nota + "\n" if nota else "") + f"{FONTE} · corsa ECMWF delle {c:%H} UTC del {c:%d/%m}\n" + CREDITI,
              ha="left", va="bottom", fontsize=6.8, color="#6b7480", style="italic")
     pos = ax.get_position()
     layout = {"asse": [round(pos.x0, 5), round(pos.y0, 5), round(pos.width, 5), round(pos.height, 5)],
@@ -647,6 +652,16 @@ def campi_serie(d):
               ("PRESS", "Pressione al livello del mare", "hPa", 10, pressione_mare(d)),
               ("TW", "Temperatura di bulbo umido", "°C", 10, gelo(d)[1]),
               ("TPRATO", "Temperatura della superficie del suolo", "°C", 10, gelo(d)[2])]
+    elenco += [("TD", "Punto di rugiada", "°C", 10, punto_rugiada(d)),
+               ("PERC", "Temperatura percepita", "°C", 10, temperatura_percepita(d)),
+               ("NUV", "Nuvolosità", "%", 1, nuvolosita(d)),
+               ("RAD", "Radiazione solare", "W/m²", 1, d["SWDOWN"]),
+               ("DIR", "Direzione del vento (da)", "°", 1, (270.0 - np.degrees(np.arctan2(d["V10"], d["U10"]))) % 360.0),
+               ("GELO", "Classe di gelo oraria", "", 1, gelo(d)[3])]
+    if "PBLH" in d:
+        elenco.append(("PBL", "Altezza strato limite", "m", 1, d["PBLH"]))
+    if "CAPE" in d:
+        elenco.append(("CAPE", "CAPE", "J/kg", 1, d["CAPE"]))
     if "TSLB" in d:
         elenco.append(("TSUOLO", "Temperatura del suolo 0-10 cm", "°C", 10, d["TSLB"][:, 0] - 273.15))
     if "SMOIS" in d:
@@ -737,6 +752,7 @@ def main():
     ap.add_argument("--corsa", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--sfondo", default="")
+    ap.add_argument("--precedente", default="", help="indice.json pubblicato prima (per conservare l'ora di fine calcolo del modello)")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -747,7 +763,16 @@ def main():
         print("ATTENZIONE sfondo:", avviso)
     if not dem:
         print("ATTENZIONE: rilievo non disponibile, mappe senza ombreggiatura e senza quota reale")
-    indice = {"corsa": a.corsa, "creato": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "fonte": FONTE, "crediti": CREDITI,
+    adesso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+    elaborato = adesso
+    if a.precedente and Path(a.precedente).exists():
+        try:
+            vecchio = json.loads(Path(a.precedente).read_text())
+            if vecchio.get("corsa") == a.corsa:
+                elaborato = vecchio.get("elaborato") or vecchio.get("creato") or adesso
+        except Exception:  # noqa: BLE001
+            pass
+    indice = {"corsa": a.corsa, "creato": adesso, "elaborato": elaborato, "fonte": FONTE, "crediti": CREDITI,
               "domini": {}}
     for dom, cartella_dom, etichetta in DOMINI:
         d = uscite.carica(a.uscite, dom)

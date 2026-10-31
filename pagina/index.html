@@ -106,6 +106,26 @@
   table.tab th, table.tab td { border-bottom: 1px solid var(--linea); padding: 6px 8px; text-align: center; }
   table.tab th:first-child { text-align: left; font-weight: 500; }
   table.tab thead th { color: var(--muto); font-weight: 600; font-size: .8rem; }
+  .scelte-meteo { margin-bottom: 12px; }
+  .meteo-testa { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+                 background: linear-gradient(135deg, #1f6fb5, #4aa3e0 60%, #8fd0f5); color: #fff; border: 0; }
+  .meteo-testa h2 { margin: 0; font-size: 1.4rem; } .meteo-testa .sub { font-size: .8rem; opacity: .9; }
+  .adesso { text-align: right; } .adesso .grande { font-size: 2.6rem; font-weight: 700; line-height: 1.1; display: block; } .adesso small { opacity: .9; }
+  .tessere { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .tessera { background: var(--card); border: 1px solid var(--linea); border-radius: 12px; padding: 8px 10px; }
+  .tessera span { display: block; font-size: .74rem; color: var(--muto); } .tessera b { font-size: 1.15rem; }
+  .giorni-card { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(130px, 1fr); gap: 8px; overflow-x: auto; margin-bottom: 12px; padding-bottom: 4px; }
+  .gcard { background: var(--card); border: 1px solid var(--linea); border-radius: 12px; padding: 10px; text-align: center; }
+  .gcard b { font-size: .82rem; display: block; } .gico { font-size: 2.2rem; line-height: 1.3; }
+  .gt .max { font-size: 1.4rem; font-weight: 700; color: #e0482f; } .gt .min { font-size: 1.1rem; color: #3f78c9; margin-left: 8px; }
+  .gcard small { display: block; color: var(--muto); font-size: .78rem; }
+  .gelo-b { color: #fff !important; border-radius: 999px; margin-top: 4px; padding: 1px 6px; font-weight: 600; }
+  .grafici .graf { margin: 4px 0 16px; } .grafici h3 { font-size: .95rem; color: var(--testo); }
+  .legende { display: flex; gap: 12px; flex-wrap: wrap; font-size: .76rem; color: var(--muto); margin: 2px 0; }
+  .leg i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .graf .notte { fill: #5b6775; opacity: .13; } .graf .vuoto { fill: var(--bg); stroke: var(--linea); }
+  .graf text.gg { font-weight: 700; } .graf text.est { font-size: 11.5px; font-weight: 700; }
+  #punto .meteo-testa { margin-top: 10px; }
   .nascosto { display: none; }
 </style>
 </head>
@@ -134,10 +154,6 @@
         <div><label for="dominio">Zona</label><select id="dominio"></select></div>
         <div><label for="parametro">Parametro</label><select id="parametro"></select></div>
       </div>
-      <div class="testa-mappa">
-        <div><strong id="data-ora">–</strong><span id="ora-utc"></span></div>
-        <div class="chip" id="chip-ore">+0h</div>
-      </div>
       <div class="immagine" id="contenitore"><img id="mappa" alt="Mappa meteo" decoding="async"><div class="marcatore nascosto" id="marcatore"></div></div>
       <p class="suggerimento" id="suggerimento">Passa sulla mappa per leggere il valore; clicca (o tocca) un punto per il meteogramma di quel punto. Tasto destro sull'immagine per copiarla o salvarla.</p>
       <div class="barra">
@@ -158,7 +174,7 @@
        Nel puntatore compare anche la quota media del terreno usata dal modello in quella cella, che sui crinali può essere più bassa di quella reale.</p>
     <h4>Brina e gelate</h4>
     <p>Per ogni ora si combinano temperatura a 2 m, temperatura di bulbo umido, temperatura della superficie del suolo, nuvolosità e vento.
-       Sulla mappa compare la classe peggiore nelle ultime 24 ore:</p>
+       Ci sono due mappe: «Brina e gelate adesso» mostra la classe dell'ora di riferimento, «Brina e gelate (max 24 h)» mostra la classe peggiore raggiunta nelle 24 ore fino a quell'ora. Le classi sono:</p>
     <ul>
       <li><b>brina</b>: suolo a 0 °C o meno, bulbo umido fino a 2 °C, cielo prevalentemente sereno e vento debole;</li>
       <li><b>gelata</b>: aria a 2 m a 0 °C o meno, oppure bulbo umido e suolo a 0 °C o meno;</li>
@@ -187,8 +203,12 @@
     </details>
   </section>
 
-  <section id="vista-meteo" class="card nascosto">
-    <div class="immagine"><img id="meteogramma" alt="Meteogramma di Nerola" decoding="async"></div>
+  <section id="vista-meteo" class="nascosto">
+    <div class="card scelte-meteo">
+      <div><label for="meteo-zona">Zona</label><select id="meteo-zona"></select></div>
+      <div><label for="meteo-luogo">Località</label><select id="meteo-luogo"></select></div>
+    </div>
+    <div id="meteo-contenuto"><p class="suggerimento">Carico il meteogramma…</p></div>
   </section>
 </main>
 <footer>
@@ -203,25 +223,23 @@ const GRUPPI = [
   ["Tempo", ["temperatura", "percepita", "umidita", "tdew", "pressione", "nuvolosita", "radiazione"]],
   ["Vento", ["vento", "pbl"]],
   ["Precipitazioni", ["pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale", "tipo_prec", "neve_24h", "quota_neve", "zero_tw", "cape"]],
-  ["Gelo e nebbia", ["gelata", "tmin24", "tmax24", "twmin24", "tprato24", "nebbia"]],
+  ["Gelo e nebbia", ["gelata_ora", "gelata", "tmin24", "tmax24", "twmin24", "tprato24", "nebbia"]],
   ["Suolo e agricoltura", ["suolo_temp", "suolo_umidita_10", "suolo_umidita_40", "et0_24h"]],
 ];
 const ICONE_SEZ = { "Tempo": "⛅", "Vento": "🌬️", "Precipitazioni": "🌧️", "Gelo e nebbia": "❄️", "Suolo e agricoltura": "🌱" };
 const ICONE = { temperatura: "🌡️", vento: "🧭", umidita: "💧", pressione: "🎯", pioggia_1h: "🌧️", pioggia_3h: "🌧️", pioggia_6h: "🌧️", pioggia_12h: "🌧️",
-  pioggia_24h: "🌧️", pioggia_totale: "☔", tmin24: "❄️", tmax24: "🔥", twmin24: "💧", tprato24: "🌱", gelata: "🧊", nebbia: "🌫️",
+  pioggia_24h: "🌧️", pioggia_totale: "☔", tmin24: "❄️", tmax24: "🔥", twmin24: "💧", tprato24: "🌱", gelata: "🧊", gelata_ora: "🧊", nebbia: "🌫️",
   suolo_temp: "🌍", suolo_umidita_10: "🌱", suolo_umidita_40: "🌱", percepita: "🥵", tdew: "💦", nuvolosita: "☁️", radiazione: "☀️", pbl: "🌀",
   neve_24h: "🌨️", tipo_prec: "🌦️", quota_neve: "🏔️", zero_tw: "📏", cape: "⚡", et0_24h: "🚿" };
 const BREVE = { temperatura: "Temperatura", vento: "Vento", umidita: "Umidità", pressione: "Pressione",
   pioggia_1h: "Pioggia 1 h", pioggia_3h: "Pioggia 3 h", pioggia_6h: "Pioggia 6 h", pioggia_12h: "Pioggia 12 h", pioggia_24h: "Pioggia 24 h",
   pioggia_totale: "Pioggia totale", tmin24: "Minima 24 h", tmax24: "Massima 24 h", twmin24: "Bulbo umido min. 24 h", tprato24: "Suolo min. 24 h",
-  gelata: "Brina e gelate", nebbia: "Nebbia", percepita: "Temperatura percepita", tdew: "Punto di rugiada", nuvolosita: "Nuvolosità", radiazione: "Radiazione solare",
+  gelata: "Brina e gelate (max 24 h)", gelata_ora: "Brina e gelate adesso", nebbia: "Nebbia", percepita: "Temperatura percepita", tdew: "Punto di rugiada", nuvolosita: "Nuvolosità", radiazione: "Radiazione solare",
   pbl: "Strato limite", neve_24h: "Neve 24 h", tipo_prec: "Tipo di precipitazione", quota_neve: "Quota neve", zero_tw: "Bulbo umido 0 °C", cape: "Temporali (CAPE)", et0_24h: "Evapotraspirazione 24 h", suolo_temp: "Temperatura suolo", suolo_umidita_10: "Umidità suolo 0-10 cm", suolo_umidita_40: "Umidità suolo 10-40 cm" };
 const $ = (id) => document.getElementById(id);
 let indice = null, immagini = [], posizione = 0, timer = null;
 let griglia = null, valoriParam = null, puntoScelto = null;
 const cacheBin = {}, cacheSerie = {};
-const fmtGiorno = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
-const fmtUtc = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
 
 function data(iso) { return new Date(iso.replace("Z", ":00Z")); }
 
@@ -237,8 +255,7 @@ async function carica() {
       "Se hai aperto il file dal computer, usa l'indirizzo pubblico della pagina. (" + e.message + ")</div>");
     return;
   }
-  const c = indice.corsa;
-  $("info").textContent = `Corsa ECMWF del ${c.slice(6, 8)}/${c.slice(4, 6)}/${c.slice(0, 4)} ore ${c.slice(8, 10)} UTC · aggiornata ${indice.creato.replace("T", " ").replace("Z", " UTC")}`;
+  aggiornaContatore(); setInterval(aggiornaContatore, 30000);
   const dom = $("dominio");
   for (const [k, v] of Object.entries(indice.domini)) dom.add(new Option("Dominio " + v.etichetta + (k === "1km" ? " (zona di Nerola)" : " (area più ampia)"), k));
   const lm = $("lista-modelli");
@@ -263,13 +280,27 @@ async function carica() {
   $("s-mappe").onclick = () => scheda("mappe");
   $("s-meteo").onclick = () => scheda("meteo");
   $("s-pagella").onclick = () => scheda("pagella");
-  $("meteogramma").src = "meteogramma_nerola.png?v=" + encodeURIComponent(indice.creato);
   riempiParametri(true);
   caricaGriglia().catch(() => {});
   const img = $("mappa");
   img.addEventListener("mousemove", (e) => sulPuntatore(e, false));
   img.addEventListener("mouseleave", () => $("tip").classList.add("nascosto"));
   img.addEventListener("click", (e) => sulPuntatore(e, true));
+}
+
+function durata(ms) {
+  const m = Math.max(0, Math.round(ms / 60000)), h = Math.floor(m / 60);
+  return h ? `${h} h ${String(m % 60).padStart(2, "0")} min` : `${m} min`;
+}
+
+function aggiornaContatore() {
+  if (!indice) return;
+  const c = indice.corsa, el = data(indice.elaborato || indice.creato), ora = Date.now();
+  const fmt = new Intl.DateTimeFormat("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+  const prossimo = el.getTime() + 12 * 3600000;
+  const dopo = ora < prossimo ? `prossimo aggiornamento stimato tra ${durata(prossimo - ora)}` : "nuova corsa in elaborazione, aggiornamento atteso a breve";
+  $("info").innerHTML = `Corsa ECMWF delle ${c.slice(8, 10)} UTC del ${c.slice(6, 8)}/${c.slice(4, 6)} · WRF pronto ${fmt.format(el)}<br>` +
+                        `<b>aggiornato ${durata(ora - el.getTime())} fa</b> · ${dopo}`;
 }
 
 function scheda(nome) {
@@ -279,6 +310,7 @@ function scheda(nome) {
     $("s-" + id).setAttribute("aria-selected", id === nome);
   }
   if (nome === "pagella" && !pagella) caricaPagella();
+  if (nome === "meteo" && !meteoPronto) iniziaMeteo();
 }
 
 function dominioAttuale() { return indice.domini[$("dominio").value]; }
@@ -413,11 +445,6 @@ function mostra(i, aggiornaCursore = true) {
   posizione = Math.max(0, Math.min(immagini.length - 1, i));
   const im = immagini[posizione];
   const d = data(im.valido_utc);
-  const g = fmtGiorno.format(d);
-  $("data-ora").textContent = g.charAt(0).toUpperCase() + g.slice(1) + " (ora locale)";
-  $("ora-utc").textContent = fmtUtc.format(d) + " UTC · " + (posizione + 1) + "/" + immagini.length;
-  const t0 = indice.domini[$("dominio").value].serie;
-  $("chip-ore").textContent = "+" + Math.round((d - data(t0.tempi[0])) / 3600000) + "h";
   $("mappa").src = im.file;
   $("mappa").alt = indice.domini[$("dominio").value].parametri[$("parametro").value].titolo;
   if (aggiornaCursore) $("cursore").value = posizione;
@@ -503,8 +530,8 @@ function sulPuntatore(e, clic) {
   if (clic) { ferma(); scegliPunto(k, pos.fx, pos.fy); }
 }
 
-async function leggiSerie(k) {
-  const D = dominioAttuale(), S = D.serie, nf = S.campi.length, nt = S.n_t;
+async function leggiSerie(k, D = dominioAttuale()) {
+  const S = D.serie, nf = S.campi.length, nt = S.n_t;
   const url = S.file + "?v=" + encodeURIComponent(indice.creato);
   const inizio = k * nf * nt * 2, fine = inizio + nf * nt * 2 - 1;
   if (cacheSerie[S.file]) return new Int16Array(cacheSerie[S.file].slice(inizio, fine + 1));
@@ -591,66 +618,230 @@ function ticks(min, max, n) {
 
 const fmtOra = new Intl.DateTimeFormat("it-IT", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Rome" });
 const fmtGg = new Intl.DateTimeFormat("it-IT", { weekday: "short", day: "numeric", timeZone: "Europe/Rome" });
+const fmtGgLungo = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Rome" });
+const fmtChiave = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" });
+const COL_GELO = ["transparent", "#9ecae1", "#4292c6", "#08306b"];
+const NOME_GELO = ["nessun gelo", "brina", "gelata", "gelata forte"];
+let idGrad = 0;
+
+function nord(gradi) { return ["N", "NE", "E", "SE", "S", "SO", "O", "NO"][Math.round(gradi / 45) % 8]; }
 
 function grafico(titolo, tempi, serie, opz = {}) {
-  const W = 640, H = 150, mL = 40, mR = opz.barre ? 40 : 10, mT = 8, mB = 22;
-  const tutti = serie.flatMap((s) => s.v).filter((x) => x !== null);
+  const W = 760, H = opz.alto || 190, mL = 42, mR = opz.barre ? 44 : 12, mT = 14, mB = 24;
+  const tutti = serie.flatMap((s) => s.v).filter((x) => x !== null && x !== undefined);
   if (!tutti.length) return "";
   let min = Math.min(...tutti), max = Math.max(...tutti);
   if (opz.da0) min = Math.min(0, min);
   if (opz.zero) { min = Math.min(min, 0); max = Math.max(max, 0); }
+  if (opz.max !== undefined) max = Math.max(max, opz.max);
+  if (opz.min !== undefined) min = Math.min(min, opz.min);
   if (max - min < (opz.minSpan || 1)) max = min + (opz.minSpan || 1);
-  const pad = (max - min) * 0.08; min -= opz.da0 ? 0 : pad; max += pad;
+  const pad = (max - min) * 0.1; if (!opz.da0) min -= pad; max += pad;
   const t0 = tempi[0].getTime(), t1 = tempi[tempi.length - 1].getTime();
   const X = (t) => mL + ((t.getTime() - t0) / (t1 - t0 || 1)) * (W - mL - mR);
   const Y = (v) => mT + (1 - (v - min) / (max - min)) * (H - mT - mB);
-  let g = "";
+  const passoX = (W - mL - mR) / Math.max(1, tempi.length - 1);
+  let g = "", defs = "";
+  // fasce notturne (radiazione quasi nulla)
+  if (opz.notte) {
+    tempi.forEach((t, i) => {
+      if (opz.notte[i] !== null && opz.notte[i] < 5) g += `<rect class="notte" x="${X(t) - passoX / 2}" y="${mT}" width="${passoX}" height="${H - mT - mB}"/>`;
+    });
+  }
   const fmtY = (max - min) < 6 ? nf1 : nf0;
-  for (const v of ticks(min, max, 4)) g += `<line class="griglia" x1="${mL}" x2="${W - mR}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${mL - 4}" y="${Y(v) + 4}" text-anchor="end">${fmtY.format(v)}</text>`;
-  tempi.forEach((t, i) => {
+  for (const v of ticks(min, max, 4)) g += `<line class="griglia" x1="${mL}" x2="${W - mR}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${mL - 5}" y="${Y(v) + 4}" text-anchor="end">${fmtY.format(v)}</text>`;
+  tempi.forEach((t) => {
     const h = +fmtOra.format(t);
-    if (h === 0) g += `<line class="giorno" x1="${X(t)}" x2="${X(t)}" y1="${mT}" y2="${H - mB}"/><text x="${X(t) + 3}" y="${H - 6}">${fmtGg.format(t)}</text>`;
-    else if (h % 6 === 0) g += `<text x="${X(t)}" y="${H - 6}" text-anchor="middle">${h}</text>`;
+    if (h === 0) g += `<line class="giorno" x1="${X(t)}" x2="${X(t)}" y1="${mT}" y2="${H - mB}"/><text class="gg" x="${X(t) + 4}" y="${H - 7}">${fmtGg.format(t)}</text>`;
+    else if (h % 6 === 0) g += `<text x="${X(t)}" y="${H - 7}" text-anchor="middle">${h}</text>`;
   });
-  if (opz.zero) g += `<line x1="${mL}" x2="${W - mR}" y1="${Y(0)}" y2="${Y(0)}" stroke="#7aa6d6" stroke-width="1"/>`;
+  if (opz.zero) g += `<line x1="${mL}" x2="${W - mR}" y1="${Y(0)}" y2="${Y(0)}" stroke="#4a90d9" stroke-width="1.2" stroke-dasharray="2 3"/>`;
+  if (opz.fasce) for (const f of opz.fasce) g += `<rect x="${mL}" y="${Y(f.a)}" width="${W - mL - mR}" height="${Math.max(0, Y(f.da) - Y(f.a))}" fill="${f.c}" opacity=".10"/>`;
   for (const s of serie) {
     if (s.barre) {
-      const w = Math.max(2, (W - mL - mR) / tempi.length - 2);
-      s.v.forEach((v, i) => { if (v > 0.04) g += `<rect x="${X(tempi[i]) - w / 2}" y="${Y(v)}" width="${w}" height="${Y(0) - Y(v)}" fill="${s.c}" opacity=".85"/>`; });
-    } else {
-      let d = "";
-      s.v.forEach((v, i) => { if (v !== null) d += (d ? "L" : "M") + X(tempi[i]).toFixed(1) + " " + Y(v).toFixed(1); });
-      g += `<path d="${d}" fill="none" stroke="${s.c}" stroke-width="2" ${s.tratteggio ? 'stroke-dasharray="5 4"' : ""}/>`;
+      const w = Math.max(2, passoX - 2);
+      s.v.forEach((v, i) => { if (v > 0.04) g += `<rect x="${X(tempi[i]) - w / 2}" y="${Y(v)}" width="${w}" height="${Y(0) - Y(v)}" rx="1.5" fill="${s.c}" opacity=".9"/>`; });
+      continue;
+    }
+    const pti = [];
+    s.v.forEach((v, i) => { if (v !== null) pti.push([X(tempi[i]), Y(v), i]); });
+    if (!pti.length) continue;
+    const d = pti.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+    if (s.area) {
+      const id = "gr" + (++idGrad), base = Y(opz.da0 ? 0 : min);
+      defs += `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.c}" stop-opacity=".45"/><stop offset="1" stop-color="${s.c}" stop-opacity=".03"/></linearGradient>`;
+      g += `<path d="${d}L${pti[pti.length - 1][0].toFixed(1)} ${base}L${pti[0][0].toFixed(1)} ${base}Z" fill="url(#${id})"/>`;
+    }
+    g += `<path d="${d}" fill="none" stroke="${s.c}" stroke-width="${s.spesso || 2.2}" stroke-linejoin="round" stroke-linecap="round" ${s.tratteggio ? 'stroke-dasharray="5 4"' : ""}/>`;
+    if (s.estremi) {   // massimo e minimo di ogni giorno
+      const per = {};
+      pti.forEach((p) => { const k = fmtChiave.format(tempi[p[2]]); (per[k] = per[k] || []).push(p); });
+      for (const lista of Object.values(per)) {
+        if (lista.length < 6) continue;
+        const hi = lista.reduce((a, b) => (s.v[b[2]] > s.v[a[2]] ? b : a)), lo = lista.reduce((a, b) => (s.v[b[2]] < s.v[a[2]] ? b : a));
+        g += `<circle cx="${hi[0]}" cy="${hi[1]}" r="3.6" fill="${s.c}" stroke="#fff" stroke-width="1.4"/><text class="est" x="${hi[0]}" y="${hi[1] - 8}" text-anchor="middle" style="fill:${s.c}">${nf0.format(s.v[hi[2]])}°</text>`;
+        g += `<circle cx="${lo[0]}" cy="${lo[1]}" r="3.6" fill="#3f78c9" stroke="#fff" stroke-width="1.4"/><text class="est" x="${lo[0]}" y="${lo[1] + 16}" text-anchor="middle" style="fill:#3f78c9">${nf0.format(s.v[lo[2]])}°</text>`;
+      }
     }
   }
-  const legenda = serie.filter((s) => s.nome).map((s) => `<span style="color:${s.c}">■</span> ${s.nome}`).join(" &nbsp; ");
-  return `<div class="graf"><h3>${titolo}${legenda ? " &nbsp; <span style=\"font-weight:400\">" + legenda + "</span>" : ""}</h3>` +
-         `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${titolo}">${g}</svg></div>`;
+  if (opz.frecce) {   // direzione del vento
+    const dir = opz.frecce;
+    tempi.forEach((t, i) => {
+      if (+fmtOra.format(t) % 3 !== 0 || dir[i] === null || opz.frecceV[i] === null) return;
+      const x = X(t), y = Y(opz.frecceV[i]) - 14;
+      g += `<g transform="translate(${x} ${Math.max(mT + 6, y)}) rotate(${dir[i] + 180})"><path d="M0 -7L4.5 6L0 3L-4.5 6Z" fill="#1f6f43" opacity=".85"/></g>`;
+    });
+  }
+  const legenda = serie.filter((s) => s.nome).map((s) => `<span class="leg"><i style="background:${s.c}"></i>${s.nome}</span>`).join("");
+  return `<div class="graf"><h3>${titolo}</h3>${legenda ? `<div class="legende">${legenda}</div>` : ""}` +
+         `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${titolo}"><defs>${defs}</defs>${g}</svg></div>`;
 }
 
-function disegnaPunto(k, dati) {
-  const D = dominioAttuale(), S = D.serie, nt = S.n_t, nf = S.campi.length;
-  const tempi = S.tempi.map((t) => data(t));
-  const campo = {};
+function strisciaGelo(tempi, gelo) {
+  const W = 760, mL = 42, mR = 12, H = 54, passo = (W - mL - mR) / Math.max(1, tempi.length - 1);
+  const t0 = tempi[0].getTime(), t1 = tempi[tempi.length - 1].getTime();
+  const X = (t) => mL + ((t.getTime() - t0) / (t1 - t0 || 1)) * (W - mL - mR);
+  let g = `<rect x="${mL}" y="6" width="${W - mL - mR}" height="22" rx="4" class="vuoto"/>`;
+  tempi.forEach((t, i) => {
+    const c = gelo[i] === null ? 0 : Math.round(gelo[i]);
+    if (c > 0) g += `<rect x="${X(t) - passo / 2}" y="6" width="${passo}" height="22" fill="${COL_GELO[c]}"/>`;
+    const h = +fmtOra.format(t);
+    if (h === 0) g += `<line class="giorno" x1="${X(t)}" x2="${X(t)}" y1="6" y2="${H - 14}"/><text class="gg" x="${X(t) + 4}" y="${H - 4}">${fmtGg.format(t)}</text>`;
+    else if (h % 6 === 0) g += `<text x="${X(t)}" y="${H - 4}" text-anchor="middle">${h}</text>`;
+  });
+  const leg = [1, 2, 3].map((c) => `<span class="leg"><i style="background:${COL_GELO[c]}"></i>${NOME_GELO[c]}</span>`).join("");
+  return `<div class="graf"><h3>Brina e gelate ora per ora</h3><div class="legende">${leg}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Brina e gelate">${g}</svg></div>`;
+}
+
+function iconaTempo(nuv, pioggia, t2) {
+  if (pioggia >= 0.3) return t2 !== null && t2 <= 1 ? "🌨️" : pioggia >= 3 ? "🌧️" : "🌦️";
+  if (nuv === null) return "⛅";
+  return nuv > 75 ? "☁️" : nuv > 40 ? "⛅" : nuv > 15 ? "🌤️" : "☀️";
+}
+
+function schedeGiorni(tempi, c, orario) {
+  const per = {};
+  tempi.forEach((t, i) => { const k = fmtChiave.format(t); (per[k] = per[k] || []).push(i); });
+  const med = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  let h = '<div class="giorni-card">';
+  for (const idx of Object.values(per)) {
+    if (idx.length < 4) continue;
+    const t2 = idx.map((i) => c.T2[i]).filter((v) => v !== null);
+    const mm = idx.reduce((s, i) => s + (orario ? orario[i] : 0), 0);
+    const vmax = Math.max(...idx.map((i) => c.VENTO[i] ?? 0));
+    const nuv = med(idx.map((i) => (c.NUV ? c.NUV[i] : null)).filter((v) => v !== null));
+    const gel = c.GELO ? Math.max(...idx.map((i) => Math.round(c.GELO[i] ?? 0))) : 0;
+    h += `<div class="gcard"><b>${fmtGgLungo.format(tempi[idx[0]]).replace(/ (\w)/, (m, a) => " " + a).replace(/^\w/, (x) => x.toUpperCase())}</b>` +
+         `<div class="gico">${iconaTempo(nuv, mm / Math.max(1, idx.length / 12), Math.min(...t2))}</div>` +
+         `<div class="gt"><span class="max">${nf0.format(Math.max(...t2))}°</span><span class="min">${nf0.format(Math.min(...t2))}°</span></div>` +
+         `<small>💧 ${mm >= 0.1 ? nf1.format(mm) + " mm" : "asciutto"}</small><small>🌬️ fino a ${nf0.format(vmax)} km/h</small>` +
+         (gel ? `<small class="gelo-b" style="background:${COL_GELO[gel]}">${NOME_GELO[gel]}</small>` : "") + `</div>`;
+  }
+  return h + "</div>";
+}
+
+function meteoHtml(titolo, sub, tempi, c, hmod) {
+  const nt = tempi.length, now = Date.now();
+  let ia = 0, best = Infinity;
+  tempi.forEach((t, i) => { const d = Math.abs(t.getTime() - now); if (d < best) { best = d; ia = i; } });
+  const orario = c.PIOGGIA ? c.PIOGGIA.map((v, i) => (i === 0 || v === null ? 0 : Math.max(0, v - (c.PIOGGIA[i - 1] ?? v)))) : null;
+  const v = (k, f = nf1, u = "") => (c[k] && c[k][ia] !== null ? f.format(c[k][ia]) + u : "–");
+  const pioggia3 = orario ? orario.slice(ia, ia + 3).reduce((a, b) => a + b, 0) : 0;
+  const cl = c.GELO ? Math.round(c.GELO[ia] ?? 0) : 0;
+  let h = `<div class="card meteo-testa"><div><h2>${titolo}</h2><div class="sub">${sub}</div></div>` +
+          `<div class="adesso"><span class="grande">${iconaTempo(c.NUV ? c.NUV[ia] : null, pioggia3 / 3, c.T2[ia])} ${v("T2", nf1, "°")}</span>` +
+          `<small>previsione per ${fmtGg.format(tempi[ia])} ore ${fmtOra.format(tempi[ia])}</small></div></div>`;
+  const tessere = [["Percepita", v("PERC", nf0, "°"), "🌡️"], ["Punto di rugiada", v("TD", nf1, "°"), "💧"], ["Umidità", v("UMID", nf0, "%"), "🌫️"],
+    ["Vento", `${v("VENTO", nf0)} km/h ${c.DIR ? nord(c.DIR[ia]) : ""}`, "🌬️"], ["Pressione", v("PRESS", nf0, " hPa"), "🎯"],
+    ["Nuvolosità", v("NUV", nf0, "%"), "☁️"], ["Pioggia prossime 3 h", pioggia3 >= 0.1 ? nf1.format(pioggia3) + " mm" : "asciutto", "🌧️"],
+    ["Bulbo umido", v("TW", nf1, "°"), "🧊"], ["Gelo adesso", NOME_GELO[cl], "❄️"]];
+  if (c.CAPE) tessere.push(["CAPE", v("CAPE", nf0, " J/kg"), "⚡"]);
+  h += '<div class="tessere">' + tessere.map((t) => `<div class="tessera"><span>${t[2]} ${t[0]}</span><b>${t[1]}</b></div>`).join("") + "</div>";
+  h += schedeGiorni(tempi, c, orario);
+  const notte = c.RAD || null;
+  h += '<div class="card grafici">';
+  const sT = [{ v: c.T2, c: "#e0482f", nome: "aria 2 m", area: true, estremi: true, spesso: 2.8 }];
+  if (c.PERC) sT.push({ v: c.PERC, c: "#f08c00", nome: "percepita", tratteggio: true, spesso: 1.6 });
+  if (c.TD) sT.push({ v: c.TD, c: "#1c9c6b", nome: "punto di rugiada", spesso: 1.6 });
+  if (c.TW) sT.push({ v: c.TW, c: "#8e5bd0", nome: "bulbo umido", spesso: 1.4 });
+  if (c.TPRATO) sT.push({ v: c.TPRATO, c: "#3f78c9", nome: "superficie del suolo", tratteggio: true, spesso: 1.6 });
+  h += grafico("Temperature (°C)", tempi, sT, { zero: true, minSpan: 6, notte, alto: 260 });
+  if (c.GELO) h += strisciaGelo(tempi, c.GELO);
+  if (orario) h += grafico("Pioggia oraria (mm) e totale", tempi, [{ v: orario, c: "#2a8be0", barre: true }, { v: c.PIOGGIA, c: "#13315c", nome: "totale dall'inizio", spesso: 2 }], { da0: true, barre: true, minSpan: 2, notte });
+  h += grafico("Vento a 10 m (km/h) e direzione di provenienza", tempi, [{ v: c.VENTO, c: "#2f9e44", area: true, nome: "velocità media" }], { da0: true, minSpan: 15, notte, frecce: c.DIR, frecceV: c.VENTO });
+  const sN = [];
+  if (c.NUV) sN.push({ v: c.NUV, c: "#7d8da1", area: true, nome: "nuvolosità (%)" });
+  if (sN.length) h += grafico("Nuvolosità (%)", tempi, sN, { da0: true, max: 100, minSpan: 100, notte });
+  if (c.RAD) h += grafico("Radiazione solare (W/m²)", tempi, [{ v: c.RAD, c: "#f4a300", area: true }], { da0: true, minSpan: 200, notte });
+  h += grafico("Umidità relativa a 2 m (%)", tempi, [{ v: c.UMID, c: "#1f9bb5", area: true }], { min: 20, max: 100, minSpan: 20, notte });
+  h += grafico("Pressione al livello del mare (hPa)", tempi, [{ v: c.PRESS, c: "#7b4fb3", spesso: 2.4 }], { minSpan: 4, notte });
+  if (c.PBL) h += grafico("Altezza dello strato limite (m)", tempi, [{ v: c.PBL, c: "#b5651d", area: true }], { da0: true, minSpan: 500, notte });
+  if (c.CAPE) h += grafico("CAPE (J/kg), energia per i temporali", tempi, [{ v: c.CAPE, c: "#d6336c", area: true }], { da0: true, minSpan: 100, notte });
+  if (c.TSUOLO) h += grafico("Temperatura del suolo 0-10 cm (°C)", tempi, [{ v: c.TSUOLO, c: "#9b6b3c", area: true }], { minSpan: 4, notte });
+  if (c.UMSUOLO) h += grafico("Umidità del suolo 0-10 cm (% di volume)", tempi, [{ v: c.UMSUOLO, c: "#8a6d3b", area: true }], { minSpan: 5, notte });
+  return h + '</div><p class="suggerimento">Le fasce grigie sono la notte (radiazione solare nulla nel modello). Orari in ora locale.</p>';
+}
+
+function campiDaDati(S, dati) {
+  const nt = S.n_t, campo = {};
   S.campi.forEach((c, j) => {
     const v = [];
     for (let t = 0; t < nt; t++) { const q = dati[j * nt + t]; v.push(q === -32768 ? null : q / c.scala); }
     campo[c.id] = v;
   });
-  const orario = campo.PIOGGIA ? campo.PIOGGIA.map((v, i) => (i === 0 ? 0 : Math.max(0, v - campo.PIOGGIA[i - 1]))) : null;
-  let html = `<button class="chiudi" id="chiudi-punto">Chiudi</button><h2>Meteogramma: ${descrizioneLuogo(griglia.lat[k], griglia.lon[k])}</h2>` +
-             `<div class="sub">${griglia.lat[k].toFixed(3)}°N ${griglia.lon[k].toFixed(3)}°E · quota del modello ${nf0.format(griglia.hgt[k])} m · orari in ora locale · zona ${D.etichetta}</div>`;
-  const serieT = [{ v: campo.T2, c: "#e0482f", nome: "aria 2 m" }];
-  if (campo.TPRATO) serieT.push({ v: campo.TPRATO, c: "#3f78c9", nome: "superficie del suolo", tratteggio: true });
-  if (campo.TSUOLO) serieT.push({ v: campo.TSUOLO, c: "#9b6b3c", nome: "suolo 0-10 cm", tratteggio: true });
-  html += grafico("Temperatura (°C)", tempi, serieT, { zero: true, minSpan: 4 });
-  html += grafico("Umidità relativa a 2 m (%)", tempi, [{ v: campo.UMID, c: "#1f9bb5" }], { minSpan: 20 });
-  html += grafico("Vento a 10 m (km/h)", tempi, [{ v: campo.VENTO, c: "#2f9e44" }], { da0: true, minSpan: 10 });
-  if (orario) html += grafico("Pioggia oraria (mm) e totale", tempi, [{ v: orario, c: "#2a6cc7", barre: true }, { v: campo.PIOGGIA, c: "#13315c", nome: "totale dall'inizio" }], { da0: true, barre: true, minSpan: 1 });
-  html += grafico("Pressione al livello del mare (hPa)", tempi, [{ v: campo.PRESS, c: "#7b4fb3" }], { minSpan: 4 });
-  if (campo.UMSUOLO) html += grafico("Umidità del suolo 0-10 cm (% di volume)", tempi, [{ v: campo.UMSUOLO, c: "#8a6d3b" }], { minSpan: 5 });
-  $("punto").innerHTML = html;
+  return campo;
+}
+
+function disegnaPunto(k, dati) {
+  const D = dominioAttuale(), tempi = D.serie.tempi.map((t) => data(t));
+  const c = campiDaDati(D.serie, dati);
+  const titolo = "Meteogramma: " + descrizioneLuogo(griglia.lat[k], griglia.lon[k]);
+  const sub = `${griglia.lat[k].toFixed(3)}°N ${griglia.lon[k].toFixed(3)}°E · quota del modello ${nf0.format(griglia.hgt[k])} m · zona ${D.etichetta}`;
+  $("punto").innerHTML = '<button class="chiudi" id="chiudi-punto">Chiudi</button>' + meteoHtml(titolo, sub, tempi, c);
   $("chiudi-punto").onclick = () => { puntoScelto = null; $("punto").classList.add("nascosto"); $("marcatore").classList.add("nascosto"); };
+}
+
+// ---------------------------------------------------------------- scheda "Meteogramma"
+let meteoPronto = false;
+
+async function iniziaMeteo() {
+  meteoPronto = true;
+  const zona = $("meteo-zona");
+  for (const [k, v] of Object.entries(indice.domini)) zona.add(new Option("WRF " + v.etichetta + (k === "1km" ? " (zona di Nerola)" : " (area più ampia)"), k));
+  zona.value = "1km" in indice.domini ? "1km" : Object.keys(indice.domini)[0];
+  zona.onchange = riempiLuoghiMeteo;
+  $("meteo-luogo").onchange = disegnaMeteo;
+  riempiLuoghiMeteo();
+}
+
+function riempiLuoghiMeteo() {
+  const D = indice.domini[$("meteo-zona").value], sel = $("meteo-luogo");
+  sel.innerHTML = "";
+  const luoghi = [...(D.luoghi || [])].sort((a, b) => a.nome.localeCompare(b.nome, "it"));
+  luoghi.forEach((l) => sel.add(new Option(l.nome, JSON.stringify([l.lat, l.lon]))));
+  const n = luoghi.findIndex((l) => l.nome === "Nerola");
+  if (n >= 0) sel.selectedIndex = n;
+  disegnaMeteo();
+}
+
+async function disegnaMeteo() {
+  const zona = $("meteo-zona").value, D = indice.domini[zona], box = $("meteo-contenuto");
+  const sel = $("meteo-luogo");
+  if (!sel.value) { box.innerHTML = "<p class='suggerimento'>Nessuna località disponibile.</p>"; return; }
+  const [lat, lon] = JSON.parse(sel.value), nome = sel.options[sel.selectedIndex].text;
+  box.innerHTML = "<p class='suggerimento'>Carico il meteogramma…</p>";
+  try {
+    const g = await leggiBin(D.griglia, "f4"), n = D.layout.ny * D.layout.nx, glat = g.subarray(0, n), glon = g.subarray(n, 2 * n), ghgt = g.subarray(2 * n, 3 * n);
+    const cs = Math.cos(lat * Math.PI / 180);
+    let m = Infinity, k = 0;
+    for (let i = 0; i < n; i++) { const d = (glat[i] - lat) ** 2 + ((glon[i] - lon) * cs) ** 2; if (d < m) { m = d; k = i; } }
+    const dati = await leggiSerie(k, D);
+    if ($("meteo-zona").value !== zona || $("meteo-luogo").value !== sel.value) return;
+    const tempi = D.serie.tempi.map((t) => data(t));
+    box.innerHTML = meteoHtml(nome, `${lat.toFixed(3)}°N ${lon.toFixed(3)}°E · quota del modello ${nf0.format(ghgt[k])} m · WRF ${D.etichetta}`, tempi, campiDaDati(D.serie, dati));
+  } catch (err) {
+    box.innerHTML = "<p class='suggerimento'>Non riesco a leggere i dati (" + err.message + ").</p>";
+  }
 }
 
 carica();
