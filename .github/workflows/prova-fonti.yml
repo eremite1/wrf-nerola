@@ -13,31 +13,35 @@ jobs:
         run: |
           exec > /tmp/esito.txt 2>&1
           python3 - <<'PY'
-          import json, urllib.request
-          def get(u):
-              r = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 wrf-nerola"})
-              return urllib.request.urlopen(r, timeout=60).read().decode("utf-8", "replace")
-          for pid in ("osservazioni-idro-meteo-stazioni-al-suolo", "meteonetwork"):
-              print("=== pacchetto", pid)
+          import urllib.request, ssl
+          def get(u, n=700):
+              r = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) wrf-nerola"})
               try:
-                  j = json.loads(get("https://dati.agenziaitaliameteo.it/api/3/action/package_show?id=" + pid))["result"]
-                  print(j.get("title"), "|", (j.get("notes") or "")[:800])
-                  for x in j["resources"]:
-                      print("-", x.get("name"), "|", x.get("format"), "|", x.get("url"), "|", (x.get("description") or "")[:300])
+                  b = urllib.request.urlopen(r, timeout=40).read().decode("utf-8", "replace")
+                  return f"OK {len(b)} byte :: " + " ".join(b[:n].split())
               except Exception as e:
-                  print("ERRORE", e)
-          print("=== meteohub datasets")
-          try:
-              for d in json.loads(get("https://meteohub.agenziaitaliameteo.it/api/datasets")):
-                  if d.get("category") != "FOR":
-                      print(json.dumps(d, ensure_ascii=False)[:500])
-          except Exception as e:
-              print("ERRORE", e)
-          print("=== temporeale")
-          try:
-              print(get("https://temporeale.regione.lazio.it/")[:600])
-          except Exception as e:
-              print("ERRORE", e)
+                  return "ERRORE " + str(e)[:200]
+          prove = [
+            "https://www.meteonetwork.it/rete/livemap/",
+            "https://www.meteonetwork.it/rete/api/",
+            "https://www.ogimet.com/cgi-bin/getsynop?block=16242&begin=202610300000&end=202610310000",
+            "https://www.ogimet.com/cgi-bin/getsynop?block=16240&begin=202610300000&end=202610310000",
+            "https://agrometeo.arsial.it/",
+            "https://www.arsial.it/servizio-agrometeorologico/",
+            "https://www.regione.lazio.it/cittadini/protezione-civile/centro-funzionale",
+            "https://dati.lazio.it/",
+            "https://www.cfumbria.it/",
+            "https://api.weather.com/v2/pws/observations/current?stationId=IROMA1&format=json&units=m&apiKey=test",
+            "https://www.wunderground.com/wundermap",
+            "https://api.open-meteo.com/v1/forecast?latitude=42.13&longitude=12.77&current=temperature_2m",
+            "https://mesonet.agron.iastate.edu/api/1/currents.json?network=IT__ASOS",
+            "https://dati.protezionecivile.it/",
+            "https://mappe.protezionecivile.gov.it/",
+            "https://www.meteoregionelazio.it/",
+            "https://temporeale.regione.lazio.it/",
+          ]
+          for u in prove:
+              print("###", u); print(get(u)); print()
           PY
       - name: Salvo l'esito nel ramo prova
         env:
