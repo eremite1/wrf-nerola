@@ -257,6 +257,63 @@ def p_pioggia(n):
             "nota": "pioggia convettiva e a grande scala"}
 
 
+# ---------------------------------------------------------------- indici bioclimatici, agricoli e funghi
+def rampa(x, a, b):
+    """0 sotto a, 1 sopra b, crescita lineare in mezzo (se a > b la rampa e' invertita)."""
+    return np.clip((x - a) / (b - a), 0.0, 1.0)
+
+
+def humidex(d, i):
+    td = punto_rugiada(d)[i]
+    t = d["T2"][i] - 273.15
+    return t + 0.5555 * (6.11 * np.exp(5417.753 * (1 / 273.16 - 1 / (td + 273.15))) - 10.0)
+
+
+def gradi_giorno_24(d, i):
+    """Gradi-giorno (base 10 gradi): media di minima e massima delle 24 ore meno 10, mai negativa."""
+    t = d["T2"][i - 24:i + 1] - 273.15
+    return np.maximum((t.max(axis=0) + t.min(axis=0)) / 2 - 10.0, 0.0)
+
+
+def ore_freddo_24(d, i):
+    """Ore di freddo (temperatura tra 0 e 7,2 gradi) nelle 24 ore: servono a fruttiferi e vite per uscire dal riposo."""
+    t = d["T2"][i - 23:i + 1] - 273.15
+    return ((t >= 0.0) & (t <= 7.2)).sum(axis=0).astype("float64")
+
+
+def ore_bagnatura_24(d, i):
+    """Ore nelle 24 con foglie probabilmente bagnate: umidita' dell'aria almeno 90 % oppure pioggia."""
+    pr = uscite.pioggia(d)
+    umido = rh2(d)[i - 23:i + 1] >= 90.0
+    piove = np.diff(pr[i - 24:i + 1], axis=0) >= 0.1
+    return (umido | piove).sum(axis=0).astype("float64")
+
+
+def ore_rischio_funghi_24(d, i):
+    """Ore nelle 24 con foglie bagnate e temperatura tra 10 e 25 gradi: le condizioni in cui peronospora, ticchiolatura,
+    botrite e altre malattie fungine delle colture si sviluppano."""
+    pr = uscite.pioggia(d)
+    t = d["T2"][i - 23:i + 1] - 273.15
+    bagnato = (rh2(d)[i - 23:i + 1] >= 90.0) | (np.diff(pr[i - 24:i + 1], axis=0) >= 0.1)
+    return (bagnato & (t >= 10.0) & (t <= 25.0)).sum(axis=0).astype("float64")
+
+
+def favorevolezza_funghi(d, i):
+    """Indice 0-100 di quanto il tempo favorisce la comparsa di funghi spontanei (porcini e simili). Media geometrica di:
+    temperatura del suolo 0-10 cm (ideale 9-17 gradi), umidita' del suolo 0-40 cm (da secco a umido), umidita' media
+    dell'aria nelle 24 ore (ideale oltre 85 %); poi si riduce se gela nelle 24 ore e se il vento medio e' forte."""
+    ts = d["TSLB"][i, 0] - 273.15
+    f_t = np.minimum(rampa(ts, 4, 9), rampa(ts, 22, 17))
+    sm = 0.5 * (d["SMOIS"][i, 0] + d["SMOIS"][i, 1])
+    f_s = rampa(sm, 0.22, 0.36)
+    f_u = rampa(rh2(d)[i - 23:i + 1].mean(axis=0), 60, 85)
+    tmin = (d["T2"][i - 23:i + 1] - 273.15).min(axis=0)
+    f_g = rampa(tmin, 0.0, 3.0)
+    vento = (np.hypot(d["U10"][i - 23:i + 1], d["V10"][i - 23:i + 1]) * 3.6).mean(axis=0)
+    f_v = np.clip(1.0 - (vento - 15.0) / 30.0, 0.6, 1.0)
+    return 100.0 * np.cbrt(f_t * f_s * f_u) * f_g * f_v
+
+
 PARAMETRI = [
     {"id": "temperatura", "titolo": "Temperatura a 2 m", "unita": "°C", "calcola": lambda d, i: d["T2"][i] - 273.15,
      "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
@@ -338,6 +395,27 @@ PARAMETRI = [
      "calcola": lambda d, i: np.max(np.diff(uscite.pioggia(d)[i - 24:i + 1], axis=0), axis=0),
      "classi": classi_pioggia(PIOGGIA[1]), "passo": 3, "inizio": 24,
      "nota": "la pioggia oraria più forte caduta nelle 24 ore fino a quell'ora"},
+    {"id": "humidex", "titolo": "Humidex (disagio da caldo umido)", "unita": "°C", "calcola": humidex,
+     "cmap": "YlOrRd", "limiti": (0, 40), "passo": 3, "inizio": 0,
+     "nota": "temperatura e umidità combinate: oltre 30 disagio, oltre 40 forte disagio, oltre 45 pericolo"},
+    {"id": "tw2", "titolo": "Bulbo umido a 2 m (stress da caldo)", "unita": "°C", "calcola": lambda d, i: gelo(d)[1][i],
+     "cmap": "RdYlBu_r", "limiti": (-5, 30), "passo": 3, "inizio": 0, "isolinee": False,
+     "nota": "oltre 28 °C il corpo non riesce più a raffreddarsi sudando; sotto 0 °C ghiaccio che si forma e si mantiene"},
+    {"id": "gradi_giorno", "titolo": "Gradi-giorno (base 10 °C, ultime 24 ore)", "unita": "°C·giorno", "calcola": gradi_giorno_24,
+     "cmap": "YlOrRd", "limiti": (0, 15), "passo": 3, "inizio": 24, "terra": True,
+     "nota": "calore utile alla crescita delle piante: sommati giorno per giorno dicono quando fioriscono e maturano le colture"},
+    {"id": "ore_freddo", "titolo": "Ore di freddo (0-7,2 °C, ultime 24 ore)", "unita": "ore", "calcola": ore_freddo_24,
+     "cmap": "Blues", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
+     "nota": "ore utili a fruttiferi e vite per il riposo invernale"},
+    {"id": "bagnatura", "titolo": "Ore di bagnatura delle foglie (ultime 24 ore)", "unita": "ore", "calcola": ore_bagnatura_24,
+     "cmap": "GnBu", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
+     "nota": "ore con umidità almeno 90 % o pioggia: le foglie restano bagnate"},
+    {"id": "rischio_funghi_colture", "titolo": "Rischio malattie fungine delle colture (ultime 24 ore)", "unita": "ore",
+     "calcola": ore_rischio_funghi_24, "cmap": "YlOrRd", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
+     "nota": "ore con foglie bagnate e temperatura tra 10 e 25 °C (peronospora, ticchiolatura, botrite): più ore, più rischio"},
+    {"id": "funghi", "titolo": "Meteo funghi: condizioni favorevoli", "unita": "indice 0-100", "calcola": favorevolezza_funghi,
+     "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "TSLB", "terra": True,
+     "nota": "temperatura e umidità del suolo, umidità dell'aria, gelo e vento: dice dove il tempo è adatto ai funghi, non dove ci sono i boschi"},
     {"id": "vpd", "titolo": "Deficit di pressione di vapore", "unita": "kPa",
      "calcola": lambda d, i: np.maximum(0.6108 * np.exp(17.27 * (d["T2"][i] - 273.15) / (d["T2"][i] - 273.15 + 237.3))
                                         - d["Q2"][i] * (d["PSFC"][i] / 1000.0) / (0.622 + d["Q2"][i]), 0),
