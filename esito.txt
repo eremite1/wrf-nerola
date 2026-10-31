@@ -1,0 +1,239 @@
+===  rete-agrometeorologica | Rete Agrometeorologica | 2020-09-23T09:49:37.015006
+   - RDF - Anagrafica Stazioni Agrometeo | SPARQL | http://dati.lazio.it/virtuoso/sparql?default-graph-uri=http%3A%2F%2Fdati.lazio.it&query=DESCRIBE+%3Chttp%3A%2F%2Fdati.lazio.it%2Fdoc%2FReteAgrometeo%3E&format=text%2Fhtml&timeout=0&debug=on
+   - Anagrafica Stazioni Agrometeo WMS | WMS | http://dati.lazio.it/geoserver/stazioniagrometeo/wms?service=WMS&version=1.1.0&request=GetCapabilities
+   - Tracciato record - Anagrafica Stazioni Agrometeo | XLSX | https://dati.lazio.it/dataset/4f4194c2-8432-4f99-aab3-2b07da7df3fd/resource/9eeb97d4-2bfb-4e3d-8238-8d38437f9ebe/download/tracciatorecordstazioniagrometeo.xlsx
+   - Grandezze misurate dalle stazioni | CSV | https://dati.lazio.it/dataset/4f4194c2-8432-4f99-aab3-2b07da7df3fd/resource/7e08c0a0-3e8e-472f-aae3-5a6ebf72d345/download/grandezzearsial.csv
+   - Tracciato record - Grandezze misurate dalle stazioni | XLSX | https://dati.lazio.it/dataset/4f4194c2-8432-4f99-aab3-2b07da7df3fd/resource/bea10b38-7a6b-470c-a634-8426f5b06ad4/download/tracciatorecordgrandezzemisuratedallestazioni.xlsx
+   - Anagrafica Stazioni Agrometeo | CSV | https://dati.lazio.it/dataset/4f4194c2-8432-4f99-aab3-2b07da7df3fd/resource/1373f7a6-f208-40f0-8d0c-e41cf25d2599/download/anagraficastazioniagrometeoarsial.csv
+===  serie-storica-agrometeo | Serie Storica Agrometeo | 2023-06-30T10:44:02.408431
+   - Dati agrometeo rilevati - Anno 2022 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/a0326d1d-04b0-4e01-81bd-8dec1aa92ace/download/arsial_2022.csv
+   - Dati agrometeo rilevati - Anno 2021 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/086fdb8b-5ffe-4351-95f2-a94657edcf9d/download/opdata21-1.csv
+   - Dati agrometeo rilevati - Anno 2020 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/3a95b075-8ccc-4865-923d-e7bf988a7218/download/opdata20.csv
+   - Dati agrometeo rilevati - Anno 2019 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/d110b954-9c0e-43cc-b13f-3d52ce185bb9/download/opdata19.csv
+   - Dati agrometeo rilevati - Anno 2018 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/46dd1809-0642-4cac-9db1-cce1c895c0b1/download/opdata18.csv
+   - Dati agrometeo rilevati - Anno 2017 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/a76edc5c-2de9-4228-8213-e6ae823a5459/download/opdata17.csv
+   - Dati agrometeo rilevati - Anno 2016 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/59af9fa7-77eb-4ced-b3d4-2f6d159ccfa2/download/opdata16.csv
+   - Dati agrometeo rilevati - Anno 2015 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/28b201a7-5949-4049-8924-0f8093b39a9f/download/opdata15.csv
+   - Dati agrometeo rilevati - Anno 2014 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/32adc32e-c971-442b-b308-b0d2dc0d4665/download/opdata14.csv
+   - Dati agrometeo rilevati - Anno 2013 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/dfe35e11-1082-415f-bb53-545adf9146aa/download/opdata13.csv
+   - Dati agrometeo rilevati - Anno 2012 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/4b7a41a9-bebd-4ca8-b0fc-a1fafe43563e/download/opdata12.csv
+   - Dati agrometeo rilevati - Anno 2011 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/35d93f3d-ef2f-4c0a-9fb0-e17f047a2b9d/download/opdata11.csv
+   - Dati agrometeo rilevati - Anno 2010 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/78dc9fef-9362-4317-a5c8-3ff6bc9b3496/download/opdata10.csv
+   - Dati agrometeo rilevati - Anno 2009 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/7a9a1453-e5bd-49c6-8836-289ed677bfdd/download/opdata09.csv
+   - Dati agrometeo rilevati - Anno 2008 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/dc8779f2-8215-4ab2-b47a-2cd086fac1c7/download/opdata08.csv
+   - Dati agrometeo rilevati - Anno 2007 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/716f2c1c-cd0c-43fd-87a8-52520937d9b8/download/opdata07.csv
+   - Dati agrometeo rilevati - Anno 2006 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/3516a86e-cfd8-47ab-813f-0c57b7f219ce/download/opdata06.csv
+   - Dati agrometeo rilevati - Anno 2005 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/eeffa5d0-6a6c-4c04-9b21-9daeea29bce7/download/opdata05.csv
+   - Dati agrometeo rilevati - Anno 2004 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/ccd2c2d1-838a-411e-8bc6-1f1beb69ff2c/download/opdata04.csv
+   - Tracciato Record | XLSX | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/5e5aee57-fc7a-4c97-97ab-d75a13682b8f/download/tracciatoseriestoricaagrometeo.xlsx
+   - Dati agrometeo rilevati - Anno 2023 | CSV | https://dati.lazio.it/dataset/d705a845-4a94-4682-9e40-a7b860c45778/resource/1cd6887b-8b6e-49ef-9689-b3ca6c790a23/download/arsial_2023.csv
+===  rete-micrometeorologica | Rete Micrometeorologica | 2020-09-23T10:00:54.359649
+   - Rete Micrometeo | CSV | https://dati.lazio.it/dataset/2c399cd2-eaf7-4eda-b075-c73eaaba6618/resource/c32c804e-1b4f-448c-b0a4-4010c98020f3/download/rete-micrometeo.csv
+   - Tracciato Record | XLSX | https://dati.lazio.it/dataset/2c399cd2-eaf7-4eda-b075-c73eaaba6618/resource/de312d07-b9e1-4187-ac99-6c492dff3f03/download/tracciatorecordretemicrometeorologica.xlsx
+===  dati-micro-meteorologici | Dati micro-meteorologici | 2025-01-08T08:59:36.098280
+   - Dati anno 2024 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/cdbfc483-4ca4-487c-9f7c-81a86855e4f6/download/2024_all.csv
+   - Dati anno 2023 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/cd1a7271-bdc0-4b07-a1cd-238437b0647b/download/dati_micro_meteo_2023_all.csv
+   - Dati anno 2022 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/9bd4abb1-f60c-4a1b-ab50-3938eca8a7f4/download/2022allbase.csv
+   - Dati anno 2021 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/a3f61772-857b-4e29-9584-ff30fbe55168/download/2021allbas1.csv
+   - Dati anno 2020 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/d9454231-ab56-4e37-95fd-f3ae9eeb5d8c/download/2020allbas1.csv
+   - Dati anno 2019 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/a8181773-b7c1-4a59-b4e8-5802d3e92499/download/2019allbase.csv
+   - Dati anno 2018 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/6469d67b-9f70-473a-9d77-7c9f114653ef/download/micrometro2018.csv
+   - Dati anno 2017 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/067a8df5-7a1c-4599-9b0f-f79f9b968288/download/micrometeo2017.csv
+   - Dati anno 2016 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/359647d2-5307-4353-ad14-a6e4113fb3fc/download/micrometeo2016.csv
+   - Dati anno 2015 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/8557d6ee-aa4d-4d23-9f20-ee7646f0092d/download/2015allbase.csv
+   - Dati anno 2014 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/b74e2419-fd62-4e68-8c13-e70f96bb6ff6/download/2014_all_base.csv
+   - Dati anno 2013 | CSV | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/03a17fc8-1ec2-4417-817c-e88ef78af50f/download/2013_all.csv
+   - Tracciato Record | XLSX | https://dati.lazio.it/dataset/10421312-5715-495d-8f96-214a5a480c3c/resource/2f25deda-3547-44b5-a6c0-3b17f12e489a/download/tracciatorecorddatimicrometeorologicimf.xlsx
+===  serie-storica-dato-termometrico | Serie storica dato termometrico | 2026-08-05T06:47:43.702779
+   - Dati Giugno 2026 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/ae43471d-d6ec-4d3f-ad9a-cc3777b89caf/download/termo_giu_26.csv
+   - Dati Maggio 2026 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/16a2bafb-35b1-463f-b666-fcc8c3f93568/download/termo_mag_26.csv
+   - Dati Aprile 2026 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/a65849fb-6bc0-45ff-91c3-098f177e311e/download/termo_apr_26.csv
+   - Dati Marzo 2026 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/b8c7dd22-0a40-4912-bf85-bd9ecd697ba2/download/termo_mar_26.csv
+   - Dati Febbraio 2026 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/923adadd-b5c5-4950-ab7c-fd443ebcdba4/download/termo_feb_26.csv
+   - Dati Gennaio 2026 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/eff94a45-ce90-4adc-879b-517b7c14a7e9/download/termo_gen_26.csv
+   - Dati Dicembre 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/791e04be-d214-4610-9d50-f498bb9a746e/download/termo_dic_25.csv
+   - Dati Novembre 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/0c38ff1d-eb18-47f1-805c-bdb4051dfbbf/download/termo_nov_25.csv
+   - Dati Ottobre 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/8e556f66-a93d-4751-a944-aace41807428/download/termo_ott_25.csv
+   - Dati Settembre 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/9f4c25e6-42dc-4af7-b306-da30b6f1c381/download/termo_sett_25.csv
+   - Dati Agosto 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/ba984343-d537-4a01-9b0e-493ecf1c74fb/download/termo_ago_25.csv
+   - Dati Luglio 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/9c3ee181-71a5-4a7e-b927-3b69d84c2044/download/termo_lug_25.csv
+   - Dati Giugno 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3460a47b-2a4b-489a-b4d9-5aeec19fc1ef/download/termo_giu_25.csv
+   - Dati Maggio 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/c663a3b0-fd13-4862-9e7f-daa61d0f4495/download/termo_mag_25.csv
+   - Dati Aprile 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3e405824-250e-401b-a43f-4486ec4025a0/download/termo_apr_25.csv
+   - Dati Marzo 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/aadcb4d9-1bd5-4e09-a91f-ca0f1d3d209f/download/termo_mar_25.csv
+   - Dati Febbraio 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/759d9ba7-3c1c-4fa4-906d-e3798f962ed6/download/termo_feb_25.csv
+   - Dati Gennaio 2025 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/8fb652cb-9ff3-4f07-af08-0ee5bb636815/download/termo_gen_25.csv
+   - Dati Dicembre 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/28d6d87d-0094-43c3-b01e-54b55400a080/download/termo_dic_24.csv
+   - Dati Novembre 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/2bfc8a9d-8a99-4952-98a7-0936862799b3/download/termo_nov_24.csv
+   - Dati Ottobre 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/e0d81911-73c8-4b8e-b0ed-698e6af2d755/download/termo_ott_24.csv
+   - Dati Settembre 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/14c69e0b-a710-4aff-a8f5-35d7289fb8db/download/termo_set_24.csv
+   - Dati Agosto 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3455e422-5b3f-48a0-ba70-b61b7f57a26e/download/termo_ago_24.csv
+   - Dati Luglio 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/df29f6e1-eb53-4e06-8d45-7c833a041045/download/termo_lug_24.csv
+   - Dati Giugno 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/a38110a3-7920-4531-acff-32191fe5b5c6/download/termo_giu_24.csv
+   - Dati Maggio 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/fe293718-371f-49fe-9fd3-3140afb06857/download/termo_mag_24.csv
+   - Dati Aprile 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/d9248fb4-7c68-417d-8cb2-b0e5a9985f4d/download/termo_apr_24.csv
+   - Dati Marzo 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3d7d7da1-55a5-4ced-b730-35e3deae2533/download/termo_mar_24.csv
+   - Dati Febbraio 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/6ccc34e4-5126-4915-8254-70f67fb003c8/download/termo_feb_24.csv
+   - Dati Gennaio 2024 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/90fa48f3-bfbb-41ed-8598-5bbb334e0e5a/download/termo_gen_24.csv
+   - Dati Dicembre 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/f2443d84-0277-45fc-8ec9-d848b73e4209/download/termo_dic_23.csv
+   - Dati Novembre 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/70adb90d-281c-4ae3-b5ec-342d7a212efd/download/termo_nov_23.csv
+   - Dati Ottobre 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/1e563c0e-68bf-4c4e-b1a6-4175b414febb/download/termo_ott_23.csv
+   - Dati Settembre 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/c0f992f7-b325-43ae-ad15-cdbcdfe92beb/download/termo_set_23.csv
+   - Dati Agosto 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/63729470-adc1-4a33-a296-f3dcda619a34/download/termo_ago_23.csv
+   - Dati Luglio 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/7efd6598-d2f8-4509-a26d-2d7e694090ea/download/termo_lug_23_mg.csv
+   -  Dati Giugno 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/848c20bd-8cdc-4edf-a348-1e9fa158044e/download/termo_giu_23.csv
+   -  Dati Maggio 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/f02b4df2-1a19-4e1a-9817-92f07751d0d0/download/termo_mag_23.csv
+   - Dati Aprile 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/d77bc689-47fc-4311-ab9b-98cd02903721/download/termoapr23.csv
+   - Dati Marzo 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/d13bf5e8-a32a-492c-80f1-0075cd0d4724/download/termomar23.csv
+   - Dati Febbraio 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/259ab08f-8a94-4ba5-9b2b-c3a99156ef3f/download/termofeb23.csv
+   - Dati Gennaio 2023 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/fb2e9084-b092-41f4-95e1-3d2e7556c714/download/termogen23.csv
+   - Dati Dicembre 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/998b5950-65f1-46ac-b0c9-e41597cc28df/download/termodic22.csv
+   - Dati Novembre 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/8df054ce-c04c-4796-9b2f-2a97bbd9a00f/download/termonov22.csv
+   - Dati Ottobre 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/e82fbbfb-5c60-4009-b0e5-f7f32fec9d85/download/termoott22.csv
+   - Dati Settembre 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/8957e628-ef32-44cb-8b71-e322e5befa9d/download/termosett22.csv
+   - Dati Agosto 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3eaf7a12-81b1-4345-af55-a7c74e94a5b1/download/termoago22.csv
+   - Dati Luglio 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3eeddf96-ca20-4502-ace9-ec2278475146/download/termolug22.csv
+   - Dati Giugno 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/bb3c896d-542a-4e91-9f78-792fb64805f2/download/termogiu22.csv
+   - Dati Maggio 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/58aff29e-a7bf-4249-8788-e846118bf8ae/download/termo_mag.csv
+   - Dati Aprile 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/03244d25-4358-4735-afff-d29c60222f27/download/termoapr22.csv
+   - Dati Marzo 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/09e47947-533e-4f74-bf7b-e5f7cc1995c0/download/termo_marz-copia.csv
+   - Dati Febbraio 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/469ad244-e3b2-4d23-ad7d-1086e3630b2b/download/termo_feb_22.csv
+   - Dati Gennaio 2022 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/fc2b565e-ad67-4b38-a615-4fdd43625d21/download/termo_gen_22.csv
+   - Dati Dicembre 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/837a53a3-aaff-41dd-9df9-ee0b64b06f30/download/termodic21.csv
+   - Dati Novembre 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/9aa07ba5-bdfc-458f-b12f-26ddc808bc25/download/termonov21.csv
+   - Dati Ottobre 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/faec27c3-4cce-4b29-ab6f-e298fac9977f/download/termoott21.csv
+   - Dati Settembre 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/732da9a9-1ac6-4a6c-b21a-b1f6cb325c20/download/termoset21.csv
+   - Dati Agosto 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/9cfc8279-9bce-488f-9d2e-90f44d1ca0f9/download/termoago21.csv
+   - Dati Luglio 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/d9806344-75cb-4721-9922-8be511a13abc/download/termolug21.csv
+   - Dati Giugno 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/351d00c4-632d-405c-b95e-26586113d833/download/termogiu21.csv
+   - Dati Maggio 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3f242db5-0cfa-4639-a654-b23f64d7d6a7/download/termo_mag_21.csv
+   - Dati Aprile 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/6a0aa6a7-cb62-48ad-ac21-23e31d690c87/download/termo_apr_21.csv
+   - Dati Marzo 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/98b1627f-7a3c-4bb0-aad0-419aeb7a5460/download/termo_mar_21.csv
+   - Dati Febbraio 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3e10d317-f42a-4cd8-9541-fd8f1a9f94fa/download/termo_feb_21.csv
+   - Dati Gennaio 2021 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/a0a31bda-1c76-489c-8951-fb9f9f8f9c8b/download/termo_gen_21.csv
+   - Dati Dicembre 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/78f0dd47-e9f5-48ae-9ec3-c6b16c4a15b5/download/termo_dic_20.csv
+   - Dati Novembre 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/7719e8e6-25a4-4ea1-bb73-f459b12d84ad/download/termo_nov_20.csv
+   - Dati Ottobre 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/7dc4146a-670f-4679-b374-d594b17eb22d/download/termo_ott_20.csv
+   - Dati Settembre 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/41f69cc4-c314-46bd-aedb-bee3ebbdb3d7/download/termo_set_20.csv
+   - Dati Agosto 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/f2321703-7b82-47e0-8e68-ee93a8c6effd/download/termo_ago_20.csv
+   - Dati Luglio 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/b4f8ba77-5fb2-4783-bd18-4c9b117158b9/download/termo_lug_20.csv
+   - Dati Giugno 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/715df4c3-385f-439e-b855-8db738a6f8db/download/termogiu20.csv
+   - Dati Maggio 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/714d06f3-7d89-40ea-8d58-409b18fee9db/download/termomag20.csv
+   - Dati Aprile 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/ec9d4464-14c9-433b-95b0-7146ff1e1be3/download/termoapr20.csv
+   - Dati Marzo 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/f38fbdab-a26f-4dfb-ac09-de4d07501fae/download/termomar20.csv
+   - Dati Febbraio 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/4c4397ae-8ac0-43a7-a712-bb1a5518019c/download/termofeb20.csv
+   - Dati Gennaio 2020 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/988021a2-679e-46df-a3dc-e849696b7878/download/termogen20.csv
+   - Dati Dicembre 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/1cd09a57-8fb5-4e99-8be9-80c0f227f9d0/download/termodic19.csv
+   - Dati Novembre 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/c5370ce0-12b6-4e54-8b8f-37f57cb2cd7e/download/termonov19.csv
+   - Dati Ottobre 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/897f1095-78a8-4ae1-8659-36e22bfdc36e/download/termoott19.csv
+   - Dati Settembre 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/936bc257-95ea-4f26-8a7c-fed24992f9fe/download/termoset19.csv
+   - Dati Agosto 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/81b26b5c-eb56-4ec3-995f-790318b941c9/download/termoago19.csv
+   - Dati Luglio 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/2f5a7d49-a402-4062-893d-99efa5283853/download/termolug19.csv
+   - Dati Giugno 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/cdd33f67-8266-43aa-8529-b4059f73f90c/download/termogiu19.csv
+   - Dati Maggio 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/697fd23c-bdca-4d57-b6c1-ca23f0706e34/download/termomag19.csv
+   - Dati Aprile 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/55be9624-44bb-4770-8f50-75ca6e259c75/download/termoapr19.csv
+   - Dati Marzo 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/819ce576-56d5-477f-8608-5817fbff3f51/download/termomar19.csv
+   - Dati Febbraio 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/ec0d5e88-94a2-4a0a-b72f-12eeef71d63a/download/termofeb19.csv
+   - Dati Gennaio 2019 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/0f65ea3c-5d01-4972-972e-6c6c6f890428/download/termogen19.csv
+   - Dati Dicembre 2018 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/77f16f25-4d47-4185-a5de-2e474d0f8b14/download/termodic2018.csv
+   - Dati Novembre 2018 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/f6c246b6-1c11-4dcb-a14b-fc1384fb4701/download/termonov2018.csv
+   - Dati Ottobre 2018 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/3bad71f6-5dbd-4da6-ae41-836a285027d0/download/termoott2018.csv
+   - Dati Settembre 2018 | CSV | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/87909d0d-91ca-4074-bb53-71d8c9962466/download/termosett2018.csv
+   - Tracciato Record | XLSX | https://dati.lazio.it/dataset/4233ea5a-2a0c-4951-9405-b43f32fdf646/resource/08b55dab-fcab-47ff-b059-e3ced95ff84d/download/termotracciatorecord.xlsx
+===  serie-storica-dato-pluviometrico | Serie storica dato pluviometrico | 2026-08-05T06:45:08.404967
+   - Dati Giugno 2026 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/ee0f020b-5ec8-4dd7-b6df-9fe9a7f7254d/download/pluvio_giu_26.csv
+   - Dati Maggio 2026 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/f01a824f-7665-48ba-9d13-f3d810247c38/download/pluvio_mag_26.csv
+   - Dati Aprile 2026 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/8fd60feb-d62d-43c8-932f-c7c3e18ec725/download/pluvio_apr_26.csv
+   - Dati Marzo 2026 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/9f19ea1f-da0f-4ebe-b949-f06214554830/download/pluvio_mar_26_ok.csv
+   - Dati Febbraio 2026 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/f797d45e-7520-4fa0-be2f-fa7c0b4bce50/download/pluvio_feb_26.csv
+   - Dati Gennaio 2026 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/b8f2d0dc-29c0-47a5-bcad-d892bb5cbbe9/download/pluvio_gen_26.csv
+   - Dati Dicembre 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/60382ed4-48af-4251-8592-b84cfbca7390/download/pluvio_dic_25.csv
+   - Dati Novembre 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/696e6ea5-d06e-4519-855e-fc628ca93461/download/pluvio_nov_25.csv
+   - Dati Ottobre 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/b1feb03b-fef2-4e27-89e7-08dd3f6e8120/download/pluvio_ott_25.csv
+   - Dati Settembre 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/d7822aec-a587-4132-b3e2-39396a100ed0/download/pluvio_sett_25.csv
+   - Dati Agosto 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/40ff8dc4-20e3-486a-a8dc-5f56a01a74ba/download/pluvio_ago_25.csv
+   - Dati Luglio 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/a11a648c-b145-4553-84d2-679d8b9a5eb8/download/pluvio_lug_25.csv
+   - Dati Giugno 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/5c06fd1e-4713-484e-b02b-1475384b9e51/download/pluvio_giu_25.csv
+   - Dati Aprile 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/859f5933-b4af-44f6-a183-594848c3cc0b/download/pluvio_apr_25.csv
+   - Dati Marzo 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/ff140913-d4dc-46b5-8c3e-72e24c108c42/download/pluvio_mar_25.csv
+   - Dati Febbraio 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/336d5e1e-328f-41f8-8b34-36f1396e0442/download/pluvio_feb_25.csv
+   - Dati Gennaio 2025 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/becbb991-312c-4d11-b425-64494c5c28bb/download/pluvio_gen_25.csv
+   - Dati Dicembre 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/50f570a8-44c4-4026-8db6-cf57b69ba5c0/download/pluvio_dic_24.csv
+   - Dati Novembre 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/37596226-4690-4336-a545-e4e0fd5148e0/download/pluvio_nov_24.csv
+   - Dati Ottobre 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/993d38d7-42c3-4f45-b7ea-ec8bb00b4ad9/download/pluvio_ott_24.csv
+   - Dati Settembre 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/b472af66-251a-4d98-911c-fa3d8bd4dcf0/download/pluvio_set_24.csv
+   - Dati Agosto 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/a247b932-705d-4676-bbb4-f6e62a5f4f3a/download/pluvio_ago_24.csv
+   - Dati Luglio 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/732f3c06-3fcb-4570-b7c5-0705c55e6d96/download/pluvio_lug_24.csv
+   - Dati Giugno 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/1bea475c-d58a-4055-bd05-a756d3a38ed7/download/pluvio_giu_24.csv
+   - Dati Maggio 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/6846be72-8bf6-4b4a-8ecc-6cfa01ec8fd1/download/pluvio_mag_24.csv
+   - Dati Aprile 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/0571dd54-b31f-462c-a4dd-a5033066dfb7/download/pluvio_apr_24.csv
+   - Dati Marzo 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/d6dff595-bcef-4519-9492-4f5c2d98e90e/download/pluvio_mar_24.csv
+   -  Dati Febbraio 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/923b0d96-b520-4978-891d-a3c2b50fd4a4/download/pluvio_feb_24.csv
+   - Dati Gennaio 2024 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/be8bda93-2ec2-4179-863f-49c23b7f957e/download/pluvio_gen_24.csv
+   - Dati Dicembre 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/0ba68327-0312-4540-bcc6-43ef0ef32aac/download/pluvio_dic_23.csv
+   - Dati Novembre 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/2ceae54c-638e-43af-b8cb-e4481421461e/download/pluvio_nov_23.csv
+   - Dati Ottobre 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/24cb003f-ac90-443b-8068-e4e7ca49ad4d/download/pluvio_ott_23.csv
+   - Dati Settembre 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/33cd79ec-7543-4874-a3b5-a85b3166060f/download/pluvio_set_23.csv
+   - Dati Agosto 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/2ff632fe-6f3f-49eb-a27b-6749c0dee952/download/pluvio_ago_23.csv
+   - Dati Luglio 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/2b801536-4674-4d5b-90a7-b0ab39d4ae30/download/pluvio_lug_23_mg.csv
+   -  Dati Giugno 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/eabd578a-eaba-4609-bd46-816a5cf9f5a4/download/pluvio_giu_23.csv
+   -  Dati Maggio 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/54b300fd-c299-4fe7-8838-45a26b6c344b/download/pluvio_mag_23.csv
+   - Dati Aprile 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/fdac0c7c-3db7-43fd-92dd-b415752f37b6/download/pluvioapr23.csv
+   - Dati Marzo 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/bd985dd3-fc63-434c-ba6c-78f1e55f85cf/download/pluviomar23.csv
+   - Dati Febbraio 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/543527f5-b92a-41ea-b5a0-91562d982d38/download/pluviofeb23.csv
+   - Dati Gennaio 2023 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/ff619ca9-6f9a-4cc7-9559-c186ba0f4a22/download/pluviogen23.csv
+   - Dati Dicembre 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/2e722a9e-1e7c-4bfa-8999-6d0b5d312961/download/pluviodic22.csv
+   - Dati Novembre 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/ee9775af-9e2f-414c-b3d4-20d9f72d27e4/download/pluvionov22.csv
+   - Dati Ottobre 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/f84371c5-5936-4f0b-bebe-e2ccc3eaa79e/download/pluvioott22.csv
+   - Dati Settembre 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/6a4b0390-42dd-4d9a-9ff9-90a612fed2d6/download/pluviosett22.csv
+   - Dati Agosto 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/6b818796-b888-4543-b0d0-0fdbc0f91766/download/pluvioago22.csv
+   - Dati Luglio 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/5f1330ba-8a2d-4a9a-92c1-5d0bedb1fcf4/download/pluviolug22.csv
+   - Dati Giugno 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/1041efe0-f1d7-4703-9950-55f63dffb862/download/pluviogiu22.csv
+   - Dati Maggio 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/12d7e982-87a5-4a4c-b9d3-e76e5c37c547/download/pluviomag22.csv
+   - Dati Aprile 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/19b69188-2884-4d65-a780-1402726682d6/download/pluvio_apr.csv
+   - Dati Marzo 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/68caf4ec-eb39-4d64-a2d9-66cb8ed25123/download/pluviomar22.csv
+   - Dati Febbraio 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/c5513737-0672-4d03-893e-103625f91da8/download/pluviofeb22.csv
+   - Dati Gennaio 2022 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/ba26986a-f4f5-4fe8-85fe-19d064599dd6/download/pluvio_gen_22.csv
+   - Dati Dicembre 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/87267b1e-05c7-4631-88f1-35e019bd65f9/download/pluviodic21.csv
+   - Dati Novembre 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/844e497c-c62f-450b-b84a-00b4540b7305/download/pluvionov21.csv
+   - Dati Ottobre 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/b1d27315-606b-4926-812d-dd32c03e9c64/download/pluvioott21.csv
+   - Dati Settembre 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/f0b52181-570a-4441-8c51-9098109811f9/download/pluvioset21.csv
+   - Dati Agosto 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/17598102-6a85-46af-ad92-5fdac0a069b2/download/pluvioago21.csv
+   - Dati Luglio 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/d8bbe93a-62a6-493a-a5b7-a98af218ebc5/download/pluviolug21.csv
+   - Dati Giugno 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/932fb402-bee1-4b8d-9c23-f207ac3e9ed0/download/pluviogiu21.csv
+   - Dati Maggio 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/0f7d1862-3905-4c8d-9c4f-4993c7cbc597/download/pluvio_mag_21.csv
+   - Dati Aprile 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/70f288da-cecc-4ee7-8287-331f2d96012f/download/pluvio_apr_21.csv
+   - Dati Marzo 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/0589cc71-3c83-4d91-a86e-df257fa777a7/download/pluvio_mar_21.csv
+   - Dati Febbraio 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/3843705b-f405-489a-bc07-5e7ac385a202/download/pluvio_feb_21.csv
+   - Dati Gennaio 2021 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/006ca91e-dc20-47d0-865b-23e8ce536590/download/pluvio_gen_21.csv
+   - Dati Dicembre 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/3348d989-4290-4b6b-96da-9854932a540c/download/pluvio_dic_20.csv
+   - Dati Novembre 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/8a8c4894-b6bb-4969-a720-9444aa74a276/download/pluvio_nov_20.csv
+   - Dati Ottobre 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/01e837d5-312a-4329-b55a-9f8003e22b69/download/pluvio_ott_20.csv
+   - Dati Settembre 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/f2be13c5-b484-4f6b-9bdd-986d65d061c7/download/pluvio_set_20.csv
+   - Dati Agosto 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/48633c30-186f-4661-b819-e028e1300252/download/pluvio_ago_20.csv
+   - Dati Luglio 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/8f8f36a8-5b90-42c2-8da2-71d5b1648e11/download/pluvio_lug_20.csv
+   - Dati Giugno 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/d94c47e9-00a3-438f-911d-6465e035e724/download/pluviogiu20.csv
+   - Dati Maggio 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/90ac6b5d-b5eb-436d-aa5f-d3c949cb4115/download/pluviomag20.csv
+   - Dati Aprile 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/f5577923-e3d1-4cbc-9f26-03fad74da1ba/download/pluvioapr20.csv
+   - Dati Marzo 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/b98e1ac3-17f3-4620-88c6-ed32ea66c4c2/download/pluviomar20.csv
+   - Dati Febbraio 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/1bd25aec-2ef1-4b35-b4b6-075cd813eb4f/download/pluviofeb20.csv
+   - Dati Gennaio 2020 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/c482774c-0c86-45b6-9ba7-915a14f2a656/download/pluviogen20.csv
+   - Dati Dicembre 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/625cd1e3-4f5e-4f67-8767-3cde1e226a94/download/pluviodic19.csv
+   - Dati Novembre 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/3f1c19f6-9e15-45da-8f83-936019cee004/download/pluvionov19.csv
+   - Dati Ottobre 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/1d014dd7-21cd-48e7-9628-d7441f2797d5/download/pluvioott19.csv
+   - Dati settembre 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/a1c49f58-9264-4ab7-b1f5-4fca3c528930/download/pluvioset19.csv
+   - Dati Agosto 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/58c78fc3-5447-471a-b56d-4ad08a28c922/download/pluvioago19.csv
+   - Dati Luglio 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/c2ae6833-359e-4bd4-a3a0-a834a9a89af8/download/pluviolug19.csv
+   - Dati Giugno 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/d02e3205-4b2f-4858-8025-8536aa636f32/download/pluviogiu19.csv
+   - Dati Maggio 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/fef266b2-cc81-47a0-be78-e1ea97e5ea7c/download/pluviomag19.csv
+   - Dati Aprile 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/c40dc0f8-10cf-4609-9500-a4bcc47ffb99/download/pluvioapr19.csv
+   - Dati Marzo 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/eef19821-9891-4895-80b7-f293706a0b86/download/pluviomar19.csv
+   - Dati Febbraio 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/93bf6a57-9233-431b-901d-e8dfbc5b4176/download/pluviofeb19.csv
+   - Dati Gennaio 2019 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/863f8bc9-464c-4237-83d5-50b2b01e817a/download/pluviogen19.csv
+   - Dati Dicembre 2018 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/16c0e650-8619-430c-9857-c9b8a7aee86c/download/pluviodic2018.csv
+   - Dati Novembre 2018 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/6b6a47dd-fafd-48f5-a5ac-a932e1eea6b4/download/pluvionov2018.csv
+   - Dati Ottobre 2018 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/03ac24be-2cb0-4d9c-8d96-8694ce819c42/download/pluvioott2018.csv
+   - Dati Settembre 2018 | CSV | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/efca3dc3-5562-4013-addf-9aa4cdff73cd/download/pluviosett2018.csv
+   - Tracciato Record | XLSX | https://dati.lazio.it/dataset/30a88e71-f5ac-4dc1-b013-4fd2fbd2b2dc/resource/d93514d7-b917-458c-9ad8-4da9289d7d0d/download/pluviotracciatorecord.xlsx
+### API meteonetwork
+@font-face { font-family: "sw-icon-font"; src:url("https://www.meteonetwork.it/wp-content/plugins/social-warfare/assets/fonts/sw-icon-font.eot?ver=4.5.6"); src:url("https://www.meteonetwork.it/wp-content/plugins/social-warfare/assets/fonts/sw-icon-font.eot?ver=4.5.6#iefix") format("embedded-opentype"), url("https://www.meteonetwork.it/wp-content/plugins/social-warfare/assets/fonts/sw-icon-font.woff?ver=4.5.6") format("woff"), url("https://www.meteonetwork.it/wp-content/plugins/social-warfare/assets/fonts/sw-icon-font.ttf?ver=4.5.6") format("truetype"), url("https://www.meteonetwork.it/wp-content/plugins/social-warfare/assets/fonts/sw-icon-font.svg?ver=4.5.6#1445203416") format("svg"); font-weight: normal; font-style: normal; font-display:block; } MeteoNetwork API - MeteoNetwork {"@context":"https:\/\/schema.org","@graph":[{"@type":"WebPage","@id":"https:\/\/www.meteonetwork.it\/supporto\/meteonetwork-api\/","url":"https:\/\/www.meteonetwork.it\/supporto\/meteonetwork-api\/","name":"MeteoNetwork API - MeteoNetwork","isPartOf":{"@id":"https:\/\/www.meteonetwork.it\/#website"},"datePublished":"2017-06-05T14:17:58+00:00","dateModified":"2025-11-29T10:38:50+00:00","breadcrumb":{"@id":"https:\/\/www.meteonetwork.it\/supporto\/meteonetwork-api\/#breadcrumb"},"inLanguage":"it-IT","potentialAction":[{"@type":"ReadAction","target":["https:\/\/www.meteonetwork.it\/supporto\/meteonetwork-api\/"]}]},{"@type":"BreadcrumbList","@id":"https:\/\/www.meteonetwork.it\/supporto\/meteonetwork-api\/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https:\/\/www.meteonetwork.it\/"},{"@type":"ListItem","position":2,"name":"Supporto","item":"https:\/\/www.meteonetwork.it\/supporto\/"},{"@type":"ListItem","position":3,"name":"MeteoNetwork API"}]},{"@type":"WebSite","@id":"https:\/\/www.meteonetwork.it\/#website","url":"https:\/\/www.meteonetwork.it\/","name":"MeteoNetwork","description":"Always looking at the sky","potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https:\/\/www.meteonetwork.it\/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"it-IT"}]} img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px} /*# sourceURL=wp-img-auto-sizes-contain-inline-css */ :root{--wp-block-synced-color:#7a00df;--wp-block-synced-color--rgb:122,0,223;--wp-bound-block-color:var(--wp-block-synced-color);--wp-editor-canvas-background:#ddd;--wp-admin-theme-color:#007cba;--wp-admin-theme-color--rgb:0,124,186;--wp-admin-theme-color-darker-10:#006ba1;--wp-admin-theme-color-darker-10--rgb:0,107,160.5;--wp-admin-theme-color-darker-20:#005a87;--wp-admin-theme-color-darker-20--rgb:0,90,135;--wp-admin-border-width-focus:2px}@media (min-resolution:192dpi){:root{--wp-admin-border-width-focus:1.5px}}.wp-element-button{cursor:pointer}:root .has-very-light-gray-background-color{background-color:#eee}:root .has-very-dark-gray-background-color{background-color:#313131}:root .has-very-light-gray-color{color:#eee}:root .has-very-dark-gray-color{color:#313131}:root .has-vivid-green-cyan-to-vivid-cyan-blue-gradient-background{background:linear-gradient(135deg,#00d084,#0693e3)}:root .has-purple-crush-gradient-background{background:linear-gradient(135deg,#34e2e4,#4721fb 50%,#ab1dfe)}:root .has-hazy-dawn-gradient-background{background:linear-gradient(135deg,#faaca8,#dad0ec)}:root .has-subdued-olive-gradient
