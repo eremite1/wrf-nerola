@@ -33,16 +33,19 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq python3-requests >/dev/null
           INIZIO=$(date +%s)
           while [ $(( ($(date +%s) - INIZIO) / 60 )) -lt 340 ]; do
-            NUOVA=$(python3 scarica_ecmwf.py --trova --ore 48 2>/dev/null | tail -n 1 || true)
+            NUOVA=$(python3 scarica_ecmwf.py --trova --ore 72 2>/dev/null | tail -n 1 || true)
             FATTA=$(curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/risultati/LEGGIMI.md" 2>/dev/null \
                     | grep -o '[0-9]\{10\}' | head -n 1 || true)
-            ATTIVI=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow previsione-nerola.yml --json status \
-                     --jq '[.[] | select(.status != "completed")] | length' 2>/dev/null || echo 0)
-            echo "$(date -u +%H:%M) ECMWF disponibile: ${NUOVA:-?}, ultima previsione: ${FATTA:-?}, WRF in corso: $ATTIVI"
-            if [ -n "$NUOVA" ] && [ "$NUOVA" -gt "${FATTA:-0}" ] 2>/dev/null && [ "$ATTIVI" = "0" ]; then
+            ELENCO=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow previsione-nerola.yml --limit 20 --json status,displayTitle \
+                     --jq '.[] | select(.status != "completed") | .displayTitle' 2>/dev/null || true)
+            ATTIVI=$(printf '%s\n' "$ELENCO" | grep -c . || true)
+            IN_CORSO=$(printf '%s\n' "$ELENCO" | grep -o '[0-9]\{10\}' | sort -n | tail -n 1 || true)
+            echo "$(date -u +%H:%M) ECMWF disponibile: ${NUOVA:-?}, online: ${FATTA:-?}, in calcolo: ${IN_CORSO:--} (corse attive: $ATTIVI)"
+            # ogni nuova corsa ECMWF parte subito (fino a 2 insieme): il calcolo dura piu' di 6 ore
+            if [ -n "$NUOVA" ] && [ "$NUOVA" -gt "${FATTA:-0}" ] 2>/dev/null && [ "$NUOVA" -gt "${IN_CORSO:-0}" ] 2>/dev/null && [ "$ATTIVI" -lt 2 ]; then
               echo "  -> faccio partire il WRF con la corsa $NUOVA"
-              gh workflow run previsione-nerola.yml --repo "$GITHUB_REPOSITORY" --ref main -f ore=48 -f ore_blocco=24 || true
-              sleep 300
+              gh workflow run previsione-nerola.yml --repo "$GITHUB_REPOSITORY" --ref main -f ore=72 -f ore_blocco=24 -f corsa="$NUOVA" || true
+              sleep 120
             fi
             sleep 900
           done

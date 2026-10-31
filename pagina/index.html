@@ -297,7 +297,7 @@ function aggiornaContatore() {
   if (!indice) return;
   const c = indice.corsa, el = data(indice.elaborato || indice.creato), ora = Date.now();
   const fmt = new Intl.DateTimeFormat("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
-  const prossimo = el.getTime() + 12 * 3600000;
+  const prossimo = el.getTime() + 6 * 3600000;
   const dopo = ora < prossimo ? `prossimo aggiornamento stimato tra ${durata(prossimo - ora)}` : "nuova corsa in elaborazione, aggiornamento atteso a breve";
   $("info").innerHTML = `Corsa ECMWF delle ${c.slice(8, 10)} UTC del ${c.slice(6, 8)}/${c.slice(4, 6)} · WRF pronto ${fmt.format(el)}<br>` +
                         `<b>aggiornato ${durata(ora - el.getTime())} fa</b> · ${dopo}`;

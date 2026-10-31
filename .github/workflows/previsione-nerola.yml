@@ -1,5 +1,5 @@
 name: "Previsione Nerola"
-run-name: "Previsione Nerola ${{ inputs.ore || '48' }} h (blocchi da ${{ inputs.ore_blocco || '24' }}) ${{ inputs.corsa }}"
+run-name: "Previsione Nerola ${{ inputs.ore || '72' }} h (blocchi da ${{ inputs.ore_blocco || '24' }}) ${{ inputs.corsa }}"
 
 # Previsione WRF a 3 km e 1 km su Nerola, con dati ECMWF IFS 0,1 gradi.
 # 1) prepara: scarica i dati, li prepara per WRF (WPS) e crea le condizioni iniziali e al contorno (real.exe)
@@ -16,7 +16,7 @@ on:
         description: "Ore di previsione (6 e 12 solo per le prove)"
         type: choice
         options: ["6", "12", "24", "48", "72"]
-        default: "24"
+        default: "72"
       ore_blocco:
         description: "Ore per ogni blocco (24 normalmente; 3 solo per provare la ripartenza con 6 ore)"
         type: choice
@@ -30,8 +30,9 @@ on:
 permissions:
   contents: write
 
+# corse diverse possono girare insieme (una nuova ECMWF ogni 6 ore, il calcolo dura piu' di 6 ore)
 concurrency:
-  group: previsione-nerola
+  group: previsione-nerola-${{ inputs.corsa || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -45,7 +46,7 @@ jobs:
       b2: ${{ steps.blocchi.outputs.b2 }}
       b3: ${{ steps.blocchi.outputs.b3 }}
     env:
-      ORE: ${{ inputs.ore || '48' }}
+      ORE: ${{ inputs.ore || '72' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -108,7 +109,7 @@ jobs:
     outputs:
       corsa: ${{ needs.dati.outputs.corsa }}
     env:
-      ORE: ${{ inputs.ore || '48' }}
+      ORE: ${{ inputs.ore || '72' }}
       CORSA: ${{ needs.dati.outputs.corsa }}
       UCX_TLS: sm,self,tcp        # MPI usa solo la memoria del computer (niente InfiniBand)
     steps:
@@ -262,12 +263,15 @@ jobs:
       stato_out: stato-3
 
   pubblica:
+    concurrency:
+      group: pubblica-risultati
+      cancel-in-progress: false
     needs: [dati, prepara, blocco1, blocco2, blocco3]
     if: ${{ always() && needs.blocco1.result == 'success' && (fromJSON(needs.dati.outputs.n) < 2 || needs.blocco2.result == 'success') && (fromJSON(needs.dati.outputs.n) < 3 || needs.blocco3.result == 'success') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      ORE: ${{ inputs.ore || '48' }}
+      ORE: ${{ inputs.ore || '72' }}
       CORSA: ${{ needs.prepara.outputs.corsa }}
     steps:
       - uses: actions/checkout@v4
@@ -353,6 +357,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          GIA=$(curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/risultati/LEGGIMI.md" 2>/dev/null | grep -o '[0-9]\{10\}' | head -n 1 || true)
+          if [ -n "$GIA" ] && [ "$GIA" -gt "$CORSA" ] 2>/dev/null; then
+            echo "Online c'e' gia' la corsa $GIA, piu' recente di $CORSA: non la sostituisco."
+            exit 0
+          fi
           cd /home/runner/pubblico
           git init -q -b risultati
           git config user.name "github-actions[bot]"

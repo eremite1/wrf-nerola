@@ -43,7 +43,7 @@ MODELLO = """&time_control
  debug_level = 0,
 /
 &domains
- time_step = 15,
+ time_step = 18,
  time_step_fract_num = 0,
  time_step_fract_den = 1,
  max_dom = 2,
@@ -68,7 +68,7 @@ MODELLO = """&time_control
  mp_physics = 6, 6,
  ra_lw_physics = 4, 4,
  ra_sw_physics = 4, 4,
- radt = 3, 3,
+ radt = 10, 6,
  sf_sfclay_physics = 5, 5,
  sf_surface_physics = 2, 2,
  bl_pbl_physics = 5, 5,
