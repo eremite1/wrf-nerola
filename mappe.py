@@ -372,8 +372,8 @@ def bilancio_idrico_24(d, i):
 def ore_trattamento_24(d, i):
     """Ore nelle 24 adatte ai trattamenti fitosanitari: vento sotto 15 km/h, nessuna pioggia nell'ora e in quella prima,
     temperatura tra 5 e 28 gradi."""
-    p = _pioggia_oraria(d, i, 25)
-    asciutto = (p[1:] < 0.1) & (p[:-1] < 0.1)
+    p = _pioggia_oraria(d, i, 24) < 0.1
+    asciutto = p & np.concatenate([p[:1], p[:-1]])
     vento = np.hypot(d["U10"][i - 23:i + 1], d["V10"][i - 23:i + 1]) * 3.6
     t = d["T2"][i - 23:i + 1] - 273.15
     return (asciutto & (vento < 15.0) & (t >= 5.0) & (t <= 28.0)).sum(axis=0).astype("float64")
