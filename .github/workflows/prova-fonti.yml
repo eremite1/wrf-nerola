@@ -13,35 +13,32 @@ jobs:
         run: |
           exec > /tmp/esito.txt 2>&1
           python3 - <<'PY'
-          import urllib.request, ssl
-          def get(u, n=700):
-              r = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) wrf-nerola"})
+          import urllib.request, re, json
+          H = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) wrf-nerola"}
+          def raw(u):
+              return urllib.request.urlopen(urllib.request.Request(u, headers=H), timeout=40).read().decode("utf-8", "replace")
+          def get(u, n=900):
               try:
-                  b = urllib.request.urlopen(r, timeout=40).read().decode("utf-8", "replace")
-                  return f"OK {len(b)} byte :: " + " ".join(b[:n].split())
+                  b = raw(u); return f"OK {len(b)} byte :: " + " ".join(b[:n].split())
               except Exception as e:
                   return "ERRORE " + str(e)[:200]
-          prove = [
-            "https://www.meteonetwork.it/rete/livemap/",
-            "https://www.meteonetwork.it/rete/api/",
-            "https://www.ogimet.com/cgi-bin/getsynop?block=16242&begin=202610300000&end=202610310000",
-            "https://www.ogimet.com/cgi-bin/getsynop?block=16240&begin=202610300000&end=202610310000",
-            "https://agrometeo.arsial.it/",
-            "https://www.arsial.it/servizio-agrometeorologico/",
-            "https://www.regione.lazio.it/cittadini/protezione-civile/centro-funzionale",
-            "https://dati.lazio.it/",
-            "https://www.cfumbria.it/",
-            "https://api.weather.com/v2/pws/observations/current?stationId=IROMA1&format=json&units=m&apiKey=test",
-            "https://www.wunderground.com/wundermap",
-            "https://api.open-meteo.com/v1/forecast?latitude=42.13&longitude=12.77&current=temperature_2m",
-            "https://mesonet.agron.iastate.edu/api/1/currents.json?network=IT__ASOS",
-            "https://dati.protezionecivile.it/",
-            "https://mappe.protezionecivile.gov.it/",
-            "https://www.meteoregionelazio.it/",
-            "https://temporeale.regione.lazio.it/",
-          ]
-          for u in prove:
-              print("###", u); print(get(u)); print()
+          print("### livemap: script e indirizzi")
+          try:
+              h = raw("https://www.meteonetwork.it/rete/livemap/")
+              for m in sorted(set(re.findall(r'(?:src|href)="([^"]+)"', h))): print(m)
+              for m in sorted(set(re.findall(r"['\"](/[^'\" ]*(?:json|api|data|station)[^'\" ]*)['\"]", h))): print("PERCORSO", m)
+          except Exception as e: print("ERRORE", e)
+          for u in ["https://www.meteonetwork.it/rete/livemap/stations.json", "https://www.meteonetwork.it/rete/livemap/data/",
+                    "https://www.meteonetwork.it/rete/livemap/json/"]:
+              print("###", u); print(get(u))
+          print("### CKAN Lazio")
+          print(get("https://dati.lazio.it/catalog/api/3/action/package_search?q=stazioni+meteo&rows=15", 3000))
+          print(get("https://dati.lazio.it/api/3/action/package_search?q=meteo&rows=15", 3000))
+          print("### aegis")
+          print(get("https://temporeale.regione.lazio.it/aegis", 1500))
+          print("### ogimet elenco stazioni vicine")
+          for b in ("16235","16239","16241","16243","16245","16246","16247","16248","16252","16215","16216","16217","16218","16219","16220"):
+              r = get(f"https://www.ogimet.com/cgi-bin/getsynop?block={b}&begin=202610310000&end=202610311200", 160); print(b, r[:200])
           PY
       - name: Salvo l'esito nel ramo prova
         env:
