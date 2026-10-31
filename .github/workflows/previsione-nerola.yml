@@ -331,7 +331,7 @@ jobs:
         run: |
           python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo
           cp pagina/index.html /home/runner/pubblico/index.html
-          cp pagina/sondaggi.html /home/runner/pubblico/sondaggi.html
+          cp pagina/sondaggi.html pagina/colonna.html pagina/comune.js /home/runner/pubblico/
           touch /home/runner/pubblico/.nojekyll
           cp /home/runner/controllo.txt /home/runner/pubblico/
           cp /home/runner/uscite/tempi_b*.txt /home/runner/pubblico/

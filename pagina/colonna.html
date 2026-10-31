@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colonna d'aria</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --testo: #1b2430; --muto: #5b6775; --linea: #d8dee5;
+    --accento: #1f6fb5; --accento-testo: #ffffff; --evid: #e8f1fa;
+    --m1: #2a78d6; --m2: #eb6834; --m3: #1baf7a; --m4: #eda100; --m5: #e87ba4; --m6: #008300; --m7: #6250d6;
+    --sotto-suolo: #e3e6ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="chiaro"]) {
+      --bg: #12171d; --card: #1b232c; --testo: #e6ebf0; --muto: #98a4b1; --linea: #2d3945;
+      --accento: #5aa9ec; --accento-testo: #0c1620; --evid: #223142;
+      --m1: #3987e5; --m2: #d95926; --m3: #199e70; --m4: #c98500; --m5: #d55181; --m6: #008300; --m7: #9085e9;
+      --sotto-suolo: #2a3038;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--testo); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--card); border-bottom: 1px solid var(--linea); }
+  .testata { max-width: 1400px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 1.3rem; margin: 0; color: var(--accento); }
+  h1 small { font-size: .85rem; font-weight: 400; color: var(--muto); margin-left: 8px; }
+  main { max-width: 1400px; margin: 0 auto; padding: 14px 16px 28px; }
+  .griglia-pagina { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .griglia-pagina { grid-template-columns: minmax(0, 1fr); } #mappa { height: 46vh !important; } .col-mappa { position: static !important; } }
+  .card { background: var(--card); border: 1px solid var(--linea); border-radius: 12px; padding: 12px; min-width: 0; }
+  .col-mappa { position: sticky; top: 10px; }
+  #mappa { height: 62vh; min-height: 320px; border-radius: 10px; background: var(--bg); }
+  .leaflet-container { font: inherit; }
+  .suggerimento { color: var(--muto); font-size: .82rem; margin: 8px 2px 0; }
+  .legenda { display: grid; gap: 4px; margin-top: 10px; }
+  .legenda label { display: flex; align-items: center; gap: 8px; font-size: .84rem; cursor: pointer; }
+  .legenda .riq { width: 22px; height: 14px; border: 2px solid; border-radius: 3px; flex: none; }
+  .legenda small { color: var(--muto); }
+  h2 { font-size: 1.1rem; margin: 0; }
+  h3 { font-size: .95rem; margin: 18px 0 4px; }
+  .sub { color: var(--muto); font-size: .84rem; }
+  .sub a, nav a { color: var(--accento); }
+  nav { margin-left: auto; font-size: .88rem; display: flex; gap: 14px; }
+  nav a[aria-current] { font-weight: 700; text-decoration: none; }
+  .quando { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 10px 0 2px; }
+  .quando strong { font-size: 1.05rem; }
+  .quando span { color: var(--muto); font-size: .85rem; }
+  .comandi { display: flex; gap: 8px; align-items: center; }
+  .comandi button { min-width: 44px; height: 44px; border: 1px solid var(--linea); background: var(--card); color: var(--testo); border-radius: 10px; font-size: 1.05rem; cursor: pointer; }
+  input[type=range] { flex: 1; height: 44px; accent-color: var(--accento); min-width: 0; }
+  .schede { display: flex; gap: 6px; margin: 10px 0 6px; flex-wrap: wrap; }
+  .schede button { padding: 7px 14px; border: 1px solid var(--linea); background: var(--card); color: var(--testo); border-radius: 10px; font: inherit; font-size: .9rem; cursor: pointer; }
+  .schede button[aria-selected="true"] { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); font-weight: 600; }
+  .assenti { font-size: .8rem; color: var(--muto); margin: 4px 0; }
+  .tabella-box { overflow-x: auto; }
+  table.col { border-collapse: separate; border-spacing: 2px; font-size: .84rem; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  table.col th { font-weight: 600; font-size: .78rem; color: var(--muto); padding: 4px 6px; white-space: nowrap; }
+  table.col thead th { vertical-align: bottom; text-align: center; min-width: 74px; }
+  table.col thead th .linea { display: block; margin: 4px auto 0; width: 22px; border-top: 3px solid; border-radius: 2px; }
+  table.col tbody th { text-align: right; }
+  table.col tbody th small { display: block; font-weight: 400; font-size: .7rem; }
+  table.col td { text-align: center; padding: 4px 6px; border-radius: 4px; min-width: 74px; }
+  table.col td.vuoto { color: var(--muto); }
+  table.col td.sotto { background: var(--sotto-suolo); color: var(--muto); font-size: .72rem; }
+  table.col tr.riga-suolo th, table.col tr.riga-suolo td { border-top: 2px solid var(--muto); }
+  table.col tr.riassunto td { background: var(--bg); font-weight: 600; }
+  .scala { display: flex; align-items: center; gap: 8px; font-size: .76rem; color: var(--muto); margin: 8px 0 0; flex-wrap: wrap; }
+  .scala .barra { height: 10px; width: 220px; border-radius: 3px; }
+  .pannelli { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 6px; }
+  .pannello { border: 1px solid var(--linea); border-radius: 10px; padding: 8px; position: relative; }
+  .pannello h4 { margin: 0 0 4px; font-size: .86rem; display: flex; align-items: center; gap: 7px; }
+  .pannello h4 .linea { width: 18px; border-top: 3px solid; border-radius: 2px; }
+  .pannello h4 small { color: var(--muto); font-weight: 400; }
+  .pannello svg { width: 100%; height: auto; display: block; cursor: crosshair; touch-action: none; }
+  .pannello svg text { fill: var(--muto); font-size: 10px; }
+  .pannello .nodati { color: var(--muto); font-size: .8rem; padding: 30px 0; text-align: center; }
+  .tip { position: fixed; z-index: 30; pointer-events: none; background: rgba(20,28,38,.95); color: #fff; padding: 6px 9px; border-radius: 8px;
+         font-size: .78rem; line-height: 1.35; box-shadow: 0 2px 10px rgba(0,0,0,.35); white-space: nowrap; }
+  .nascosto { display: none !important; }
+  details.info { margin-top: 14px; }
+  details.info summary { cursor: pointer; font-weight: 600; }
+  details.info li { font-size: .86rem; color: var(--muto); margin: 4px 0; }
+  details.info ul { margin: 4px 0 4px 18px; padding: 0; }
+  footer { max-width: 1400px; margin: 0 auto; padding: 0 16px 30px; color: var(--muto); font-size: .78rem; }
+  footer a { color: var(--accento); }
+</style>
+</head>
+<body>
+<header>
+  <div class="testata">
+    <h1>Colonna d'aria a confronto <small>temperatura dal suolo a 100 hPa, tutti i modelli affiancati</small></h1>
+    <nav><a href="sondaggi.html" id="link-sondaggi">Radiosondaggi</a><a href="colonna.html" aria-current="page">Colonna d'aria</a></nav>
+  </div>
+</header>
+<main>
+  <div class="griglia-pagina">
+    <div class="col-mappa">
+      <div class="card">
+        <div id="mappa" role="application" aria-label="Mappa del Lazio: clicca un punto per confrontare la colonna d'aria"></div>
+        <p class="suggerimento">Clicca un punto qualsiasi della mappa: compare la temperatura di tutta la colonna d'aria sopra quel punto, modello per modello.</p>
+        <div class="legenda" id="legenda"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div id="intestazione"><h2>Nessun punto scelto</h2><div class="sub">Clicca sulla mappa.</div></div>
+      <div class="quando">
+        <strong id="quando-testo">–</strong>
+        <span id="quando-dopo"></span>
+      </div>
+      <div class="comandi">
+        <button id="prima" type="button" aria-label="Ora precedente">‹</button>
+        <input id="cursore" type="range" min="0" max="0" value="0" step="1" aria-label="Ora della previsione">
+        <button id="dopo" type="button" aria-label="Ora successiva">›</button>
+      </div>
+
+      <h3>Temperatura a ogni livello</h3>
+      <div class="schede" role="tablist">
+        <button type="button" role="tab" id="sch-valori" aria-selected="true">Valori</button>
+        <button type="button" role="tab" id="sch-diff" aria-selected="false">Differenza dalla media dei modelli</button>
+      </div>
+      <div class="assenti" id="assenti"></div>
+      <div class="tabella-box"><table class="col" id="tabella"></table></div>
+      <div class="scala" id="scala"></div>
+
+      <h3>Andamento nel tempo</h3>
+      <div class="sub">Ogni riquadro è un modello: in orizzontale le ore, in verticale la quota (pressione). La linea nera è lo zero termico, quella verticale l'ora scelta sopra. Tocca un riquadro per spostarti a quell'ora.</div>
+      <div class="pannelli" id="pannelli"></div>
+
+      <details class="info">
+        <summary>Come si legge e come è calcolato</summary>
+        <ul>
+          <li>Ogni colonna della tabella è un modello, ogni riga un livello di pressione (in alto i livelli più alti); la quota accanto alla pressione è la media dei modelli. L'ultima riga prima degli zeri termici è la temperatura a 2 m dal suolo del modello, con la quota del suolo che il modello "vede".</li>
+          <li>Ogni modello è mostrato solo sui livelli che calcola davvero: dove manca un numero il modello non ha quel livello (ICON-2I ne ha solo 6) oppure il livello è sotto il suolo. Nessun valore è inventato o corretto.</li>
+          <li>"Differenza dalla media": quanto ogni modello è più caldo (rosso) o più freddo (blu) della media dei modelli che hanno quel livello, alla stessa ora.</li>
+          <li>Zero termico: quota sopra la quale la temperatura resta sotto 0 °C. Zero del bulbo umido: lo stesso con il bulbo umido (equazione psicrometrica alla pressione del livello), utile per la quota neve.</li>
+          <li>WRF 1 km e 3 km (nostro modello su Nerola) ogni 3 ore; ICON-2I, AROME (2,5 km), ECMWF IFS, UKMO e ICON-EU ogni ora, dall'ultima corsa disponibile su Open-Meteo, valori della cella del modello senza correzioni con la quota.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+</main>
+<div class="tip nascosto" id="tip"></div>
+<footer>Dati: modello WRF Nerola (condizioni iniziali ECMWF IFS open data, CC BY 4.0); <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0) per ICON-2I (ItaliaMeteo-ARPAE), AROME (Météo-France), ECMWF IFS, UKMO (Met Office), ICON-EU (DWD). Mappa © OpenStreetMap.</footer>
+
+<script src="comune.js"></script>
+<script>
+"use strict";
+stato.vista = "valori";
+
+// ------------------------------------------------------------------------------------------------ colori
+// scala divergente: blu sotto lo zero, rosso sopra, grigio neutro allo zero
+const scuro = () => matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.tema !== "chiaro";
+function hex(h) { return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); }
+function mescola(a, b, f) { const A = hex(a), B = hex(b); return A.map((x, i) => Math.round(x + (B[i] - x) * f)); }
+function coloreScala(v, limNeg, limPos) {
+  const S = scuro()
+    ? { n: "#383835", fb: "#2f5d93", ff: "#5f9de6", cb: "#7f3330", cf: "#e0675c" }
+    : { n: "#f0efec", fb: "#a9c8ec", ff: "#2a63b8", cb: "#f1b0a3", cf: "#c23a32" };
+  let rgb;
+  if (v < 0) { const f = Math.min(1, -v / limNeg); rgb = f < 0.5 ? mescola(S.n, S.fb, f * 2) : mescola(S.fb, S.ff, (f - 0.5) * 2); }
+  else { const f = Math.min(1, v / limPos); rgb = f < 0.5 ? mescola(S.n, S.cb, f * 2) : mescola(S.cb, S.cf, (f - 0.5) * 2); }
+  const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+  return { sfondo: `rgb(${rgb.join(",")})`, testo: lum > 0.55 ? "#141a20" : "#ffffff" };
+}
+const coloreT = (t) => coloreScala(t, 40, 30);
+const coloreD = (d) => coloreScala(d, 4, 4);
+
+// ------------------------------------------------------------------------------------------------ tabella
+function tempoAttuale() { return stato.tempi[stato.i]; }
+function livelloEsatto(prof, p) {
+  for (let i = 1; i < prof.length; i++) if (Math.abs(prof[i].p - p) < 0.01) return prof[i];
+  return null;
+}
+function disegnaTabella() {
+  const tab = $("tabella"), ms = disponibili();
+  const assenti = MODELLI.filter((m) => !profiloDi(m.id)).map((m) => `${m.nome} (${statoModello(m) || "nessun dato"})`);
+  $("assenti").textContent = assenti.length ? "Non mostrati: " + assenti.join(" · ") : "";
+  if (!ms.length) { tab.innerHTML = ""; $("scala").innerHTML = ""; return; }
+  const profili = Object.fromEntries(ms.map((m) => [m.id, profiloDi(m.id)]));
+  const livelli = [...new Set(ms.flatMap((m) => profili[m.id].slice(1).map((l) => l.p)))].sort((a, b) => a - b);  // dall'alto
+  const diff = stato.vista === "diff";
+  let h = "<thead><tr><th>Livello</th>" +
+    ms.map((m) => `<th>${m.nome}<small style="display:block;font-weight:400">${m.ris}</small><span class="linea" style="border-color:${colore(m)}"></span></th>`).join("") +
+    "</tr></thead><tbody>";
+  const cella = (v, media, extra = "") => {
+    if (v == null) return `<td class="vuoto">·</td>`;
+    if (diff) {
+      if (media == null) return `<td class="vuoto">·</td>`;
+      const d = Math.abs(v - media) < 0.05 ? 0 : v - media, c = coloreD(d);
+      return `<td style="background:${c.sfondo};color:${c.testo}" title="${nf1.format(v)} °C">${d > 0 ? "+" : ""}${nf1.format(d)}${extra}</td>`;
+    }
+    const c = coloreT(v);
+    return `<td style="background:${c.sfondo};color:${c.testo}">${nf1.format(v)}°${extra}</td>`;
+  };
+  const media = (vals) => { const v = vals.filter((x) => x != null); return v.length >= 2 ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  for (const p of livelli) {
+    const lv = ms.map((m) => livelloEsatto(profili[m.id], p));
+    const zs = lv.filter(Boolean).map((l) => l.z);
+    const zMedia = zs.reduce((a, b) => a + b, 0) / zs.length;
+    const mt = media(lv.map((l) => l && l.t));
+    h += `<tr><th>${nf0.format(p)} hPa<small>circa ${nf0.format(Math.round(zMedia / 10) * 10)} m</small></th>` +
+      ms.map((m, j) => {
+        if (lv[j]) return cella(lv[j].t, mt);
+        return profili[m.id][0].p <= p ? `<td class="sotto">sotto il suolo</td>` : `<td class="vuoto">·</td>`;
+      }).join("") + "</tr>";
+  }
+  const suolo = ms.map((m) => profili[m.id][0]);
+  const ms2 = media(suolo.map((s) => s.t));
+  h += `<tr class="riga-suolo"><th>2 m dal suolo<small>quota del suolo nel modello</small></th>` +
+    suolo.map((s) => cella(s.t, ms2, `<small style="display:block;font-size:.7rem;opacity:.8">${nf0.format(s.z)} m</small>`)).join("") + "</tr>";
+  const quota = (r) => r ? (r.alSuolo ? "al suolo" : nf0.format(Math.round(r.z / 10) * 10) + " m") : "–";
+  h += `<tr class="riassunto"><th>Zero termico</th>` + ms.map((m) => `<td>${quota(quotaDiCambio(profili[m.id], (l) => l.t))}</td>`).join("") + "</tr>";
+  h += `<tr class="riassunto"><th>Zero bulbo umido</th>` + ms.map((m) => `<td>${quota(quotaDiCambio(profili[m.id], (l) => l.td == null ? l.t : bulboUmido(l.t, l.td, l.p)))}</td>`).join("") + "</tr>";
+  tab.innerHTML = h + "</tbody>";
+  const passi = diff ? [-4, -2, 0, 2, 4] : [-40, -20, 0, 15, 30];
+  const gr = passi.map((v, i) => `${(diff ? coloreD(v) : coloreT(v)).sfondo} ${i * 25}%`).join(",");
+  $("scala").innerHTML = `<span>${diff ? "più freddo della media" : "−40 °C"}</span><span class="barra" style="background:linear-gradient(90deg,${gr})"></span><span>${diff ? "più caldo della media" : "+30 °C"}</span>` +
+    `<span>· ${diff ? "valori in °C rispetto alla media; passa sopra una cella per il valore vero" : "grigio = 0 °C"}</span>`;
+}
+
+// ------------------------------------------------------------------------------------------------ andamento nel tempo
+const PW = 320, PH = 190, PX0 = 30, PX1 = 314, PY0 = 6, PY1 = 168, PTOP = 100, PBOT = 1040;
+const pyP = (p) => PY1 - (PY1 - PY0) * (Math.log(PBOT) - Math.log(p)) / (Math.log(PBOT) - Math.log(PTOP));
+const ppY = (y) => Math.exp(Math.log(PBOT) - (PY1 - y) / (PY1 - PY0) * (Math.log(PBOT) - Math.log(PTOP)));
+let firmaPannelli = "";
+function asseTempo() {
+  const t0 = Date.parse(stato.tempi[0]), t1 = Date.parse(stato.tempi[stato.tempi.length - 1]) + 3600e3;
+  return { t0, t1, x: (t) => PX0 + (t - t0) / (t1 - t0) * (PX1 - PX0), t: (x) => t0 + (x - PX0) / (PX1 - PX0) * (t1 - t0) };
+}
+function pressioneZero(prof) {                 // pressione dello zero termico (dall'alto), per la linea nera
+  for (let i = prof.length - 2; i >= 0; i--) {
+    const a = prof[i], b = prof[i + 1];
+    if (a.t > 0 && b.t <= 0) return Math.exp(Math.log(a.p) + a.t / (a.t - b.t) * (Math.log(b.p) - Math.log(a.p)));
+    if (b.t > 0) return null;
+  }
+  return prof[0].t <= 0 ? prof[0].p : null;
+}
+function disegnaPannelli() {
+  const box = $("pannelli");
+  if (!stato.tempi.length) { box.innerHTML = ""; firmaPannelli = ""; return; }
+  const firma = stato.tempi.join() + MODELLI.map((m) => stato.risultati[m.id] ? m.id : "").join() + (scuro() ? "s" : "c");
+  if (firma === firmaPannelli) { aggiornaMarcatori(); return; }
+  firmaPannelli = firma;
+  box.innerHTML = "";
+  const A = asseTempo();
+  for (const m of MODELLI) {
+    const r = stato.risultati[m.id];
+    const div = document.createElement("div"); div.className = "pannello";
+    div.innerHTML = `<h4><span class="linea" style="border-color:${colore(m)}"></span>${m.nome} <small>${m.ris}</small></h4>`;
+    box.appendChild(div);
+    if (!r || !r.profili) { div.insertAdjacentHTML("beforeend", `<div class="nodati">${statoModello(m) || "nessun dato"}</div>`); continue; }
+    const tempi = Object.keys(r.profili).filter((t) => Date.parse(t) >= A.t0).sort();
+    if (!tempi.length) { div.insertAdjacentHTML("beforeend", `<div class="nodati">nessun dato in questo periodo</div>`); continue; }
+    const svg = el("svg", { viewBox: `0 0 ${PW} ${PH}`, role: "img", "aria-label": `Temperatura nel tempo e in quota, ${m.nome}` });
+    svg.appendChild(el("rect", { x: PX0, y: PY0, width: PX1 - PX0, height: PY1 - PY0, fill: "var(--sotto-suolo)" }));
+    const passo = tempi.length > 1 ? Math.min(...tempi.slice(1).map((t, i) => Date.parse(t) - Date.parse(tempi[i]))) : 3600e3;
+    const zeri = [];
+    for (const t of tempi) {
+      const prof = r.profili[t], tm = Date.parse(t);
+      const xa = A.x(tm - passo / 2), xb = A.x(tm + passo / 2);
+      for (let i = 0; i < prof.length; i++) {
+        const l = prof[i];
+        const pGiu = i === 0 ? prof[0].p : Math.sqrt(l.p * prof[i - 1].p);
+        const pSu = i === prof.length - 1 ? PTOP : Math.sqrt(l.p * prof[i + 1].p);
+        if (pSu > PBOT) continue;
+        const ya = pyP(Math.min(pGiu, PBOT)), yb = pyP(Math.max(pSu, PTOP));
+        svg.appendChild(el("rect", { x: Math.max(PX0, xa).toFixed(1), y: yb.toFixed(1), width: Math.max(0, Math.min(PX1, xb) - Math.max(PX0, xa) + 0.4).toFixed(1),
+                                     height: (ya - yb + 0.4).toFixed(1), fill: coloreT(l.t).sfondo }));
+      }
+      const pz = pressioneZero(prof);
+      zeri.push(pz == null ? null : [A.x(tm), pyP(pz)]);
+    }
+    svg.appendChild(el("path", { d: percorso(zeri.map((z) => z || [null, null])), fill: "none", stroke: scuro() ? "#ffffff" : "#000000", "stroke-width": 1.6 }));
+    for (const p of [1000, 850, 700, 500, 300, 200, 100]) {
+      svg.appendChild(el("line", { x1: PX0 - 3, x2: PX0, y1: pyP(p), y2: pyP(p), stroke: "var(--muto)" }));
+      svg.appendChild(el("text", { x: PX0 - 5, y: pyP(p) + 3, "text-anchor": "end" }, String(p)));
+    }
+    for (let t = Math.ceil(A.t0 / 3600e3) * 3600e3; t <= A.t1; t += 3600e3) {   // mezzanotte italiana
+      const ora = new Date(t).toLocaleString("it-IT", { hour: "2-digit", hour12: false, timeZone: "Europe/Rome" });
+      if (+ora !== 0) continue;
+      svg.appendChild(el("line", { x1: A.x(t), x2: A.x(t), y1: PY0, y2: PY1 + 4, stroke: "var(--muto)", "stroke-dasharray": "2 2" }));
+      const g = new Date(t + 12 * 3600e3).toLocaleString("it-IT", { weekday: "short", day: "numeric", timeZone: "Europe/Rome" });
+      svg.appendChild(el("text", { x: Math.min(A.x(t + 12 * 3600e3), PX1 - 14), y: PY1 + 15, "text-anchor": "middle" }, g));
+    }
+    svg.appendChild(el("rect", { x: PX0, y: PY0, width: PX1 - PX0, height: PY1 - PY0, fill: "none", stroke: "var(--linea)" }));
+    svg.appendChild(el("line", { class: "marca", x1: 0, x2: 0, y1: PY0, y2: PY1, stroke: "var(--accento)", "stroke-width": 2 }));
+    svg.addEventListener("pointermove", (ev) => suPannello(ev, m, svg, false));
+    svg.addEventListener("pointerdown", (ev) => suPannello(ev, m, svg, true));
+    svg.addEventListener("pointerleave", () => $("tip").classList.add("nascosto"));
+    div.appendChild(svg);
+  }
+  aggiornaMarcatori();
+}
+function aggiornaMarcatori() {
+  const t = tempoAttuale(); if (!t) return;
+  const A = asseTempo(), x = A.x(Date.parse(t));
+  document.querySelectorAll("#pannelli .marca").forEach((l) => { l.setAttribute("x1", x); l.setAttribute("x2", x); });
+}
+function suPannello(ev, m, svg, clic) {
+  const r = svg.getBoundingClientRect();
+  const x = (ev.clientX - r.left) / r.width * PW, y = (ev.clientY - r.top) / r.height * PH, tip = $("tip");
+  if (x < PX0 || x > PX1 || y < PY0 || y > PY1) { tip.classList.add("nascosto"); return; }
+  const A = asseTempo(), tm = A.t(x), p = ppY(y);
+  if (clic) {                                            // sposto l'ora scelta
+    let k = 0, d = Infinity;                             // l'ora piu' vicina tra quelle che questo modello ha
+    stato.tempi.forEach((t, j) => { if (!stato.risultati[m.id].profili[t]) return; const dd = Math.abs(Date.parse(t) - tm); if (dd < d) { d = dd; k = j; } });
+    vaiA(k);
+  }
+  const ris = stato.risultati[m.id];
+  let migliore = null, d = Infinity;
+  for (const t of Object.keys(ris.profili)) { const dd = Math.abs(Date.parse(t) - tm); if (dd < d) { d = dd; migliore = t; } }
+  const prof = migliore && ris.profili[migliore];
+  const tt = prof ? interp(prof, p, "t") : null, z = prof ? interp(prof, p, "z") : null;
+  tip.innerHTML = `<b>${m.nome}</b> · ${etichettaTempo(migliore)}<br>${nf0.format(p)} hPa${z == null ? "" : ` (${nf0.format(z)} m)`}: ` +
+    (tt == null ? "sotto il suolo" : `<b>${nf1.format(tt)} °C</b>`);
+  tip.classList.remove("nascosto");
+  const w = tip.offsetWidth;
+  tip.style.left = Math.min(ev.clientX + 12, innerWidth - w - 6) + "px";
+  tip.style.top = (ev.clientY - tip.offsetHeight - 10) + "px";
+}
+
+// ------------------------------------------------------------------------------------------------ pagina
+function disegnaIntestazione() {
+  if (!stato.punto) return;
+  const { lat, lon } = stato.punto;
+  $("intestazione").innerHTML = `<h2>${lat.toFixed(3)}° N, ${lon.toFixed(3)}° E</h2>` +
+    `<div class="sub"><a href="sondaggi.html#${lat.toFixed(4)},${lon.toFixed(4)}">Apri il radiosondaggio completo di questo punto</a></div>`;
+  const t = tempoAttuale();
+  $("quando-testo").textContent = t ? etichettaTempo(t) : "–";
+  if (t) {
+    const h = Math.round((Date.parse(t) - Date.now()) / 3600e3);
+    $("quando-dopo").textContent = (h === 0 ? "adesso" : h > 0 ? `fra ${h} ore` : `${-h} ore fa`) + " · ora italiana";
+  } else $("quando-dopo").textContent = "";
+}
+function disegnaTutto() { disegnaIntestazione(); disegnaTabella(); disegnaPannelli(); }
+function vaiA(i) { stato.i = Math.max(0, Math.min(stato.tempi.length - 1, i)); $("cursore").value = stato.i; disegnaIntestazione(); disegnaTabella(); aggiornaMarcatori(); }
+$("cursore").addEventListener("input", (e) => vaiA(+e.target.value));
+$("prima").addEventListener("click", () => vaiA(stato.i - 1));
+$("dopo").addEventListener("click", () => vaiA(stato.i + 1));
+for (const [id, vista] of [["sch-valori", "valori"], ["sch-diff", "diff"]]) {
+  $(id).addEventListener("click", () => {
+    stato.vista = vista;
+    $("sch-valori").setAttribute("aria-selected", String(vista === "valori"));
+    $("sch-diff").setAttribute("aria-selected", String(vista === "diff"));
+    disegnaTabella();
+  });
+}
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowLeft") vaiA(stato.i - 1);
+  if (e.key === "ArrowRight") vaiA(stato.i + 1);
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", disegnaTutto);
+
+(async () => {
+  disegnaTutto();
+  await preparaMappa();
+  const h = location.hash.slice(1).split(",").map(Number);
+  if (h.length === 2 && h.every(isFinite)) scegli(h[0], h[1]);
+  else scegli(NEROLA.lat, NEROLA.lon);
+})();
+</script>
+</body>
+</html>
