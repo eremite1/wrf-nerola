@@ -245,6 +245,9 @@ let indice = null, immagini = [], posizione = 0, timer = null;
 let griglia = null, valoriParam = null, puntoScelto = null;
 const cacheBin = {}, cacheSerie = {};
 
+// il nome del file dipende solo dall'ora valida: senza questo codice il browser mescola mappe di corse diverse
+function urlImg(f) { return f + "?v=" + encodeURIComponent(indice.creato); }
+
 function data(iso) { return new Date(iso.replace("Z", ":00Z")); }
 
 async function carica() {
@@ -449,16 +452,16 @@ function mostra(i, aggiornaCursore = true) {
   posizione = Math.max(0, Math.min(immagini.length - 1, i));
   const im = immagini[posizione];
   const d = data(im.valido_utc);
-  $("mappa").src = im.file;
+  $("mappa").src = urlImg(im.file);
   $("mappa").alt = indice.domini[$("dominio").value].parametri[$("parametro").value].titolo;
   if (aggiornaCursore) $("cursore").value = posizione;
-  for (const k of [posizione + 1, posizione - 1]) if (immagini[k]) new Image().src = immagini[k].file;
+  for (const k of [posizione + 1, posizione - 1]) if (immagini[k]) new Image().src = urlImg(immagini[k].file);
 }
 
 function parti() {
   $("gioca").classList.add("on"); $("gioca").textContent = "❚❚";
   timer = setInterval(() => { mostra(posizione + 1 >= immagini.length ? 0 : posizione + 1); }, 700);
-  immagini.forEach((im) => { new Image().src = im.file; });
+  immagini.forEach((im) => { new Image().src = urlImg(im.file); });
 }
 function ferma() {
   if (timer) clearInterval(timer);
