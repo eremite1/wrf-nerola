@@ -49,7 +49,7 @@ jobs:
           METEOHUB_USERNAME: ${{ secrets.METEOHUB_USERNAME }}
           METEOHUB_PASSWORD: ${{ secrets.METEOHUB_PASSWORD }}
         run: |
-          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA"
+          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA" --altri-modelli
 
       - name: Aggiorno lo storico
         env:
@@ -58,6 +58,8 @@ jobs:
           cd /home/runner/storico
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # un solo commit: lo storico non accumula cronologia e resta leggero
+          git checkout -q --orphan nuovo
           git add -A
-          git commit -q -m "Pagella aggiornata ($(date -u +%Y-%m-%d\ %H:%M) UTC)" || { echo "niente di nuovo"; exit 0; }
-          git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" storico
+          git commit -q -m "Pagella aggiornata ($(date -u +%Y-%m-%d\ %H:%M) UTC)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" nuovo:storico

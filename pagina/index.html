@@ -198,7 +198,7 @@
       <p><b>Errore medio</b>: di quanto, in media, la previsione sbaglia (senza considerare se per eccesso o per difetto). Più è basso, meglio è.</p>
       <p><b>Tendenza</b>: se è positiva WRF tende a prevedere valori più alti di quelli misurati (ad esempio più caldo), se è negativa più bassi.</p>
       <p>Le fasce (0-12 ore, 12-24 ore, ...) dicono a quante ore dall'inizio della corsa si riferisce la previsione: di solito le prime ore sono più precise.
-         Le osservazioni sono quelle degli aeroporti (bollettini METAR); le quote delle stazioni sono diverse da quelle del modello, quindi sui rilievi una differenza è normale.
+         Le osservazioni sono quelle degli aeroporti (METAR) e delle reti della Protezione Civile del Lazio e dell'Umbria e di MeteoNetwork; le quote delle stazioni sono diverse da quelle del modello, quindi sui rilievi una differenza è normale.
          Il confronto usa gli ultimi giorni e si arricchisce a ogni corsa.</p>
     </details>
   </section>
@@ -569,7 +569,8 @@ async function scegliPunto(k, fx, fy) {
 
 let pagella = null;
 const URL_PAGELLA = "https://raw.githubusercontent.com/eremite1/wrf-nerola/storico/pagella.json";
-const NOMI_VAR = { T: ["Temperatura", "°C"], Td: ["Punto di rugiada", "°C"], V: ["Vento", "km/h"] };
+const NOMI_VAR = { T: ["Temperatura", "°C"], Td: ["Punto di rugiada", "°C"], V: ["Vento", "km/h"], P6: ["Pioggia su 6 ore", "mm"] };
+const COL_MOD = { oss: "#222222", wrf1: "#e0482f", wrf3: "#2a6cc7", wrfc: "#c49a00", icon2i: "#2e9d4a", arome: "#8e44ad", ecmwf: "#6c7a89", ukmo: "#d9822b", iconeu: "#16a0a0" };
 
 async function caricaPagella() {
   try {
@@ -582,23 +583,84 @@ async function caricaPagella() {
   }
   const n = pagella.stazioni.length;
   $("pag-intro").textContent = `Aggiornata ${pagella.aggiornato.replace("T", " ").replace("Z", " UTC")} · ${n} stazioni · ultimi ${pagella.giorni} giorni · ${pagella.fonte}`;
-  const fasce = Object.keys(pagella.riepilogo["1km"].T);
-  const cella = (st) => !st || st.n < 5 ? "–" : `<b>${nf1.format(st.mae)}</b><small style="display:block;color:var(--muto)">tendenza ${st.bias > 0 ? "+" : ""}${nf1.format(st.bias)}</small>`;
-  let h = '<div style="overflow-x:auto"><table class="tab"><thead><tr><th>Errore medio</th>' + fasce.map((f) => `<th>${f}</th>`).join("") + "</tr></thead><tbody>";
-  for (const v of ["T", "Td", "V"]) for (const d of ["1km", "3km"])
-    h += `<tr><th>${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]}) · WRF ${d === "1km" ? "1 km" : "3 km"}</th>` + fasce.map((f) => `<td>${cella(pagella.riepilogo[d][v][f])}</td>`).join("") + "</tr>";
-  $("pag-riepilogo").innerHTML = h + "</tbody></table></div>";
+  $("pag-riepilogo").innerHTML =
+    '<div class="scelte" style="margin-top:8px"><div><label for="pag-zona">Confronto tra i modelli</label><select id="pag-zona"><option value="tutte">Tutte le stazioni della zona</option><option value="nerola">Solo Nerola (media delle stazioni vicine)</option></select></div><div></div></div>' +
+    '<div id="pag-tabelle"></div><div id="pag-stima"></div><div id="pag-nerola"></div><div id="pag-stazioni"></div>';
+  $("pag-zona").onchange = tabelleModelli;
+  tabelleModelli();
+  stimaErrori();
+  graficiNerola();
   const sel = $("pag-stazione");
   sel.innerHTML = "";
   pagella.stazioni.forEach((st, i) => sel.add(new Option(`${st.nome} · ${nf0.format(st.dist_km)} km da Nerola · ${nf0.format(st.quota ?? 0)} m`, i)));
+  const cella = (st) => !st || st.n < 5 ? "–" : `<b>${nf1.format(st.mae)}</b><small style="display:block;color:var(--muto)">tendenza ${st.bias > 0 ? "+" : ""}${nf1.format(st.bias)}</small>`;
   let t2 = '<h3 style="font-size:.95rem;margin:16px 0 4px">Le stazioni più vicine a Nerola (temperatura, prime 24 ore di previsione)</h3><div style="overflow-x:auto"><table class="tab"><thead><tr><th>Stazione</th><th>Distanza</th><th>Quota stazione / modello 1 km</th><th>Errore medio 1 km</th><th>Errore medio 3 km</th></tr></thead><tbody>';
   for (const st of pagella.stazioni.filter((x) => x.errori && (x.errori["1km"] || x.errori["3km"])).slice(0, 15))
-    t2 += `<tr><th>${st.nome}</th><td>${nf0.format(st.dist_km)} km</td><td>${nf0.format(st.quota ?? 0)} / ${st.quota_modello["1km"] != null ? nf0.format(st.quota_modello["1km"]) : "–"} m</td><td>${cella(st.errori["1km"] && st.errori["1km"].T)}</td><td>${cella(st.errori["3km"] && st.errori["3km"].T)}</td></tr>`;
-  $("pag-riepilogo").insertAdjacentHTML("beforeend", t2 + "</tbody></table></div>");
+    t2 += `<tr><th>${st.nome}</th><td>${nf0.format(st.dist_km)} km</td><td>${st.quota != null ? nf0.format(st.quota) : "?"} / ${st.quota_modello["1km"] != null ? nf0.format(st.quota_modello["1km"]) : "–"} m</td><td>${cella(st.errori["1km"] && st.errori["1km"].T)}</td><td>${cella(st.errori["3km"] && st.errori["3km"].T)}</td></tr>`;
+  $("pag-stazioni").innerHTML = t2 + "</tbody></table></div>";
   const pref = pagella.stazioni.findIndex((st) => st.serie.tempi.length);
   if (pref >= 0) sel.value = pref;
   sel.onchange = disegnaPagella;
   disegnaPagella();
+}
+
+function tabelleModelli() {
+  const zona = $("pag-zona").value, rie = pagella.riepilogo[zona];
+  const fasce = Object.keys(rie.T);
+  let h = "";
+  for (const v of ["T", "Td", "V", "P6"]) {
+    const modelli = Object.keys(pagella.modelli).filter((m) => fasce.some((f) => rie[v][f][m] && rie[v][f][m].n >= 5));
+    if (!modelli.length) { h += `<h3 style="font-size:.95rem;margin:14px 0 4px">${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})</h3><p class="suggerimento" style="text-align:left">Ancora pochi dati: si riempirà con le prossime corse.</p>`; continue; }
+    const migliore = {};
+    for (const f of fasce) { const c = modelli.map((m) => [m, rie[v][f][m]]).filter((x) => x[1] && x[1].n >= 5); if (c.length > 1) migliore[f] = c.reduce((a, b) => (b[1].mae < a[1].mae ? b : a))[0]; }
+    h += `<h3 style="font-size:.95rem;margin:14px 0 4px">${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]}) · errore medio per fascia di ore</h3><div style="overflow-x:auto"><table class="tab"><thead><tr><th>Modello</th>` + fasce.map((f) => `<th>${f}</th>`).join("") + "</tr></thead><tbody>";
+    for (const m of modelli) {
+      h += `<tr><th><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${COL_MOD[m]};margin-right:6px"></span>${pagella.modelli[m].nome}</th>`;
+      for (const f of fasce) {
+        const st = rie[v][f][m];
+        if (!st || st.n < 5) { h += "<td>–</td>"; continue; }
+        let x = `<b${migliore[f] === m ? ' style="color:#1f7a3d"' : ""}>${nf1.format(st.mae)}</b><small style="display:block;color:var(--muto)">tendenza ${st.bias > 0 ? "+" : ""}${nf1.format(st.bias)}</small>`;
+        if (v === "P6" && st.eventi) x += `<small style="display:block;color:var(--muto)">pioggia ≥1 mm: ${st.pod != null ? Math.round(st.pod * 100) : "–"}% colta · ${st.far != null ? Math.round(st.far * 100) : "–"}% falsi allarmi (${st.eventi} casi)</small>`;
+        h += `<td>${x}</td>`;
+      }
+      h += "</tr>";
+    }
+    h += "</tbody></table></div>";
+  }
+  $("pag-tabelle").innerHTML = h + '<p class="suggerimento" style="text-align:left">Verde = il migliore della fascia. Tutti i modelli sono confrontati sulle stesse stazioni e sulle stesse ore. Per gli altri modelli le ore sono contate da quando il programma ha scaricato la previsione (di solito 3-6 ore dopo l\'inizio della loro corsa), quindi per loro le fasce sono un po\' più favorevoli che per WRF.</p>';
+}
+
+function stimaErrori() {
+  const eo = pagella.errori_orari;
+  if (!eo || !eo["1km"] || !eo["1km"].T) return;
+  const ore = ["00-03", "03-06", "06-09", "09-12", "12-15", "15-18", "18-21", "21-24"];
+  let h = '<h3 style="font-size:.95rem;margin:18px 0 4px">Gli errori di WRF e la correzione</h3><p class="suggerimento" style="text-align:left">Tendenza del modello (previsto meno osservato) a seconda dell\'ora del giorno (ora UTC; in Italia +1 o +2). WRF 1 km tra parentesi quello a 3 km. Se la tendenza è sempre dello stesso segno alla stessa ora, è un errore sistematico che si può correggere.</p><div style="overflow-x:auto"><table class="tab"><thead><tr><th>Ora UTC</th>' + ore.map((o) => `<th>${o}</th>`).join("") + "</tr></thead><tbody>";
+  for (const v of ["T", "Td", "V"]) {
+    h += `<tr><th>${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})</th>` + ore.map((_, i) => {
+      const a = eo["1km"][v][i], b = eo["3km"] && eo["3km"][v] ? eo["3km"][v][i] : null;
+      const f = (s) => (s && s.n >= 5 ? (s.bias > 0 ? "+" : "") + nf1.format(s.bias) : "–");
+      return `<td><b>${f(a)}</b><small style="display:block;color:var(--muto)">(${f(b)})</small></td>`;
+    }).join("") + "</tr>";
+  }
+  h += '</tbody></table></div><p class="suggerimento" style="text-align:left">«WRF 1 km corretto» nelle tabelle sopra è un esperimento: a ogni previsione toglie l\'errore medio che il modello aveva, nelle due settimane <i>precedenti</i> la corsa, in quella stazione e in quella fascia di 3 ore (per il vento moltiplica per il rapporto osservato/previsto). Non usa mai dati futuri, quindi la sua pagella è onesta. Il modello fisico non viene toccato: la correzione si applicherà alle mappe solo se, col passare delle settimane, risulterà davvero migliore.</p>';
+  $("pag-stima").innerHTML = h;
+}
+
+function graficiNerola() {
+  const ner = pagella.nerola;
+  if (!ner || !ner.tempi.length) { $("pag-nerola").innerHTML = ""; return; }
+  const tempi = ner.tempi.map(data);
+  const cum = (arr) => { let s = 0, partito = false; return arr.map((x) => { if (x === null || x === undefined) return partito ? s : null; partito = true; s += x; return s; }); };
+  const modelli = ["wrf1", "wrf3", "icon2i", "arome", "ecmwf", "ukmo", "iconeu"].filter((m) => ner.prev[m] && ner.prev[m].T.some((x) => x !== null));
+  let h = `<h3 style="font-size:.95rem;margin:18px 0 4px">Nerola: osservato e previsioni di tutti i modelli</h3><p class="suggerimento" style="text-align:left">L'«osservato» è la media delle stazioni entro pochi km da Nerola (${ner.vicine.map((x) => x.split(":")[1]).join(", ")}): Nerola non ha una stazione ufficiale. Ultima previsione disponibile di ciascun modello.</p>`;
+  for (const v of ["T", "Td", "V"]) {
+    const serie = [{ v: ner.oss[v], c: COL_MOD.oss, nome: "osservato", spesso: 3 }].concat(modelli.map((m) => ({ v: ner.prev[m][v], c: COL_MOD[m], nome: pagella.modelli[m].nome, tratteggio: m === "wrf3" })));
+    h += grafico(`${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`, tempi, serie, v === "V" ? { da0: true } : {});
+  }
+  const serieP = [{ v: cum(ner.oss.P), c: COL_MOD.oss, nome: "osservato", spesso: 3 }].concat(modelli.map((m) => ({ v: cum(ner.prev[m].P), c: COL_MOD[m], nome: pagella.modelli[m].nome, tratteggio: m === "wrf3" })));
+  h += grafico("Pioggia accumulata dal primo istante del grafico (mm)", tempi, serieP, { da0: true });
+  h += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;margin:2px 0 8px">' + [["oss", "osservato"]].concat(modelli.map((m) => [m, pagella.modelli[m].nome])).map(([m, n]) => `<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${COL_MOD[m]};margin-right:5px"></span>${n}</span>`).join("") + "</div>";
+  $("pag-nerola").innerHTML = h;
 }
 
 function disegnaPagella() {
@@ -607,10 +669,11 @@ function disegnaPagella() {
   if (!st.serie.tempi.length) { $("pag-grafici").innerHTML = '<p class="suggerimento" style="text-align:left">Il grafico è disponibile solo per le 40 stazioni più vicine a Nerola.</p>'; return; }
   const tempi = st.serie.tempi.map(data);
   const qm = st.quota_modello;
-  let h = `<p class="suggerimento" style="text-align:left">${st.nome}: quota della stazione ${nf0.format(st.quota ?? 0)} m, quota del modello ${qm["1km"] != null ? nf0.format(qm["1km"]) + " m (1 km)" : ""}${qm["3km"] != null ? " · " + nf0.format(qm["3km"]) + " m (3 km)" : ""}.</p>`;
-  for (const v of ["T", "Td", "V"]) {
-    const serie = [{ v: st.serie.oss[v], c: "#222222", nome: "osservato" }, { v: st.serie.wrf1[v], c: "#e0482f", nome: "WRF 1 km" }, { v: st.serie.wrf3[v], c: "#2a6cc7", nome: "WRF 3 km", tratteggio: true }];
-    h += grafico(`${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`, tempi, serie, v === "V" ? { da0: true } : {});
+  let h = `<p class="suggerimento" style="text-align:left">${st.nome}: quota della stazione ${st.quota != null ? nf0.format(st.quota) + " m" : "non nota"}, quota del modello ${qm["1km"] != null ? nf0.format(qm["1km"]) + " m (1 km)" : ""}${qm["3km"] != null ? " · " + nf0.format(qm["3km"]) + " m (3 km)" : ""}.</p>`;
+  for (const v of ["T", "Td", "V", "P"]) {
+    const serie = [{ v: st.serie.oss[v], c: "#222222", nome: "osservato", barre: v === "P" }, { v: st.serie.wrf1[v], c: "#e0482f", nome: "WRF 1 km" }, { v: st.serie.wrf3[v], c: "#2a6cc7", nome: "WRF 3 km", tratteggio: true }];
+    if (v === "P" && !serie.some((s) => s.v.some((x) => x !== null && x > 0))) continue;
+    h += grafico(v === "P" ? "Pioggia oraria (mm)" : `${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`, tempi, serie, v === "V" || v === "P" ? { da0: true } : {});
   }
   $("pag-grafici").innerHTML = h;
 }
