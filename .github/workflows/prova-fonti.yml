@@ -16,7 +16,8 @@ jobs:
           METEOHUB_PASSWORD: ${{ secrets.METEOHUB_PASSWORD }}
         run: |
           exec > /tmp/esito.txt 2>&1
-          python3 - <<'PY'
+          set +e
+          python3 - <<'PY' || true
           import json, os, urllib.request, urllib.parse
           from collections import Counter
           from datetime import datetime, timedelta, timezone
@@ -28,7 +29,7 @@ jobs:
           q = f"reftime: >={inizio:%Y-%m-%d %H:%M},<={fine:%Y-%m-%d %H:%M};license:CCBY_COMPLIANT"
           for rete in ("dpcn-lazio", "mnw", "dpcn-umbria"):
               par = urllib.parse.urlencode({"networks": rete, "q": q, "reliabilityCheck": "true", "lonmin": 11.3, "latmin": 41.0, "lonmax": 14.3, "latmax": 43.4})
-              j = json.loads(S.richiesta(S.BASE_MH + "/api/observations?" + par, intervalli if False else None, {"Authorization": "Bearer " + token, "Accept": "application/json"}) if False else S.richiesta(S.BASE_MH + "/api/observations?" + par, intestazioni={"Authorization": "Bearer " + token, "Accept": "application/json"}))
+              j = json.loads(S.richiesta(S.BASE_MH + "/api/observations?" + par, intestazioni={"Authorization": "Bearer " + token, "Accept": "application/json"}))
               c = Counter(); es = {}
               for it in j.get("data", []):
                   for p in it.get("prod", []):
@@ -54,6 +55,7 @@ jobs:
           except Exception as e:
               print("ERRORE open-meteo", e, getattr(e, "read", lambda: b"")()[:300])
           PY
+          true
       - name: Salvo l'esito nel ramo prova
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
