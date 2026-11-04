@@ -6,19 +6,22 @@ jobs:
   prova:
     runs-on: ubuntu-24.04
     steps:
-      - name: Leggo la home del sito
+      - name: Leggo le pagine dati del sito
         run: |
           mkdir -p /tmp/out && cd /tmp/out
-          curl -sSL -m 60 -A "Mozilla/5.0" -o home.html -w "%{http_code} %{size_download}\n" https://meteonerola.it/ > esito.txt 2>&1 || true
-          {
-            echo "=== link e script con parole chiave"
-            grep -oiE "(src|href|data-[a-z-]+)=\"[^\"]*(realtime|clientraw|weewx|wd|meteobridge|json|txt|stazione|weather|dati|ajax|iframe)[^\"]*\"" home.html | sort -u | head -60
-            echo "=== iframe"
-            grep -oiE "<iframe[^>]*>" home.html | head
-            echo "=== testo con valori"
-            sed -e 's/<script[^>]*>.*<\/script>//g' -e 's/<[^>]*>/ /g' home.html | tr -s ' \n' | grep -iE "temperatur|umidit|vento|pioggia|pressione|°" | head -30
-          } >> esito.txt 2>&1
-          head -c 200 home.html >> esito.txt
+          : > esito.txt
+          for u in dati-live archivio-dati dati-tecnici; do
+            curl -sSL -m 60 -A "Mozilla/5.0" -o $u.html -w "$u %{http_code} %{size_download}\n" https://www.meteonerola.it/$u/ >> esito.txt 2>&1 || true
+            echo "--- riferimenti in $u" >> esito.txt
+            grep -oiE "(https?:)?//[^\"' )<>]*(\.json|\.txt|\.csv|realtime|clientraw|wp-json|ajax|api|dati|stazione|\.php)[^\"' )<>]*" $u.html | sort -u | grep -v "wp-includes\|emoji\|gstatic\|fonts" | head -40 >> esito.txt
+            echo "--- testo $u" >> esito.txt
+            sed -e 's/<script[^>]*>.*<\/script>//g' -e 's/<[^>]*>/ /g' $u.html | tr -s ' \n\t' | head -c 1500 >> esito.txt
+            echo >> esito.txt
+          done
+          echo "--- wp-json routes" >> esito.txt
+          curl -sSL -m 60 -A "Mozilla/5.0" https://www.meteonerola.it/wp-json/ | python3 -c "import sys,json; d=json.load(sys.stdin); print('\n'.join(d.get('routes',{}).keys()))" >> esito.txt 2>&1 || true
+          echo "--- script inline della home con dati" >> esito.txt
+          curl -sSL -m 60 -A "Mozilla/5.0" https://www.meteonerola.it/ | grep -oiE "(fetch|XMLHttpRequest|\.json|\.txt)[^;]{0,160}" | head -20 >> esito.txt
           cd /tmp/out && git init -q -b prova && git config user.name bot && git config user.email b@b
           git add esito.txt && git commit -q -m esito
           git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" prova
