@@ -44,12 +44,21 @@ jobs:
             echo "storico nuovo"
           fi
 
+      - name: Dati della stazione di Nerola (dal sito)
+        run: |
+          if git clone -q --depth 1 -b stazione "https://github.com/${GITHUB_REPOSITORY}.git" /home/runner/stazione 2>/dev/null; then
+            echo "storico stazione trovato"
+          else
+            mkdir -p /home/runner/stazione
+          fi
+          python3 stazione_nerola.py --cartella /home/runner/stazione || echo "home non letta, uso lo storico"
+
       - name: Confronto previsione e osservazioni
         env:
           METEOHUB_USERNAME: ${{ secrets.METEOHUB_USERNAME }}
           METEOHUB_PASSWORD: ${{ secrets.METEOHUB_PASSWORD }}
         run: |
-          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA" --altri-modelli
+          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA" --stazione /home/runner/stazione --altri-modelli
 
       - name: Aggiorno lo storico
         env:

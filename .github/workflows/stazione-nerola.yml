@@ -1,0 +1,45 @@
+name: "Stazione di Nerola (dati dal sito)"
+run-name: "Raccolgo i dati della stazione di Nerola dalla home del sito"
+
+# Ogni mezz'ora legge la home di meteonerola.it (valori di adesso + temperatura delle ultime 24 ore) e li accumula
+# nel ramo "stazione" (nerola.csv). La pagella li usa come osservazione di Nerola.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,37 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stazione-nerola
+  cancel-in-progress: false
+
+jobs:
+  raccolta:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recupero lo storico della stazione
+        run: |
+          if git clone -q --depth 1 -b stazione "https://github.com/${GITHUB_REPOSITORY}.git" /home/runner/stazione 2>/dev/null; then
+            echo "storico trovato"
+          else
+            mkdir -p /home/runner/stazione
+            echo "storico nuovo"
+          fi
+          rm -rf /home/runner/stazione/.git
+      - name: Leggo la home del sito
+        run: python3 stazione_nerola.py --cartella /home/runner/stazione
+      - name: Salvo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd /home/runner/stazione
+          git init -q -b stazione
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Stazione di Nerola ($(date -u +%Y-%m-%d\ %H:%M) UTC)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" stazione

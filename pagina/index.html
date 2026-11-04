@@ -137,6 +137,7 @@
       <button role="tab" id="s-mappe" aria-selected="true">Mappe</button>
       <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
       <button role="tab" id="s-pagella" aria-selected="false">Pagella</button>
+      <button role="tab" id="s-corretto" aria-selected="false">WRF corretto (sperimentale)</button>
     </div>
     <div class="sotto" id="info">Caricamento…</div>
   </div>
@@ -187,6 +188,20 @@
     <p>Temperatura e umidità del suolo vengono dal modello del suolo di WRF (l'umidità iniziale arriva da ECMWF). La pioggia è la somma di quella convettiva e a grande scala.</p>
   </details>
   <div class="tip nascosto" id="tip"></div>
+
+  <section id="vista-corretto" class="card nascosto">
+    <h2 style="margin:0 0 4px;font-size:1.1rem">WRF corretto per Nerola (sperimentale)</h2>
+    <p class="suggerimento" style="text-align:left" id="cor-intro">Caricamento…</p>
+    <div id="cor-grafici"></div>
+    <div id="cor-tabella"></div>
+    <details class="info"><summary>Come funziona</summary>
+      <p>Il modello WRF ha errori che si ripetono: ad esempio, a una certa ora del giorno scalda un po' troppo, oppure prevede più vento di quello che le stazioni misurano.
+         La correzione toglie al modello l'errore medio che aveva fatto nelle due settimane <i>prima</i> dell'inizio della corsa, nella stessa stazione e nella stessa fascia di 3 ore del giorno
+         (per il vento moltiplica per il rapporto tra osservato e previsto). Non guarda mai il futuro, quindi la sua pagella è onesta.</p>
+      <p>Il modello fisico non viene modificato e la pioggia non viene corretta. Le mappe restano quelle di WRF normale: questa scheda è solo un esperimento da confrontare con le stazioni.
+         Se col tempo risulterà davvero migliore, la correzione potrà passare anche alle mappe.</p>
+    </details>
+  </section>
 
   <section id="vista-pagella" class="card nascosto">
     <h2 style="margin:0 0 4px;font-size:1.1rem">Pagella: la previsione contro la realtà</h2>
@@ -287,6 +302,7 @@ async function carica() {
   $("s-mappe").onclick = () => scheda("mappe");
   $("s-meteo").onclick = () => scheda("meteo");
   $("s-pagella").onclick = () => scheda("pagella");
+  $("s-corretto").onclick = () => scheda("corretto");
   riempiParametri(true);
   caricaGriglia().catch(() => {});
   const img = $("mappa");
@@ -312,12 +328,41 @@ function aggiornaContatore() {
 
 function scheda(nome) {
   ferma();
-  for (const [id, n] of [["mappe", "vista-mappe"], ["meteo", "vista-meteo"], ["pagella", "vista-pagella"]]) {
+  for (const [id, n] of [["mappe", "vista-mappe"], ["meteo", "vista-meteo"], ["pagella", "vista-pagella"], ["corretto", "vista-corretto"]]) {
     $(n).classList.toggle("nascosto", id !== nome);
     $("s-" + id).setAttribute("aria-selected", id === nome);
   }
   if (nome === "pagella" && !pagella) caricaPagella();
   if (nome === "meteo" && !meteoPronto) iniziaMeteo();
+  if (nome === "corretto") disegnaCorretto();
+}
+
+async function disegnaCorretto() {
+  if (!pagella) await caricaPagella();
+  if (!pagella) { $("cor-intro").textContent = "I dati del confronto non sono ancora disponibili."; return; }
+  const ner = pagella.nerola;
+  $("cor-intro").textContent = `Previsione WRF 1 km per Nerola, normale e corretta, contro la stazione di Nerola. Ultimo aggiornamento della pagella: ${pagella.aggiornato.replace("T", " ").replace("Z", " UTC")}.`;
+  if (!ner || !ner.tempi.length || !ner.prev.wrfc) { $("cor-grafici").innerHTML = '<p class="suggerimento" style="text-align:left">La previsione corretta comparirà dopo la prossima corsa.</p>'; return; }
+  const tempi = ner.tempi.map(data);
+  let h = "";
+  for (const v of ["T", "Td", "V"]) {
+    const serie = [{ v: ner.oss[v], c: COL_MOD.oss, nome: "osservato", spesso: 3 }, { v: ner.prev.wrf1[v], c: COL_MOD.wrf1, nome: "WRF 1 km", tratteggio: true }, { v: ner.prev.wrfc[v], c: "#1f7a3d", nome: "WRF 1 km corretto", spesso: 2.6 }];
+    h += grafico(`${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`, tempi, serie, v === "V" ? { da0: true } : {});
+  }
+  h += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;margin:2px 0 8px">' + [["#222", "osservato (stazione di Nerola)"], [COL_MOD.wrf1, "WRF 1 km (tratteggiato)"], ["#1f7a3d", "WRF 1 km corretto"]].map(([c, n]) => `<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c};margin-right:5px"></span>${n}</span>`).join("") + "</div>";
+  $("cor-grafici").innerHTML = h;
+  // quanto migliora, su tutte le stazioni
+  const rie = pagella.riepilogo.tutte, fasce = Object.keys(rie.T);
+  let t = '<h3 style="font-size:.95rem;margin:14px 0 4px">Quanto migliora, su tutte le stazioni (errore medio: normale → corretto)</h3><div style="overflow-x:auto"><table class="tab"><thead><tr><th></th>' + fasce.map((f) => `<th>${f}</th>`).join("") + "</tr></thead><tbody>";
+  for (const v of ["T", "Td", "V"]) {
+    t += `<tr><th>${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})</th>` + fasce.map((f) => {
+      const a = rie[v][f].wrf1, b = rie[v][f].wrfc;
+      if (!a || !b || a.n < 5) return "<td>–</td>";
+      const mig = b.mae < a.mae;
+      return `<td>${nf1.format(a.mae)} → <b style="color:${mig ? "#1f7a3d" : "#b3261e"}">${nf1.format(b.mae)}</b></td>`;
+    }).join("") + "</tr>";
+  }
+  $("cor-tabella").innerHTML = t + "</tbody></table></div>";
 }
 
 function dominioAttuale() { return indice.domini[$("dominio").value]; }
@@ -652,7 +697,7 @@ function graficiNerola() {
   const tempi = ner.tempi.map(data);
   const cum = (arr) => { let s = 0, partito = false; return arr.map((x) => { if (x === null || x === undefined) return partito ? s : null; partito = true; s += x; return s; }); };
   const modelli = ["wrf1", "wrf3", "icon2i", "arome", "ecmwf", "ukmo", "iconeu"].filter((m) => ner.prev[m] && ner.prev[m].T.some((x) => x !== null));
-  let h = `<h3 style="font-size:.95rem;margin:18px 0 4px">Nerola: osservato e previsioni di tutti i modelli</h3><p class="suggerimento" style="text-align:left">L'«osservato» è la media delle stazioni entro pochi km da Nerola (${ner.vicine.map((x) => x.split(":")[1]).join(", ")}): Nerola non ha una stazione ufficiale. Ultima previsione disponibile di ciascun modello.</p>`;
+  let h = `<h3 style="font-size:.95rem;margin:18px 0 4px">Nerola: osservato e previsioni di tutti i modelli</h3><p class="suggerimento" style="text-align:left">L'«osservato» ${ner.vicine[0] === "stazione" ? "è la stazione meteo di Nerola (i dati pubblicati sulla home del sito)" : "è la media delle stazioni entro pochi km da Nerola (" + ner.vicine.map((x) => x.split(":")[1]).join(", ") + ")"}. Ultima previsione disponibile di ciascun modello.</p>`;
   for (const v of ["T", "Td", "V"]) {
     const serie = [{ v: ner.oss[v], c: COL_MOD.oss, nome: "osservato", spesso: 3 }].concat(modelli.map((m) => ({ v: ner.prev[m][v], c: COL_MOD[m], nome: pagella.modelli[m].nome, tratteggio: m === "wrf3" })));
     h += grafico(`${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`, tempi, serie, v === "V" ? { da0: true } : {});

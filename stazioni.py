@@ -200,6 +200,40 @@ def distanza_nerola(lat, lon):
 RAGGIO_NEROLA = 4.5      # km: le stazioni entro questa distanza fanno la "osservazione di Nerola"
 
 
+def leggi_stazione_nerola(cartella, ore=72):
+    """Osservazioni orarie della stazione di Nerola (dati pubblicati sul sito, raccolti da stazione_nerola.py in nerola.csv)."""
+    p = Path(cartella) / "nerola.csv"
+    if not p.exists():
+        return []
+    with open(p, newline="", encoding="utf-8") as f:
+        letture = [(datetime.strptime(r["ts"], "%Y-%m-%dT%H:%M:00Z").replace(tzinfo=timezone.utc), r) for r in csv.DictReader(f)]
+    limite = datetime.now(timezone.utc) - timedelta(hours=ore)
+    letture = [(t, r) for t, r in letture if t >= limite]
+    per_ora = {}
+    for t, r in letture:
+        per_ora.setdefault(ora_iso((t + timedelta(minutes=30)).replace(minute=0, second=0, microsecond=0)), []).append(r)
+    pioggia = [(t, num(r["pioggia_oggi"])) for t, r in letture if num(r["pioggia_oggi"]) is not None]
+
+    def cumulata(h):
+        tb = datetime.strptime(h, "%Y-%m-%dT%H:00Z").replace(tzinfo=timezone.utc)
+        vicini = [(abs((t - tb).total_seconds()), c) for t, c in pioggia if abs((t - tb).total_seconds()) <= 20 * 60]
+        return min(vicini)[1] if vicini else None
+
+    righe = []
+    for h in sorted(per_ora):
+        rr = per_ora[h]
+        riga = {"id": "NEROLA", "nome": "Nerola (stazione MeteoNerola)", "lat": NEROLA[0], "lon": NEROLA[1], "quota": "", "ora": h}
+        for v in ("T", "Td", "V"):
+            xs = [num(r[v]) for r in rr if num(r[v]) is not None]
+            riga[v] = round(sum(xs) / len(xs), 2) if xs else ""
+        c1 = cumulata(h)
+        c0 = cumulata(ora_iso(datetime.strptime(h, "%Y-%m-%dT%H:00Z").replace(tzinfo=timezone.utc) - timedelta(hours=1)))
+        riga["P"] = "" if c1 is None or c0 is None else round(c1 - c0 if c1 >= c0 else c1, 2)
+        if any(riga[v] != "" for v in ("T", "Td", "V", "P")):
+            righe.append(riga)
+    return righe
+
+
 def osservazioni_nerola(oss_righe):
     """Nerola non ha una stazione ufficiale: usiamo la media delle stazioni entro pochi km (Moricone, Montelibretti, ...)."""
     vicine = {r["id"] for r in oss_righe if distanza_nerola(float(r["lat"]), float(r["lon"])) <= RAGGIO_NEROLA}
@@ -679,7 +713,7 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
            "oss": {v: [pulisci(num(oss[("NEROLA", t)][v])) if ("NEROLA", t) in oss else None for t in tempi] for v in VARS}, "prev": {}}
     ner["prev"]["wrf1"] = {v: [num(ultime["d02"][("NEROLA", t)].get(f"{v}_d02")) if ("NEROLA", t) in ultime["d02"] else None for t in tempi] for v in VARS}
     ner["prev"]["wrf3"] = {v: [num(ultime["d01"][("NEROLA", t)].get(f"{v}_d01")) if ("NEROLA", t) in ultime["d01"] else None for t in tempi] for v in VARS}
-    for m in MODELLI_OM:
+    for m in list(MODELLI_OM) + ["wrfc"]:
         ultimo = {}
         for snap, sid, valido, ore, vals in camp.get(m, []):
             if sid == "NEROLA" and (valido not in ultimo or snap > ultimo[valido][0]):
@@ -703,6 +737,7 @@ def main():
     ap.add_argument("--uscite", default="", help="cartella con d01_tutto.npz e d02_tutto.npz dell'ultima corsa")
     ap.add_argument("--corsa", default="", help="AAAAMMGGHH della corsa in --uscite")
     ap.add_argument("--ore", type=int, default=72, help="ore di osservazioni da scaricare")
+    ap.add_argument("--stazione", default="", help="cartella con nerola.csv (dati della stazione di Nerola dal sito)")
     ap.add_argument("--altri-modelli", action="store_true", help="scarica anche le previsioni degli altri modelli (Open-Meteo)")
     a = ap.parse_args()
     cart = Path(a.storico)
@@ -717,10 +752,20 @@ def main():
         nuove += leggi_meteohub(a.ore)
     except Exception as e:  # noqa: BLE001
         print("ATTENZIONE: MeteoHub non scaricato:", e, file=sys.stderr)
+    if a.stazione:
+        try:
+            ner = leggi_stazione_nerola(a.stazione, a.ore)
+            print("stazione di Nerola (dal sito): ore", len(ner))
+            nuove += ner
+        except Exception as e:  # noqa: BLE001
+            print("ATTENZIONE: stazione di Nerola non letta:", e, file=sys.stderr)
     oss = unisci_osservazioni(cart / "osservazioni.csv", nuove)
     stazioni = {r["id"]: {"id": r["id"], "lat": float(r["lat"]), "lon": float(r["lon"])} for r in oss}
-    nerola, vicine = osservazioni_nerola(oss)
-    print("Nerola: stazioni vicine", vicine, "ore con osservazione", len(nerola))
+    if any(r["id"] == "NEROLA" for r in oss):
+        nerola, vicine = [], ["stazione"]       # c'e' la stazione vera: niente media delle vicine
+    else:
+        nerola, vicine = osservazioni_nerola(oss)
+    print("Nerola: osservazione da", vicine, "ore con osservazione", len(nerola) or "(stazione)")
     oss_tutte = oss + nerola
     stazioni["NEROLA"] = {"id": "NEROLA", "lat": NEROLA[0], "lon": NEROLA[1]}
     if a.uscite and a.corsa:
