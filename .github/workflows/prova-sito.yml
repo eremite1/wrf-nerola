@@ -1,0 +1,24 @@
+name: "Prova sito (temporaneo)"
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  prova:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Leggo la home del sito
+        run: |
+          mkdir -p /tmp/out && cd /tmp/out
+          curl -sSL -m 60 -A "Mozilla/5.0" -o home.html -w "%{http_code} %{size_download}\n" https://meteonerola.it/ > esito.txt 2>&1 || true
+          {
+            echo "=== link e script con parole chiave"
+            grep -oiE "(src|href|data-[a-z-]+)=\"[^\"]*(realtime|clientraw|weewx|wd|meteobridge|json|txt|stazione|weather|dati|ajax|iframe)[^\"]*\"" home.html | sort -u | head -60
+            echo "=== iframe"
+            grep -oiE "<iframe[^>]*>" home.html | head
+            echo "=== testo con valori"
+            sed -e 's/<script[^>]*>.*<\/script>//g' -e 's/<[^>]*>/ /g' home.html | tr -s ' \n' | grep -iE "temperatur|umidit|vento|pioggia|pressione|°" | head -30
+          } >> esito.txt 2>&1
+          head -c 200 home.html >> esito.txt
+          cd /tmp/out && git init -q -b prova && git config user.name bot && git config user.email b@b
+          git add esito.txt && git commit -q -m esito
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" prova
