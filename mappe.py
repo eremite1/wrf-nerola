@@ -258,6 +258,34 @@ def p_pioggia(n):
             "nota": "pioggia convettiva e a grande scala"}
 
 
+def ship(d, i):
+    """Significant Hail Parameter dello Storm Prediction Center (NOAA), calcolato con i campi del WRF.
+    SHIP = CAPE * r * gradiente * (-T500) * shear / 42 000 000, con le correzioni ufficiali per CAPE sotto 1300 J/kg,
+    gradiente sotto 5,8 °C/km e zero termico sotto 2400 m. r = rapporto di mescolanza al suolo (g/kg, tra 11 e 13,6);
+    gradiente 850-500 hPa ricavato dallo spessore dello strato (equazione ipsometrica); shear = differenza di vento
+    tra 10 m e 500 hPa (m/s, tra 7 e 27)."""
+    if not all(k in d for k in ("CAPE", "Q2", "T850", "T500", "U500", "V500", "U10", "V10")):
+        return np.full(d["lat"].shape, np.nan)
+    cape = np.clip(np.nan_to_num(d["CAPE"][i]), 0, None)
+    r = np.clip(d["Q2"][i] * 1000.0, 11.0, 13.6)
+    t8, t5 = d["T850"][i] + 273.15, d["T500"][i] + 273.15
+    dz_km = 287.05 * (t8 + t5) / 2 / 9.80665 * np.log(850 / 500) / 1000.0
+    lr = (t8 - t5) / dz_km
+    # sulle montagne piu' alte del livello 850 hPa: gradiente tra il suolo (T a 2 m) e 500 hPa
+    if "Z500" in d and np.isnan(lr).any():
+        dz_s = np.maximum(d["Z500"][i] * 10.0 - d["hgt"], 500.0) / 1000.0
+        lr = np.where(np.isfinite(lr), lr, (d["T2"][i] - t5) / dz_s)
+    lr = np.clip(np.nan_to_num(lr), 0, None)
+    t500 = np.minimum(d["T500"][i], -5.5)
+    sh = np.clip(np.hypot(d["U500"][i] - d["U10"][i], d["V500"][i] - d["V10"][i]), 7.0, 27.0)
+    s_ = cape * r * lr * (-t500) * sh / 42.0e6
+    s_ = s_ * np.where(cape < 1300, cape / 1300.0, 1.0) * np.where(lr < 5.8, lr / 5.8, 1.0)
+    if "ZT0" in d:
+        zt = np.clip(d["ZT0"][i], 0, None)
+        s_ = s_ * np.where(zt < 2400, zt / 2400.0, 1.0)
+    return np.clip(s_, 0, None)
+
+
 # ---------------------------------------------------------------- indici bioclimatici, agricoli e funghi
 def rampa(x, a, b):
     """0 sotto a, 1 sopra b, crescita lineare in mezzo (se a > b la rampa e' invertita)."""
@@ -567,6 +595,12 @@ PARAMETRI = [
      "cmap": "YlGnBu", "limiti": (0, 400), "passo": 3, "inizio": 0, "serve": "LH"},
     {"id": "cape", "titolo": "Energia dei temporali (CAPE)", "unita": "J/kg", "calcola": lambda d, i: d["CAPE"][i],
      "cmap": "YlOrRd", "limiti": (0, 2000), "passo": 3, "inizio": 0, "serve": "CAPE"},
+    {"id": "grandine", "titolo": "Rischio grandine (SHIP)", "unita": "", "calcola": ship, "passo": 3, "inizio": 0, "serve": "U500",
+     "classi": {"bordi": [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3],
+                "colori": ["#ffffff", "#fff3b0", "#ffd166", "#ffa94d", "#ff7043", "#e53935", "#c2185b", "#8e24aa", "#4a148c"],
+                "etichette": ["< 0,1", "0,1-0,25", "0,25-0,5", "0,5-0,75", "0,75-1", "1-1,5", "1,5-2", "2-3", "> 3"], "nascondi": {0}},
+     "scala": 100, "unita_dato": "", "etichetta_dato": "Indice di grandine",
+     "nota": "indice SHIP (NOAA): sopra 0,5 grandine possibile, sopra 1 grandine grossa (oltre 5 cm)"},
     {"id": "et0_24h", "titolo": "Evapotraspirazione di riferimento (24 h)", "unita": "mm", "calcola": lambda d, i: np.nansum(et0_oraria(d)[i - 23:i + 1], axis=0),
      "cmap": "YlGn", "limiti": (0, 6), "passo": 3, "inizio": 24, "terra": True,
      "nota": "acqua che un prato ben irrigato perde in 24 ore (FAO-56 Penman-Monteith con i campi del modello)"},
