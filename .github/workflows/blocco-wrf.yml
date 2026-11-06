@@ -72,20 +72,29 @@ jobs:
         run: |
           cd /home/runner/run
           read C NLEV NSOIL < corsa.txt
-          python3 "$GITHUB_WORKSPACE/namelist.py" --corsa "$C" --da "$DA" --a "$A" --nlev "$NLEV" --nsoil "$NSOIL" > namelist.input
-          grep -E "run_hours|start_|end_|restart" namelist.input | head -24
           ulimit -s unlimited || true
           export OMP_NUM_THREADS=1
-          rm -f rsl.*
           T0=$(date +%s)
-          echo "== wrf.exe da +${DA} h a +${A} h, 4 processi ($(date -u +%H:%M) UTC)"
-          set +e
-          mpirun -np 4 ./wrf.exe > wrf_stdout.log 2>&1
-          RC=$?
-          set -e
+          # prima con il passo di tempo adattivo (molto piu' veloce); se fallisce, di nuovo con il passo fisso
+          MODO="adattivo"
+          for TENTATIVO in adattivo fisso; do
+            OPZ=""; [ "$TENTATIVO" = fisso ] && OPZ="--fisso"
+            python3 "$GITHUB_WORKSPACE/namelist.py" --corsa "$C" --da "$DA" --a "$A" --nlev "$NLEV" --nsoil "$NSOIL" $OPZ > namelist.input
+            grep -E "run_hours|start_|end_|restart|adaptive" namelist.input | head -24
+            rm -f rsl.*
+            echo "== wrf.exe da +${DA} h a +${A} h, 4 processi, passo $TENTATIVO ($(date -u +%H:%M) UTC)"
+            set +e
+            mpirun -np 4 ./wrf.exe > wrf_stdout.log 2>&1
+            RC=$?
+            set -e
+            MODO="$TENTATIVO"
+            grep -q "SUCCESS COMPLETE WRF" rsl.error.0000 2>/dev/null && break
+            echo "ATTENZIONE: wrf.exe con passo $TENTATIVO non riuscito"
+            grep -n -i -E "fatal|error|cfl" rsl.error.0000 2>/dev/null | head -8 || true
+          done
           T1=$(date +%s)
           mkdir -p /home/runner/uscite
-          echo "blocco $BLOCCO: da +${DA} h a +${A} h, $((T1-T0)) secondi ($(( (T1-T0)/60 )) minuti), uscita $RC" | tee /home/runner/uscite/tempi_b${BLOCCO}.txt
+          echo "blocco $BLOCCO: da +${DA} h a +${A} h, $((T1-T0)) secondi ($(( (T1-T0)/60 )) minuti), uscita $RC, passo $MODO" | tee /home/runner/uscite/tempi_b${BLOCCO}.txt
           if ! grep -q "SUCCESS COMPLETE WRF" rsl.error.0000 2>/dev/null; then
             echo "ERRORE: wrf.exe non e' riuscito."
             grep -n -i -E "fatal|error|cfl|segmentation|forrtl|nan" rsl.error.* 2>/dev/null | head -20 || true

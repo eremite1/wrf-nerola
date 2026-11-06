@@ -46,7 +46,7 @@ MODELLO = """&time_control
  time_step = 18,
  time_step_fract_num = 0,
  time_step_fract_den = 1,
- max_dom = 2,
+@ADATTIVO@ max_dom = 2,
  e_we = 81, 73,
  e_sn = 81, 73,
  e_vert = 45, 45,
@@ -122,6 +122,8 @@ def main():
     ap.add_argument("--a", type=int, required=True)
     ap.add_argument("--nlev", type=int, default=15)
     ap.add_argument("--nsoil", type=int, default=4)
+    ap.add_argument("--fisso", action="store_true",
+                    help="passo di tempo fisso (18 s e 6 s) invece di quello adattivo: si usa se l'adattivo fallisce")
     a = ap.parse_args()
     if a.a <= a.da:
         sys.exit("--a deve essere maggiore di --da")
@@ -136,6 +138,19 @@ def main():
         "RESTART": ".true." if a.da > 0 else ".false.",
         "RINT": ore * 60,          # un file di ripresa alla fine del blocco
         "NLEV": a.nlev, "NSOIL": a.nsoil,
+        # passo di tempo ADATTIVO: invece di avanzare sempre di 18 s (3 km) e 6 s (1 km), WRF allunga il passo quando
+        # i venti sono deboli e lo accorcia quando sono forti, restando sempre stabile (numero di Courant 1,2).
+        # Con tempo normale il calcolo diventa molto piu' veloce; le uscite restano alle ore esatte.
+        "ADATTIVO": "" if a.fisso else (
+            " use_adaptive_time_step = .true.,\n"
+            " step_to_output_time = .true.,\n"
+            " target_cfl = 1.2, 1.2,\n"
+            " target_hcfl = 0.84, 0.84,\n"
+            " max_step_increase_pct = 5, 51,\n"
+            " starting_time_step = 18, 6,\n"
+            " max_time_step = 36, 12,\n"
+            " min_time_step = 9, 3,\n"
+            " adaptation_domain = 2,\n"),
     }
     t = MODELLO
     for k, v in sost.items():
