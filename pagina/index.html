@@ -136,7 +136,7 @@
     <div class="schede" role="tablist">
       <button role="tab" id="s-mappe" aria-selected="true">Mappe</button>
       <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
-      <button role="tab" id="s-pagella" aria-selected="false">Pagella</button>
+      <button role="tab" id="s-pagella" aria-selected="false">🏆 Pagelle ↗</button>
       <button role="tab" id="s-corretto" aria-selected="false">WRF corretto (sperimentale)</button>
     </div>
     <div class="sotto" id="info">Caricamento…</div>
@@ -301,7 +301,11 @@ async function carica() {
   });
   $("s-mappe").onclick = () => scheda("mappe");
   $("s-meteo").onclick = () => scheda("meteo");
-  $("s-pagella").onclick = () => scheda("pagella");
+  // le pagelle ora sono una sola per tutti i modelli (scheda "Pagelle" della pagina Modelli del sito)
+  $("s-pagella").onclick = () => {
+    if (window.top !== window) window.parent.postMessage({ mn: "pagelle" }, "*");
+    else location.href = "https://www.meteonerola.it/modelli-meteo/#pagelle";
+  };
   $("s-corretto").onclick = () => scheda("corretto");
   riempiParametri(true);
   caricaGriglia().catch(() => {});
