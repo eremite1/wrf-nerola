@@ -168,6 +168,15 @@ def temperatura_percepita(d):
     return np.where((t >= 27) & (rh >= 40), np.maximum(hi, t), np.where((t <= 10) & (v >= 4.8), np.minimum(wc, t), t))
 
 
+CLASSI_DISAGIO = ["gelo intenso", "molto freddo", "freddo", "fresco", "gradevole", "caldo", "molto caldo", "caldo pericoloso"]
+SOGLIE_DISAGIO = [-10, 0, 10, 18, 26, 32, 40]      # °C di temperatura percepita che separano le classi
+
+
+def disagio_termico(d, i):
+    """Classe di disagio 0-7 (vedi CLASSI_DISAGIO) dalla temperatura percepita: un solo indice per freddo e caldo."""
+    return np.digitize(temperatura_percepita(d)[i], SOGLIE_DISAGIO).astype("float64")
+
+
 _CACHE_NUV = {}
 
 
@@ -457,9 +466,12 @@ PARAMETRI = [
     {"id": "pressione", "titolo": "Pressione ridotta al livello del mare", "unita": "hPa",
      "calcola": lambda d, i: pressione_mare(d)[i], "cmap": "Spectral_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
     p_pioggia(1), p_pioggia(3), p_pioggia(6), p_pioggia(12), p_pioggia(24), p_pioggia(0),
-    {"id": "percepita", "titolo": "Temperatura percepita", "unita": "°C", "calcola": lambda d, i: temperatura_percepita(d)[i],
-     "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True,
-     "nota": "indice di calore con caldo umido, temperatura di vento con freddo e vento"},
+    {"id": "disagio", "titolo": "Disagio da freddo o da caldo", "unita": "", "calcola": disagio_termico, "passo": 3, "inizio": 0,
+     "classi": {"bordi": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5],
+                "colori": ["#5e3c99", "#2c7bb6", "#74add1", "#abd9e9", "#a6d96a", "#fee08b", "#f46d43", "#a50026"],
+                "etichette": CLASSI_DISAGIO, "nascondi": set()},
+     "scala": 1, "unita_dato": "", "etichetta_dato": "Disagio da freddo o da caldo",
+     "nota": "classi ricavate dalla temperatura percepita: vento che raffredda quando fa freddo, umidità che appesantisce quando fa caldo"},
     {"id": "tdew", "titolo": "Punto di rugiada a 2 m", "unita": "°C", "calcola": lambda d, i: punto_rugiada(d)[i],
      "cmap": "YlGnBu", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
     {"id": "nuvolosita", "titolo": "Nuvolosità (stima dall'infrarosso)", "unita": "%", "calcola": lambda d, i: nuvolosita(d)[i],
@@ -528,12 +540,6 @@ PARAMETRI = [
      "calcola": lambda d, i: np.max(np.diff(uscite.pioggia(d)[i - 24:i + 1], axis=0), axis=0),
      "classi": classi_pioggia(PIOGGIA[1]), "passo": 3, "inizio": 24,
      "nota": "la pioggia oraria più forte caduta nelle 24 ore fino a quell'ora"},
-    {"id": "humidex", "titolo": "Humidex (disagio da caldo umido)", "unita": "°C", "calcola": humidex,
-     "cmap": "YlOrRd", "limiti": (0, 40), "passo": 3, "inizio": 0,
-     "nota": "temperatura e umidità combinate: oltre 30 disagio, oltre 40 forte disagio, oltre 45 pericolo"},
-    {"id": "tw2", "titolo": "Bulbo umido a 2 m (stress da caldo)", "unita": "°C", "calcola": lambda d, i: gelo(d)[1][i],
-     "cmap": "RdYlBu_r", "limiti": (-5, 30), "passo": 3, "inizio": 0, "isolinee": False,
-     "nota": "oltre 28 °C il corpo non riesce più a raffreddarsi sudando; sotto 0 °C ghiaccio che si forma e si mantiene"},
     {"id": "gradi_giorno", "titolo": "Gradi-giorno (base 10 °C, ultime 24 ore)", "unita": "°C·giorno", "calcola": gradi_giorno_24,
      "cmap": "YlOrRd", "limiti": (0, 15), "passo": 3, "inizio": 24, "terra": True,
      "nota": "calore utile alla crescita delle piante: sommati giorno per giorno dicono quando fioriscono e maturano le colture"},
@@ -549,10 +555,6 @@ PARAMETRI = [
     {"id": "funghi", "titolo": "Meteo funghi autunnali e primaverili (porcini)", "unita": "indice 0-100", "calcola": favorevolezza_funghi,
      "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "TSLB", "terra": True,
      "nota": "temperatura e umidità del suolo, umidità dell'aria, gelo e vento: dice dove il tempo è adatto ai funghi, non dove ci sono i boschi"},
-    {"id": "wbgt", "titolo": "WBGT stimato all'ombra (stress da caldo)", "unita": "°C", "calcola": wbgt, "cmap": "YlOrRd", "limiti": (5, 32), "passo": 3, "inizio": 0,
-     "nota": "indice usato per il lavoro all'aperto: sopra 28 °C rischio alto, sopra 31 °C molto alto (formula semplificata, all'ombra)"},
-    {"id": "thom", "titolo": "Indice di disagio di Thom", "unita": "°C", "calcola": disagio_thom, "cmap": "RdYlBu_r", "limiti": (-5, 32), "passo": 3, "inizio": 0,
-     "nota": "temperatura e umidità: da 21 a 24 qualche persona soffre il caldo, oltre 29 stress forte"},
     {"id": "escursione", "titolo": "Escursione termica nelle ultime 24 ore", "unita": "°C", "calcola": escursione_24, "cmap": "YlOrBr", "limiti": (0, 20), "passo": 3, "inizio": 24, "terra": True},
     {"id": "ore_caldo", "titolo": "Ore sopra 30 °C (ultime 24 ore)", "unita": "ore", "calcola": ore_caldo_24, "cmap": "YlOrRd", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True},
     {"id": "ore_sole", "titolo": "Ore di sole forte (ultime 24 ore)", "unita": "ore", "calcola": ore_sole_24, "cmap": "YlOrBr", "limiti": (0, 12), "passo": 3, "inizio": 24,
