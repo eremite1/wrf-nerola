@@ -7,7 +7,7 @@ on:
 
 jobs:
   dominio:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -18,18 +18,18 @@ jobs:
           sudo apt-get install -y libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev \
             python3-numpy python3-matplotlib python3-netcdf4
 
-      - name: Recupera WPS compilato
+      - name: Recupera WPS compilato (ARM, lo stesso della previsione)
         uses: actions/cache/restore@v4
         with:
-          path: /home/runner/pacchetto
-          key: wrf-compilato-cerca
-          restore-keys: wrf-compilato-
+          path: /home/runner/wrf-install
+          key: wrf-arm-v1-cerca
+          restore-keys: wrf-arm-v1-
+          fail-on-cache-miss: true
 
-      - name: Estrai WPS
+      - name: Prepara WPS
         run: |
-          ls -lh /home/runner/pacchetto
-          test -e /home/runner/pacchetto/wps.tar.gz || { echo "ERRORE: pacchetto WPS non trovato"; exit 1; }
-          tar -xzf /home/runner/pacchetto/wps.tar.gz -C /home/runner
+          mkdir -p /home/runner/WPS
+          cp -a /home/runner/wrf-install/WPS/. /home/runner/WPS/
           ls -l /home/runner/WPS/*.exe
 
       - name: Scarica i dati geografici (grandi, può richiedere molto tempo)
