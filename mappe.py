@@ -40,7 +40,15 @@ import uscite  # noqa: E402
 
 ROMA = ZoneInfo("Europe/Rome")
 NEROLA = (42.13, 12.77)
-FONTE = "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)"
+FORZANTI = {"ECMWF": "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)",
+            "GFS": "WRF su dati NOAA GFS 0,25° (pubblico dominio, dati modificati)"}
+NOME_FORZANTE = "ECMWF"
+FONTE = FORZANTI[NOME_FORZANTE]
+# parametri della catena a 333 m: solo quelli che hanno senso a quella risoluzione
+ESSENZIALI = ["temperatura", "delta_t24", "disagio", "umidita", "tdew", "t_superficie", "inversione", "inversione_500",
+              "vento", "vento_max24", "pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_24h", "pioggia_totale", "tipo_prec",
+              "nebbia", "gelata_ora", "gelata", "tmin24", "tmax24", "tprato24", "ghiaccio_strade", "nuv_bassa", "radiazione",
+              "pbl", "suolo_temp", "suolo_umidita_10"]
 CREDITI = "Rilievo: Terrain Tiles (SRTM/GMTED) · Confini: ISTAT, Natural Earth · Nomi: GeoNames"
 DOMINI = (("d02", "1km", "1 km"), ("d01", "3km", "3 km"))
 
@@ -472,6 +480,15 @@ PARAMETRI = [
                 "etichette": CLASSI_DISAGIO, "nascondi": set()},
      "scala": 1, "unita_dato": "", "etichetta_dato": "Disagio da freddo o da caldo",
      "nota": "classi ricavate dalla temperatura percepita: vento che raffredda quando fa freddo, umidità che appesantisce quando fa caldo"},
+    {"id": "t_superficie", "titolo": "Temperatura della superficie (terreno, prato, asfalto)", "unita": "°C",
+     "calcola": lambda d, i: d["TSK"][i] - 273.15, "cmap": "RdYlBu_r", "limiti": "auto", "passo": 1, "inizio": 0, "serve": "TSK",
+     "nota": "temperatura della pelle del suolo: di notte con cielo sereno scende molto sotto quella dell'aria"},
+    {"id": "inversione", "titolo": "Inversione termica nei primi 200 m", "unita": "°C",
+     "calcola": lambda d, i: d["T200M"][i] - d["T2"][i], "cmap": "RdBu_r", "limiti": (-6, 6), "passo": 1, "inizio": 0, "serve": "T200M",
+     "nota": "temperatura a 200 m dal suolo meno quella a 2 m: rosso = inversione (più caldo in alto, aria ferma e fredda nelle valli), blu = normale calo con la quota"},
+    {"id": "inversione_500", "titolo": "Inversione termica nei primi 500 m", "unita": "°C",
+     "calcola": lambda d, i: d["T500M"][i] - d["T2"][i], "cmap": "RdBu_r", "limiti": (-8, 8), "passo": 3, "inizio": 0, "serve": "T500M",
+     "nota": "temperatura a 500 m dal suolo meno quella a 2 m: rosso = inversione, blu = normale calo con la quota (circa −3 °C)"},
     {"id": "tdew", "titolo": "Punto di rugiada a 2 m", "unita": "°C", "calcola": lambda d, i: punto_rugiada(d)[i],
      "cmap": "YlGnBu", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
     {"id": "nuvolosita", "titolo": "Nuvolosità (stima dall'infrarosso)", "unita": "%", "calcola": lambda d, i: nuvolosita(d)[i],
@@ -924,7 +941,7 @@ def disegna(d, p, i, dom, etichetta, corsa, ctx, cartella, lim):
     fig.text(xr, 1 - 0.36 / Fh, f"WRF {etichetta}", fontsize=16, fontweight="bold", ha="right", va="center", color="#1d4e89")
     fig.text(xr, 1 - 0.80 / Fh, f"+{ore}h", fontsize=13, fontweight="bold", ha="right", va="center", color="#555555")
     nota = p.get("nota", "")
-    fig.text(x0, 0.08 / Fh, (nota + "\n" if nota else "") + f"{FONTE} · corsa ECMWF delle {c:%H} UTC del {c:%d/%m}\n" + CREDITI,
+    fig.text(x0, 0.08 / Fh, (nota + "\n" if nota else "") + f"{FONTE} · corsa {NOME_FORZANTE} delle {c:%H} UTC del {c:%d/%m}\n" + CREDITI,
              ha="left", va="bottom", fontsize=6.8, color="#6b7480", style="italic")
     pos = ax.get_position()
     layout = {"asse": [round(pos.x0, 5), round(pos.y0, 5), round(pos.width, 5), round(pos.height, 5)],
@@ -1046,7 +1063,7 @@ def meteogramma(d, corsa, destinazione):
     fig.autofmt_xdate()
     c = datetime.strptime(corsa, "%Y%m%d%H")
     fig.suptitle(f"Nerola (punto di griglia a {lat[j]:.3f} N, {lon[j]:.3f} E, quota modello {d['hgt'][j]:.0f} m)\n"
-                 f"corsa ECMWF {c:%d/%m/%Y %H} UTC, orari in ora locale", fontsize=11)
+                 f"corsa {NOME_FORZANTE} {c:%d/%m/%Y %H} UTC, orari in ora locale", fontsize=11)
     fig.tight_layout(rect=[0, 0.025, 1, 0.94])
     fig.text(0.5, 0.005, FONTE, ha="center", fontsize=8, color="0.4")
     fig.savefig(destinazione, dpi=100, bbox_inches="tight")
@@ -1060,7 +1077,16 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--sfondo", default="")
     ap.add_argument("--precedente", default="", help="indice.json pubblicato prima (per conservare l'ora di fine calcolo del modello)")
+    ap.add_argument("--forzante", default="ECMWF", choices=sorted(FORZANTI))
+    ap.add_argument("--domini", default="", help="es. d03:300m:333 m (vuoto = 1 km e 3 km)")
+    ap.add_argument("--essenziali", action="store_true", help="solo i parametri utili ad altissima risoluzione")
     a = ap.parse_args()
+    global NOME_FORZANTE, FONTE, DOMINI, PARAMETRI
+    NOME_FORZANTE, FONTE = a.forzante, FORZANTI[a.forzante]
+    if a.domini:
+        DOMINI = tuple(tuple(y.replace("_", " ") for y in x.split(":")) for x in a.domini.split(","))
+    if a.essenziali:
+        PARAMETRI = [p for p in PARAMETRI if p["id"] in ESSENZIALI]
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     cartella_sfondo = a.sfondo or "/nonesiste"
@@ -1079,7 +1105,7 @@ def main():
                 elaborato = vecchio.get("elaborato") or vecchio.get("creato") or adesso
         except Exception:  # noqa: BLE001
             pass
-    indice = {"corsa": a.corsa, "creato": adesso, "elaborato": elaborato, "fonte": FONTE, "crediti": CREDITI,
+    indice = {"corsa": a.corsa, "forzante": NOME_FORZANTE, "creato": adesso, "elaborato": elaborato, "fonte": FONTE, "crediti": CREDITI,
               "domini": {}}
     for dom, cartella_dom, etichetta in DOMINI:
         d = uscite.carica(a.uscite, dom)
@@ -1090,7 +1116,7 @@ def main():
         frames = {p["id"]: [i for i in range(p["inizio"], n, p["passo"])] for p in parametri}
         parametri = [p for p in parametri if frames[p["id"]]]
         lim = limiti_automatici(d, parametri, frames)
-        piccolo = etichetta == "1 km"
+        piccolo = etichetta != "3 km"
         cand = candidati(sf, d["lat"], d["lon"], vicini=True)     # elenco completo (serve alla pagina per dire "x km da ...")
         imposta_geometria(d["lon"], d["lat"])
         scelti = cand if piccolo else candidati_capoluoghi(d["lat"], d["lon"])
@@ -1146,7 +1172,7 @@ def main():
         print(dom, "parametri:", len(parametri), "immagini:", sum(len(v["immagini"]) for v in voce["parametri"].values()))
         salva = {k: v for k, v in d.items() if k != "tempi"}
         np.savez_compressed(out / f"{dom}_tutto.npz", **salva, tempi=np.array(d["tempi"]))
-        if dom == "d02":
+        if dom == DOMINI[0][0]:
             meteogramma(d, a.corsa, str(out / "meteogramma_nerola.png"))
     (out / "indice.json").write_text(json.dumps(indice, ensure_ascii=False, indent=1))
 

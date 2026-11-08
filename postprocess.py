@@ -31,15 +31,36 @@ def istante(nc):
     return riga.tobytes().decode()
 
 
+def temperature_dal_suolo(nc, quote=(50, 200, 500)):
+    """Temperatura dell'aria (K) a 50, 200 e 500 m sopra il suolo, interpolata tra i livelli del modello.
+    Serve per le inversioni termiche: T a 200 m meno T a 2 m positiva = aria piu' calda in alto."""
+    p = np.array(nc["P"][0]) + np.array(nc["PB"][0])
+    th = np.array(nc["T"][0]) + 300.0
+    t = th * (p / 1e5) ** 0.2857
+    zf = (np.array(nc["PH"][0]) + np.array(nc["PHB"][0])) / 9.81
+    z = 0.5 * (zf[1:] + zf[:-1]) - np.array(nc["HGT"][0])[None]
+    out = {}
+    for q in quote:
+        k = np.clip((z < q).sum(axis=0), 1, z.shape[0] - 1)
+        z0 = np.take_along_axis(z, (k - 1)[None], 0)[0]
+        z1 = np.take_along_axis(z, k[None], 0)[0]
+        t0 = np.take_along_axis(t, (k - 1)[None], 0)[0]
+        t1 = np.take_along_axis(t, k[None], 0)[0]
+        w = np.clip((q - z0) / np.maximum(z1 - z0, 1e-3), 0, 1)
+        out[f"T{q}M"] = (t0 + w * (t1 - t0)).astype("float32")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", required=True)
     ap.add_argument("--blocco", type=int, required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--domini", type=int, default=2)
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    for dom in ("d01", "d02"):
+    for dom in [f"d0{k}" for k in range(1, a.domini + 1)]:
         files = sorted(glob.glob(f"{a.run}/wrfout_{dom}_*"))
         if not files:
             sys.exit(f"nessun file wrfout_{dom}_* in {a.run}")
@@ -80,6 +101,12 @@ def main():
                     tempi_sond.append(tempi[-1])
                 except Exception as e:  # noqa: BLE001
                     print("ATTENZIONE: radiosondaggio virtuale non calcolato:", e, file=sys.stderr)
+            if all(x in nc.variables for x in ("P", "PB", "T", "PH", "PHB", "HGT")):
+                try:
+                    for k, v in temperature_dal_suolo(nc).items():
+                        dati.setdefault(k, []).append(v)
+                except Exception as e:  # noqa: BLE001
+                    print("ATTENZIONE: temperature dal suolo non calcolate:", e, file=sys.stderr)
             c, s = np.array(nc["COSALPHA"][0]), np.array(nc["SINALPHA"][0])
             u, v = np.array(nc["U10"][0]), np.array(nc["V10"][0])
             dati.setdefault("U10", []).append((u * c - v * s).astype("float32"))

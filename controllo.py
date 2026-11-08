@@ -17,6 +17,7 @@ def main():
     ap.add_argument("--uscite", required=True)
     ap.add_argument("--ore", type=int, required=True)
     ap.add_argument("--rapporto", default="")
+    ap.add_argument("--domini", type=int, default=2)
     a = ap.parse_args()
     righe, errori = [], []
 
@@ -27,7 +28,7 @@ def main():
         righe.append("ERRORE " + msg)
         errori.append(msg)
 
-    for dom in ("d01", "d02"):
+    for dom in [f"d0{k}" for k in range(1, a.domini + 1)]:
         d = uscite.carica(a.uscite, dom)
         if d is None:
             ko(f"{dom}: nessun file di risultati")

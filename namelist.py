@@ -10,6 +10,7 @@ Uso:
 Per real.exe si usa --da 0 --a (durata totale della previsione).
 """
 import argparse
+import re
 import sys
 from datetime import datetime, timedelta
 
@@ -115,6 +116,29 @@ MODELLO = """&time_control
 """
 
 
+# terzo dominio (333 m su Nerola, catena "fine"): valore per ogni chiave; le altre ripetono quello del dominio 2
+TERZO = {"e_we": "61", "e_sn": "61", "dx": "333.3333", "dy": "333.3333", "grid_id": "3", "parent_id": "2",
+         "i_parent_start": "27", "j_parent_start": "27", "parent_grid_ratio": "3", "parent_time_step_ratio": "3",
+         "radt": "2", "starting_time_step": "2", "max_time_step": "4", "min_time_step": "1",
+         "specified": ".false.", "nested": ".true."}
+
+
+def tre_domini(t):
+    """Aggiunge il terzo dominio a ogni riga con un valore per dominio, e lo rende un annidamento a senso unico."""
+    out = []
+    for riga in t.splitlines():
+        m = re.match(r"^( *)(\w+)( *= *)(.+?),\s*$", riga)
+        if m and m.group(4).count(",") == 1:
+            chiave = m.group(2)
+            v2 = m.group(4).split(",")[1].strip()
+            riga = f"{riga.rstrip().rstrip(',')}, {TERZO.get(chiave, v2)},"
+        out.append(riga)
+    t = "\n".join(out) + "\n"
+    t = t.replace(" max_dom = 2,", " max_dom = 3,").replace(" feedback = 1,", " feedback = 0,")
+    t = t.replace(" adaptation_domain = 2,", " adaptation_domain = 3,")
+    return t
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--corsa", required=True)
@@ -124,6 +148,7 @@ def main():
     ap.add_argument("--nsoil", type=int, default=4)
     ap.add_argument("--fisso", action="store_true",
                     help="passo di tempo fisso (18 s e 6 s) invece di quello adattivo: si usa se l'adattivo fallisce")
+    ap.add_argument("--domini", type=int, default=2, choices=(2, 3), help="3 = aggiunge il dominio a 333 m su Nerola")
     a = ap.parse_args()
     if a.a <= a.da:
         sys.exit("--a deve essere maggiore di --da")
@@ -155,6 +180,8 @@ def main():
     t = MODELLO
     for k, v in sost.items():
         t = t.replace("@" + k + "@", str(v))
+    if a.domini == 3:
+        t = tre_domini(t)
     if "@" in t:
         sys.exit("segnaposto non sostituito: " + t[t.index("@"):t.index("@") + 20])
     sys.stdout.write(t)

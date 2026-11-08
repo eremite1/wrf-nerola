@@ -24,6 +24,14 @@ on:
       stato_out:
         type: string
         required: true
+      domini:
+        description: "2 = 3 km e 1 km (normale); 3 = anche 333 m su Nerola (catena fine)"
+        type: number
+        default: 2
+      nome_uscite:
+        description: "prefisso del nome dei file delle uscite (diverso per ogni catena)"
+        type: string
+        default: "uscite"
 
 jobs:
   blocco:
@@ -34,6 +42,7 @@ jobs:
       DA: ${{ inputs.da }}
       A: ${{ inputs.a }}
       BLOCCO: ${{ inputs.blocco }}
+      NDOM: ${{ inputs.domini }}
       UCX_TLS: sm,self,tcp        # MPI usa solo la memoria del computer (niente InfiniBand)
     steps:
       - uses: actions/checkout@v4
@@ -79,7 +88,7 @@ jobs:
           MODO="adattivo"
           for TENTATIVO in adattivo fisso; do
             OPZ=""; [ "$TENTATIVO" = fisso ] && OPZ="--fisso"
-            python3 "$GITHUB_WORKSPACE/namelist.py" --corsa "$C" --da "$DA" --a "$A" --nlev "$NLEV" --nsoil "$NSOIL" $OPZ > namelist.input
+            python3 "$GITHUB_WORKSPACE/namelist.py" --corsa "$C" --da "$DA" --a "$A" --nlev "$NLEV" --nsoil "$NSOIL" --domini "$NDOM" $OPZ > namelist.input
             grep -E "run_hours|start_|end_|restart|adaptive" namelist.input | head -24
             rm -f rsl.*
             echo "== wrf.exe da +${DA} h a +${A} h, 4 processi, passo $TENTATIVO ($(date -u +%H:%M) UTC)"
@@ -107,7 +116,7 @@ jobs:
           echo "wrf.exe riuscito"
           ls wrfout_d0* | wc -l
           FINE=$(date -u -d "${C:0:8} ${C:8:2}:00 UTC + ${A} hours" +%Y-%m-%d_%H:%M:%S)
-          for d in 1 2; do
+          for d in $(seq 1 $NDOM); do
             test -s "wrfrst_d0${d}_${FINE}" || { echo "ERRORE: manca il file di ripresa del dominio ${d} alle ${FINE}"; ls wrfrst_* 2>/dev/null || true; exit 1; }
           done
           echo "$FINE" > fine.txt
@@ -117,12 +126,14 @@ jobs:
           cd /home/runner/run
           FINE=$(cat fine.txt)
           mkdir -p /home/runner/stato_out
-          tar -czf /home/runner/stato_out/stato.tgz wrfinput_d01 wrfinput_d02 wrfbdy_d01 "wrfrst_d01_${FINE}" "wrfrst_d02_${FINE}" corsa.txt
+          FILE_STATO="wrfbdy_d01 corsa.txt"
+          for d in $(seq 1 $NDOM); do FILE_STATO="$FILE_STATO wrfinput_d0${d} wrfrst_d0${d}_${FINE}"; done
+          tar -czf /home/runner/stato_out/stato.tgz $FILE_STATO
           ls -lh /home/runner/stato_out
 
       - name: Tengo solo i campi che servono (file piccoli)
         run: |
-          python3 postprocess.py --run /home/runner/run --blocco "$BLOCCO" --out /home/runner/uscite
+          python3 postprocess.py --run /home/runner/run --blocco "$BLOCCO" --out /home/runner/uscite --domini "$NDOM"
           ls -lh /home/runner/uscite
 
       - name: Salvo lo stato per il blocco dopo
@@ -136,7 +147,7 @@ jobs:
       - name: Salvo le uscite del blocco
         uses: actions/upload-artifact@v4
         with:
-          name: uscite-${{ inputs.blocco }}
+          name: ${{ inputs.nome_uscite }}-${{ inputs.blocco }}
           path: /home/runner/uscite/*
           retention-days: 3
 

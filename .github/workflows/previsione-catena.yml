@@ -1,0 +1,317 @@
+name: "Previsione Nerola, altre catene"
+run-name: "Catena ${{ inputs.catena || (github.event.schedule == '10 5,17 * * *' && 'gfs' || 'fine') }} ${{ inputs.corsa }}"
+
+# Le altre catene del WRF Nerola, ognuna su computer separati (non rallentano la catena principale):
+#   fine: 3 km, 1 km e 333 m su Nerola (terzo dominio annidato nell'1 km, senza ritorno), dati ECMWF, 36 ore a blocchi di 12
+#   gfs:  3 km e 1 km come la principale, ma con i dati iniziali e al contorno del modello americano GFS, 48 ore
+# Pubblicano nelle sottocartelle fine/ e gfs/ del ramo "risultati": la pagina le mostra come altri modelli.
+on:
+  schedule:
+    - cron: '10 5,17 * * *'      # GFS: le corse delle 00 e delle 12 sono complete circa 4-5 ore dopo
+    - cron: '25 8,20 * * *'      # fine: corse ECMWF delle 00 e delle 12
+  workflow_dispatch:
+    inputs:
+      catena:
+        type: choice
+        options: ["fine", "gfs"]
+        default: "fine"
+      corsa:
+        description: "Corsa AAAAMMGGHH (vuoto = l'ultima disponibile)"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catena-${{ inputs.catena || github.event.schedule }}-${{ inputs.corsa || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  dati:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      catena: ${{ steps.param.outputs.catena }}
+      forzante: ${{ steps.param.outputs.forzante }}
+      ndom: ${{ steps.param.outputs.ndom }}
+      ore: ${{ steps.param.outputs.ore }}
+      opzioni: ${{ steps.param.outputs.opzioni }}
+      corsa: ${{ steps.scelta.outputs.corsa }}
+      n: ${{ steps.blocchi.outputs.n }}
+      b1: ${{ steps.blocchi.outputs.b1 }}
+      b2: ${{ steps.blocchi.outputs.b2 }}
+      b3: ${{ steps.blocchi.outputs.b3 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parametri della catena
+        id: param
+        env:
+          SCELTA: ${{ inputs.catena || (github.event.schedule == '10 5,17 * * *' && 'gfs' || 'fine') }}
+        run: |
+          case "$SCELTA" in
+            fine) P="catena=fine forzante=ECMWF ndom=3 ore=36 bl=12";
+                  echo "opzioni=--domini d03:300m:333_m --essenziali" >> "$GITHUB_OUTPUT";;
+            gfs)  P="catena=gfs forzante=GFS ndom=2 ore=48 bl=24"; echo "opzioni=" >> "$GITHUB_OUTPUT";;
+            *) echo "catena sconosciuta: $SCELTA"; exit 1;;
+          esac
+          for kv in $P; do echo "$kv" >> "$GITHUB_OUTPUT"; echo "${kv%%=*}" | tr a-z A-Z | xargs -I{} echo "{}=${kv#*=}" >> "$GITHUB_ENV"; done
+          cat "$GITHUB_OUTPUT"
+
+      - name: Quanti blocchi servono
+        id: blocchi
+        run: |
+          [ $((ORE % BL)) -eq 0 ] || { echo "ERRORE: le ore ($ORE) devono essere un multiplo delle ore del blocco ($BL)"; exit 1; }
+          N=$((ORE / BL))
+          { [ "$N" -ge 1 ] && [ "$N" -le 3 ]; } || { echo "ERRORE: servirebbero $N blocchi, ne sono ammessi da 1 a 3"; exit 1; }
+          echo "$N blocchi da $BL ore"
+          { echo "n=$N"; echo "b1=$BL"; echo "b2=$((2 * BL))"; echo "b3=$((3 * BL))"; } >> "$GITHUB_OUTPUT"
+
+      - name: Programmi necessari
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cdo libeccodes-tools python3-requests
+
+      - name: Scelgo la corsa
+        id: scelta
+        env:
+          CORSA_IN: ${{ inputs.corsa }}
+        run: |
+          case "$CORSA_IN" in
+            ""|[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+            *) echo "ERRORE: la corsa va scritta AAAAMMGGHH, per esempio 2026102400"; exit 1;;
+          esac
+          PROG=scarica_ecmwf.py; [ "$FORZANTE" = GFS ] && PROG=scarica_gfs.py
+          if [ -n "$CORSA_IN" ]; then
+            C=$(python3 $PROG --trova --ore "$ORE" --corsa "$CORSA_IN")
+          else
+            C=$(python3 $PROG --trova --ore "$ORE")
+          fi
+          echo "CORSA SCELTA: $C (previsione di $ORE ore)"
+          echo "corsa=$C" >> "$GITHUB_OUTPUT"
+          echo "CORSA=$C" >> "$GITHUB_ENV"
+
+      - name: Scarico i dati (solo i campi e la zona che servono)
+        run: |
+          if [ "$FORZANTE" = GFS ]; then
+            python3 scarica_gfs.py --corsa "$CORSA" --ore "$ORE" --out /home/runner/finali
+          else
+            python3 scarica_ecmwf.py --corsa "$CORSA" --ore "$ORE" --out /home/runner/grezzi
+            bash prepara_grib.sh /home/runner/grezzi /home/runner/finali "$ORE"
+            rm -rf /home/runner/grezzi
+          fi
+          du -sh /home/runner/finali
+
+      - name: Salvo i dati pronti
+        uses: actions/upload-artifact@v4
+        with:
+          name: dati-finali
+          path: /home/runner/finali
+          retention-days: 1
+
+  prepara:
+    needs: dati
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 150
+    outputs:
+      corsa: ${{ needs.dati.outputs.corsa }}
+    env:
+      ORE: ${{ needs.dati.outputs.ore }}
+      NDOM: ${{ needs.dati.outputs.ndom }}
+      FORZANTE: ${{ needs.dati.outputs.forzante }}
+      CORSA: ${{ needs.dati.outputs.corsa }}
+      UCX_TLS: sm,self,tcp        # MPI usa solo la memoria del computer (niente InfiniBand)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Programmi necessari
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tcsh mpich \
+            libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev python3-numpy python3-netcdf4
+
+      - name: Recupero WRF e WPS compilati per ARM
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/wrf-install
+          key: wrf-arm-v1-cerca
+          restore-keys: wrf-arm-v1-
+          fail-on-cache-miss: true
+
+      - name: Recupero i file del dominio (3 km e 1 km)
+        if: needs.dati.outputs.ndom == '2'
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/geo_em
+          key: geo-em-cerca
+          restore-keys: geo-em-
+          fail-on-cache-miss: true
+
+      - name: Recupero i file del dominio (3 km, 1 km e 333 m)
+        if: needs.dati.outputs.ndom == '3'
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/geo_em
+          key: dominio3-cerca
+          restore-keys: dominio3-
+          fail-on-cache-miss: true
+
+      - name: Recupero i dati pronti
+        uses: actions/download-artifact@v4
+        with:
+          name: dati-finali
+          path: /home/runner/finali
+
+      - name: ungrib e metgrid
+        run: |
+          mkdir -p /home/runner/WPS
+          cp -a /home/runner/wrf-install/WPS/. /home/runner/WPS/
+          cp /home/runner/geo_em/geo_em.d0*.nc /home/runner/WPS/
+          cp /home/runner/geo_em/namelist.wps /home/runner/WPS/namelist.wps
+          if [ "$FORZANTE" = GFS ]; then cp /home/runner/WPS/ungrib/Variable_Tables/Vtable.GFS /home/runner/WPS/Vtable; else cp Vtable.ECMWF01 /home/runner/WPS/Vtable; fi
+          cd /home/runner/WPS
+          EPOCH=$(date -u -d "${CORSA:0:8} ${CORSA:8:2}:00 UTC" +%s)
+          START=$(date -u -d @$EPOCH +%Y-%m-%d_%H:%M:%S)
+          END=$(date -u -d @$((EPOCH + ORE*3600)) +%Y-%m-%d_%H:%M:%S)
+          echo "Periodo: $START -> $END"
+          S=""; E=""; for d in $(seq 1 $NDOM); do S="$S'$START',"; E="$E'$END',"; done
+          sed -i "s/^ *start_date.*/ start_date = $S/; s/^ *end_date.*/ end_date   = $E/" namelist.wps
+          rm -f GRIBFILE.* FILE:*
+          ./link_grib.csh /home/runner/finali/*.grib2
+          ./ungrib.exe > ungrib.log 2>&1 || true
+          grep -q "Successful completion" ungrib.log || { echo "ERRORE: ungrib non e' riuscito. Ultime righe:"; tail -n 40 ungrib.log; exit 1; }
+          ATTESI=$((ORE/3 + 1))
+          echo "file di ungrib: $(ls FILE:* | wc -l) (attesi $ATTESI)"
+          test "$(ls FILE:* | wc -l)" -eq "$ATTESI" || { echo "ERRORE: numero di istanti sbagliato"; exit 1; }
+          ./metgrid.exe > metgrid.log 2>&1 || true
+          grep -q "Successful completion" metgrid.log || { echo "ERRORE: metgrid non e' riuscito. Ultime righe:"; tail -n 40 metgrid.log; exit 1; }
+          for d in $(seq -f "d%02g" 1 $NDOM); do
+            N=$(ls met_em.$d.* | wc -l)
+            echo "met_em $d: $N (attesi $ATTESI)"
+            test "$N" -eq "$ATTESI" || { echo "ERRORE: met_em $d incompleti"; exit 1; }
+          done
+          rm -rf /home/runner/finali FILE:*
+
+      - name: real.exe (condizioni iniziali e al contorno)
+        run: |
+          mkdir -p /home/runner/run
+          cd /home/runner/run
+          cp -aL /home/runner/wrf-install/WRF/run/. .
+          cp -L /home/runner/wrf-install/WRF/real.exe .
+          ln -sf /home/runner/WPS/met_em.d0* .
+          NLEV=$(python3 -c "from netCDF4 import Dataset;import glob;n=Dataset(sorted(glob.glob('met_em.d01.*'))[0]);print(len(n.dimensions['num_metgrid_levels']))")
+          NSOIL=$(python3 -c "from netCDF4 import Dataset;import glob;n=Dataset(sorted(glob.glob('met_em.d01.*'))[0]);print(int(n.getncattr('NUM_METGRID_SOIL_LEVELS')))")
+          echo "livelli di metgrid: $NLEV, livelli di suolo: $NSOIL"
+          test "$NSOIL" -ge 1 || { echo "ERRORE: metgrid non ha trovato il suolo"; exit 1; }
+          echo "$CORSA $NLEV $NSOIL" > corsa.txt
+          python3 "$GITHUB_WORKSPACE/namelist.py" --corsa "$CORSA" --da 0 --a "$ORE" --nlev "$NLEV" --nsoil "$NSOIL" --domini "$NDOM" > namelist.input
+          grep -E "run_hours|start_|end_" namelist.input | head -12
+          ulimit -s unlimited || true
+          export OMP_NUM_THREADS=1
+          rm -f rsl.*
+          set +e
+          mpirun -np 1 ./real.exe > real_stdout.log 2>&1
+          echo "codice di uscita di real.exe: $?"
+          set -e
+          if ! grep -q "SUCCESS COMPLETE REAL_EM" rsl.error.0000 2>/dev/null; then
+            echo "ERRORE: real.exe non e' riuscito."
+            tail -n 30 rsl.error.0000 || true
+            tail -n 15 real_stdout.log || true
+            exit 1
+          fi
+          ls -lh wrfinput_d0* wrfbdy_d01
+          mkdir -p /home/runner/stato
+          tar -czf /home/runner/stato/stato.tgz wrfinput_d0* wrfbdy_d01 corsa.txt
+          ls -lh /home/runner/stato
+
+      - name: Salvo lo stato iniziale
+        uses: actions/upload-artifact@v4
+        with:
+          name: stato-0
+          path: /home/runner/stato/stato.tgz
+          retention-days: 2
+          compression-level: 0
+
+      - name: Log (solo se qualcosa e' andato storto)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-prepara
+          path: |
+            /home/runner/run/namelist.input
+            /home/runner/run/rsl.error.0000
+            /home/runner/run/real_stdout.log
+            /home/runner/WPS/ungrib.log
+            /home/runner/WPS/metgrid.log
+            /home/runner/WPS/namelist.wps
+          if-no-files-found: ignore
+          retention-days: 7
+
+  blocco1:
+    needs: [dati, prepara]
+    uses: ./.github/workflows/blocco-wrf.yml
+    with:
+      corsa: ${{ needs.prepara.outputs.corsa }}
+      da: 0
+      a: ${{ fromJSON(needs.dati.outputs.b1) }}
+      blocco: 1
+      stato_in: stato-0
+      stato_out: stato-1
+      domini: ${{ fromJSON(needs.dati.outputs.ndom) }}
+      nome_uscite: uscite-${{ needs.dati.outputs.catena }}
+
+  blocco2:
+    needs: [dati, prepara, blocco1]
+    if: ${{ fromJSON(needs.dati.outputs.n) >= 2 }}
+    uses: ./.github/workflows/blocco-wrf.yml
+    with:
+      corsa: ${{ needs.prepara.outputs.corsa }}
+      da: ${{ fromJSON(needs.dati.outputs.b1) }}
+      a: ${{ fromJSON(needs.dati.outputs.b2) }}
+      blocco: 2
+      stato_in: stato-1
+      stato_out: stato-2
+      domini: ${{ fromJSON(needs.dati.outputs.ndom) }}
+      nome_uscite: uscite-${{ needs.dati.outputs.catena }}
+
+  blocco3:
+    needs: [dati, prepara, blocco2]
+    if: ${{ fromJSON(needs.dati.outputs.n) >= 3 }}
+    uses: ./.github/workflows/blocco-wrf.yml
+    with:
+      corsa: ${{ needs.prepara.outputs.corsa }}
+      da: ${{ fromJSON(needs.dati.outputs.b2) }}
+      a: ${{ fromJSON(needs.dati.outputs.b3) }}
+      blocco: 3
+      stato_in: stato-2
+      stato_out: stato-3
+      domini: ${{ fromJSON(needs.dati.outputs.ndom) }}
+      nome_uscite: uscite-${{ needs.dati.outputs.catena }}
+
+  # dopo i primi due blocchi la previsione va subito sul sito
+  pubblica48:
+    needs: [dati, prepara, blocco1, blocco2]
+    if: ${{ fromJSON(needs.dati.outputs.n) >= 3 && needs.blocco1.result == 'success' && needs.blocco2.result == 'success' }}
+    uses: ./.github/workflows/pubblica.yml
+    with:
+      ore: "24"
+      corsa: ${{ needs.prepara.outputs.corsa }}
+      cartella: ${{ needs.dati.outputs.catena }}
+      forzante: ${{ needs.dati.outputs.forzante }}
+      domini: ${{ fromJSON(needs.dati.outputs.ndom) }}
+      opzioni_mappe: ${{ needs.dati.outputs.opzioni }}
+      nome_uscite: uscite-${{ needs.dati.outputs.catena }}
+
+  pubblica:
+    needs: [dati, prepara, blocco1, blocco2, blocco3]
+    if: ${{ always() && needs.blocco1.result == 'success' && (fromJSON(needs.dati.outputs.n) < 2 || needs.blocco2.result == 'success') && (fromJSON(needs.dati.outputs.n) < 3 || needs.blocco3.result == 'success') }}
+    uses: ./.github/workflows/pubblica.yml
+    with:
+      ore: ${{ needs.dati.outputs.ore }}
+      corsa: ${{ needs.prepara.outputs.corsa }}
+      cartella: ${{ needs.dati.outputs.catena }}
+      forzante: ${{ needs.dati.outputs.forzante }}
+      domini: ${{ fromJSON(needs.dati.outputs.ndom) }}
+      opzioni_mappe: ${{ needs.dati.outputs.opzioni }}
+      nome_uscite: uscite-${{ needs.dati.outputs.catena }}

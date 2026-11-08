@@ -11,6 +11,24 @@ on:
       corsa:
         type: string
         required: true
+      cartella:
+        description: "vuoto = catena principale (ECMWF 3 km e 1 km); altrimenti sottocartella (fine, gfs)"
+        type: string
+        default: ""
+      forzante:
+        type: string
+        default: "ECMWF"
+      domini:
+        description: "numero di domini della catena (2 o 3)"
+        type: number
+        default: 2
+      opzioni_mappe:
+        description: "opzioni in piu' per mappe.py (es. --domini d03:300m:333 m --essenziali)"
+        type: string
+        default: ""
+      nome_uscite:
+        type: string
+        default: "uscite"
 
 permissions:
   contents: write
@@ -25,6 +43,9 @@ jobs:
     env:
       ORE: ${{ inputs.ore }}
       CORSA: ${{ inputs.corsa }}
+      CARTELLA: ${{ inputs.cartella }}
+      FORZANTE: ${{ inputs.forzante }}
+      NDOM: ${{ inputs.domini }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,7 +57,7 @@ jobs:
       - name: Scarico le uscite di tutti i blocchi
         uses: actions/download-artifact@v4
         with:
-          pattern: uscite-*
+          pattern: ${{ inputs.nome_uscite }}-*
           merge-multiple: true
           path: /home/runner/uscite
 
@@ -44,11 +65,11 @@ jobs:
         run: |
           ls -lh /home/runner/uscite
           set +e
-          python3 controllo.py --uscite /home/runner/uscite --ore "$ORE" --rapporto /home/runner/controllo.txt
+          python3 controllo.py --uscite /home/runner/uscite --ore "$ORE" --rapporto /home/runner/controllo.txt --domini "$NDOM"
           RC=$?
           set -e
           {
-            echo "## Previsione Nerola, corsa ECMWF $CORSA, $ORE ore"
+            echo "## Previsione Nerola ${CARTELLA:-principale}, corsa $FORZANTE $CORSA, $ORE ore"
             echo '```'
             cat /home/runner/controllo.txt
             echo
@@ -81,7 +102,7 @@ jobs:
 
       - name: Mappe e meteogramma
         run: |
-          python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo
+          python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo --forzante "$FORZANTE" ${{ inputs.opzioni_mappe }}
           # la pagina web si prende sempre dall'ultima versione su main (la corsa dura ore e il codice puo' essere cambiato nel frattempo)
           curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/pagina/index.html" -o /home/runner/pubblico/index.html || cp pagina/index.html /home/runner/pubblico/index.html
           cp pagina/sondaggi.html pagina/colonna.html pagina/comune.js /home/runner/pubblico/
@@ -91,7 +112,7 @@ jobs:
           cat > /home/runner/pubblico/LEGGIMI.md <<EOT
           # Previsione WRF su Nerola
 
-          Corsa ECMWF **$CORSA UTC**, $ORE ore.
+          Corsa $FORZANTE **$CORSA UTC**, $ORE ore${CARTELLA:+ (catena $CARTELLA)}.
 
           - \`mappe/1km/<parametro>/AAAAMMGG_HH.png\` e \`mappe/3km/...\`: una mappa per parametro (ora UTC nel nome del file).
           - \`index.html\`: la pagina web (con \`indice.json\`, l'elenco di tutte le mappe).
@@ -112,19 +133,39 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          GIA=$(curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/risultati/LEGGIMI.md" 2>/dev/null | grep -o '[0-9]\{10\}' | head -n 1 || true)
+          REMOTO="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          RAMO=/home/runner/ramo
+          rm -rf "$RAMO" && mkdir -p "$RAMO"
+          # contenuto attuale del ramo (serve per non cancellare le altre catene)
+          ( cd "$RAMO" && git init -q && git fetch -q --depth 1 "$REMOTO" risultati && git archive FETCH_HEAD | tar -x ) || echo "ramo risultati vuoto"
+          rm -rf "$RAMO/.git"
+          SOTTO="$RAMO${CARTELLA:+/$CARTELLA}"
+          GIA=$(grep -o '[0-9]\{10\}' "$SOTTO/LEGGIMI.md" 2>/dev/null | head -n 1 || true)
           if [ -n "$GIA" ] && [ "$GIA" -gt "$CORSA" ] 2>/dev/null; then
             echo "Online c'e' gia' la corsa $GIA, piu' recente di $CORSA: non la sostituisco."
             exit 0
           fi
-          cd /home/runner/pubblico
+          if [ -z "$CARTELLA" ]; then
+            # catena principale: sostituisco tutto tranne le sottocartelle delle altre catene
+            for c in fine gfs; do [ -d "$RAMO/$c" ] && mv "$RAMO/$c" "/home/runner/tieni_$c"; done
+            rm -rf "$RAMO" && cp -a /home/runner/pubblico "$RAMO"
+            for c in fine gfs; do [ -d "/home/runner/tieni_$c" ] && mv "/home/runner/tieni_$c" "$RAMO/$c"; done
+          else
+            # altra catena: solo la sua sottocartella (la pagina e i file comuni restano quelli della principale)
+            rm -rf "$SOTTO" && mkdir -p "$SOTTO"
+            cp -a /home/runner/pubblico/. "$SOTTO/"
+            rm -f "$SOTTO/index.html" "$SOTTO/sondaggi.html" "$SOTTO/colonna.html" "$SOTTO/comune.js" "$SOTTO/.nojekyll"
+            [ -f "$RAMO/index.html" ] || cp pagina/index.html pagina/sondaggi.html pagina/colonna.html pagina/comune.js "$RAMO/"
+            touch "$RAMO/.nojekyll"
+          fi
+          cd "$RAMO"
           git init -q -b risultati
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -q -m "Previsione Nerola, corsa ECMWF $CORSA, $ORE h"
-          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" risultati
-          echo "Pubblicato: https://github.com/${GITHUB_REPOSITORY}/tree/risultati"
+          git commit -q -m "Previsione Nerola ${CARTELLA:-principale}, corsa $FORZANTE $CORSA, $ORE h"
+          git push -q -f "$REMOTO" risultati
+          echo "Pubblicato: https://github.com/${GITHUB_REPOSITORY}/tree/risultati${CARTELLA:+/$CARTELLA}"
 
       - name: Se il controllo ha bocciato i risultati, li tengo per guardarli
         if: failure()
