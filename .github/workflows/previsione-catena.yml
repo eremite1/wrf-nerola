@@ -1,19 +1,23 @@
 name: "Previsione Nerola, altre catene"
-run-name: "Catena ${{ inputs.catena || (github.event.schedule == '10 5,17 * * *' && 'gfs' || 'fine') }} ${{ inputs.corsa }}"
+run-name: "Catena ${{ inputs.catena || github.event.schedule }} ${{ inputs.corsa }}"
 
 # Le altre catene del WRF Nerola, ognuna su computer separati (non rallentano la catena principale):
 #   fine: 3 km, 1 km e 333 m su Nerola (terzo dominio annidato nell'1 km, senza ritorno), dati ECMWF, 36 ore a blocchi di 12
 #   gfs:  3 km e 1 km come la principale, ma con i dati iniziali e al contorno del modello americano GFS, 48 ore
+#   iconeu: come gfs ma con il modello tedesco ICON-EU (DWD), 48 ore
+#   icon2i: come gfs ma con il modello italiano ICON-2I (ItaliaMeteo); sopra 250 hPa e suolo da ICON-EU, 48 ore
 # Pubblicano nelle sottocartelle fine/ e gfs/ del ramo "risultati": la pagina le mostra come altri modelli.
 on:
   schedule:
     - cron: '10 5,17 * * *'      # GFS: le corse delle 00 e delle 12 sono complete circa 4-5 ore dopo
     - cron: '25 8,20 * * *'      # fine: corse ECMWF delle 00 e delle 12
+    - cron: '40 4,16 * * *'      # iconeu: corse delle 00 e delle 12
+    - cron: '55 5,17 * * *'      # icon2i: corse delle 00 e delle 12
   workflow_dispatch:
     inputs:
       catena:
         type: choice
-        options: ["fine", "gfs"]
+        options: ["fine", "gfs", "iconeu", "icon2i"]
         default: "fine"
       corsa:
         description: "Corsa AAAAMMGGHH (vuoto = l'ultima disponibile)"
@@ -48,12 +52,21 @@ jobs:
       - name: Parametri della catena
         id: param
         env:
-          SCELTA: ${{ inputs.catena || (github.event.schedule == '10 5,17 * * *' && 'gfs' || 'fine') }}
+          SCELTA: ${{ inputs.catena }}
+          ORARIO: ${{ github.event.schedule }}
         run: |
+          if [ -z "$SCELTA" ]; then
+            case "$ORARIO" in
+              "10 5,17 * * *") SCELTA=gfs;; "25 8,20 * * *") SCELTA=fine;;
+              "40 4,16 * * *") SCELTA=iconeu;; "55 5,17 * * *") SCELTA=icon2i;;
+            esac
+          fi
           case "$SCELTA" in
             fine) P="catena=fine forzante=ECMWF ndom=3 ore=36 bl=12";
                   echo "opzioni=--domini d03:300m:333_m --essenziali" >> "$GITHUB_OUTPUT";;
             gfs)  P="catena=gfs forzante=GFS ndom=2 ore=48 bl=24"; echo "opzioni=" >> "$GITHUB_OUTPUT";;
+            iconeu) P="catena=iconeu forzante=ICONEU ndom=2 ore=48 bl=24"; echo "opzioni=" >> "$GITHUB_OUTPUT";;
+            icon2i) P="catena=icon2i forzante=ICON2I ndom=2 ore=48 bl=24"; echo "opzioni=" >> "$GITHUB_OUTPUT";;
             *) echo "catena sconosciuta: $SCELTA"; exit 1;;
           esac
           for kv in $P; do echo "$kv" >> "$GITHUB_OUTPUT"; echo "${kv%%=*}" | tr a-z A-Z | xargs -I{} echo "{}=${kv#*=}" >> "$GITHUB_ENV"; done
@@ -83,6 +96,13 @@ jobs:
             *) echo "ERRORE: la corsa va scritta AAAAMMGGHH, per esempio 2026102400"; exit 1;;
           esac
           PROG=scarica_ecmwf.py; [ "$FORZANTE" = GFS ] && PROG=scarica_gfs.py
+          case "$FORZANTE" in
+            ICON*)
+              pip install -q omfiles fsspec s3fs pillow requests scipy
+              git clone -q --depth 1 https://github.com/eremite1/meteo-mappe /home/runner/meteo-mappe
+              MOD=$(echo "$FORZANTE" | tr A-Z a-z)
+              PROG="intermedio_icon.py --modello $MOD";;
+          esac
           if [ -n "$CORSA_IN" ]; then
             C=$(python3 $PROG --trova --ore "$ORE" --corsa "$CORSA_IN")
           else
@@ -94,7 +114,10 @@ jobs:
 
       - name: Scarico i dati (solo i campi e la zona che servono)
         run: |
-          if [ "$FORZANTE" = GFS ]; then
+          if [ "${FORZANTE#ICON}" != "$FORZANTE" ]; then
+            MOD=$(echo "$FORZANTE" | tr A-Z a-z)
+            PYTHONPATH="$GITHUB_WORKSPACE" python3 intermedio_icon.py --modello "$MOD" --corsa "$CORSA" --ore "$ORE" --out /home/runner/finali
+          elif [ "$FORZANTE" = GFS ]; then
             python3 scarica_gfs.py --corsa "$CORSA" --ore "$ORE" --out /home/runner/finali
           else
             python3 scarica_ecmwf.py --corsa "$CORSA" --ore "$ORE" --out /home/runner/grezzi
@@ -178,9 +201,15 @@ jobs:
           S=""; E=""; for d in $(seq 1 $NDOM); do S="$S'$START',"; E="$E'$END',"; done
           sed -i "s/^ *start_date.*/ start_date = $S/; s/^ *end_date.*/ end_date   = $E/" namelist.wps
           rm -f GRIBFILE.* FILE:*
-          ./link_grib.csh /home/runner/finali/*.grib2
-          ./ungrib.exe > ungrib.log 2>&1 || true
-          grep -q "Successful completion" ungrib.log || { echo "ERRORE: ungrib non e' riuscito. Ultime righe:"; tail -n 40 ungrib.log; exit 1; }
+          if [ "${FORZANTE#ICON}" != "$FORZANTE" ]; then
+            # ICON: i file sono gia' nel formato intermedio di WPS (intermedio_icon.py), niente ungrib
+            for f in /home/runner/finali/ICON_*; do cp "$f" "FILE:${f##*/ICON_}"; done
+            echo "ICON: file intermedi pronti" > ungrib.log
+          else
+            ./link_grib.csh /home/runner/finali/*.grib2
+            ./ungrib.exe > ungrib.log 2>&1 || true
+            grep -q "Successful completion" ungrib.log || { echo "ERRORE: ungrib non e' riuscito. Ultime righe:"; tail -n 40 ungrib.log; exit 1; }
+          fi
           ATTESI=$((ORE/3 + 1))
           echo "file di ungrib: $(ls FILE:* | wc -l) (attesi $ATTESI)"
           test "$(ls FILE:* | wc -l)" -eq "$ATTESI" || { echo "ERRORE: numero di istanti sbagliato"; exit 1; }

@@ -68,7 +68,7 @@ jobs:
             [ -f "/home/runner/vecchio/$f" ] && cp "/home/runner/vecchio/$f" /home/runner/pubblico/ || true
           done
           # le altre catene (333 m, GFS) restano come sono
-          for c in fine gfs; do [ -d "/home/runner/vecchio/$c" ] && cp -a "/home/runner/vecchio/$c" /home/runner/pubblico/; done
+          for c in fine gfs iconeu icon2i; do [ -d "/home/runner/vecchio/$c" ] && cp -a "/home/runner/vecchio/$c" /home/runner/pubblico/; done
           du -sh /home/runner/pubblico
 
       - name: Pubblico nel ramo "risultati"

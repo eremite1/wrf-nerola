@@ -147,9 +147,9 @@ jobs:
           fi
           if [ -z "$CARTELLA" ]; then
             # catena principale: sostituisco tutto tranne le sottocartelle delle altre catene
-            for c in fine gfs; do [ -d "$RAMO/$c" ] && mv "$RAMO/$c" "/home/runner/tieni_$c"; done
+            for c in fine gfs iconeu icon2i; do [ -d "$RAMO/$c" ] && mv "$RAMO/$c" "/home/runner/tieni_$c"; done
             rm -rf "$RAMO" && cp -a /home/runner/pubblico "$RAMO"
-            for c in fine gfs; do [ -d "/home/runner/tieni_$c" ] && mv "/home/runner/tieni_$c" "$RAMO/$c"; done
+            for c in fine gfs iconeu icon2i; do [ -d "/home/runner/tieni_$c" ] && mv "/home/runner/tieni_$c" "$RAMO/$c"; done
           else
             # altra catena: solo la sua sottocartella (la pagina e i file comuni restano quelli della principale)
             rm -rf "$SOTTO" && mkdir -p "$SOTTO"

@@ -41,7 +41,9 @@ import uscite  # noqa: E402
 ROMA = ZoneInfo("Europe/Rome")
 NEROLA = (42.13, 12.77)
 FORZANTI = {"ECMWF": "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)",
-            "GFS": "WRF su dati NOAA GFS 0,25° (pubblico dominio, dati modificati)"}
+            "GFS": "WRF su dati NOAA GFS 0,25° (pubblico dominio, dati modificati)",
+            "ICONEU": "WRF su dati DWD ICON-EU via Open-Meteo (CC BY 4.0, dati modificati)",
+            "ICON2I": "WRF su dati ItaliaMeteo ICON-2I e DWD ICON-EU via Open-Meteo (CC BY 4.0, dati modificati)"}
 NOME_FORZANTE = "ECMWF"
 FONTE = FORZANTI[NOME_FORZANTE]
 # parametri della catena a 333 m: solo quelli che hanno senso a quella risoluzione
