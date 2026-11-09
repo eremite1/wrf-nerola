@@ -45,6 +45,58 @@ DEM_LARGO = {"riquadro": (10.9, 14.6, 40.9, 43.4), "zoom": 9, "passo": 0.004}
 CODICI_SEDE = {"PPLA", "PPLA2", "PPLA3", "PPLC"}
 
 
+ISTAT = "https://www.istat.it/storage/cartografia/confini_amministrativi/non_generalizzati/{anno}/Limiti0101{anno}.zip"
+
+
+def strati_istat():
+    """Confini ufficiali ISTAT non generalizzati (precisione di pochi metri, CC BY 3.0 IT): comuni e province
+    delle regioni attorno ai domini, ritagliati sulla zona larga e diradati a circa 20 m."""
+    import io
+    import zipfile
+    import shapefile                      # pyshp
+    from pyproj import Transformer
+    dati = None
+    for anno in (2025, 2024, 2023):
+        try:
+            dati = scarica(ISTAT.format(anno=anno))
+            break
+        except Exception as e:  # noqa: BLE001
+            print("ISTAT", anno, e)
+    if dati is None:
+        raise RuntimeError("confini ISTAT non scaricabili")
+    z = zipfile.ZipFile(io.BytesIO(dati))
+    tr = Transformer.from_crs(32632, 4326, always_xy=True)
+    lon0, lon1, lat0, lat1 = DEM_LARGO["riquadro"]
+    out = {}
+    for chiave, prefisso, campo_reg in (("comuni", "Com", "COD_REG"), ("province", "ProvCM", "COD_REG")):
+        nomi = [n for n in z.namelist() if f"/{prefisso}" in n and n.rsplit("/", 1)[-1].startswith(prefisso)]
+        base = sorted({n.rsplit(".", 1)[0] for n in nomi if n.endswith(".shp")})[0]
+        r = shapefile.Reader(shp=io.BytesIO(z.read(base + ".shp")), dbf=io.BytesIO(z.read(base + ".dbf")),
+                             shx=io.BytesIO(z.read(base + ".shx")))
+        campi = [f[0] for f in r.fields[1:]]
+        linee = []
+        for rec, shp in zip(r.iterRecords(), r.iterShapes()):
+            if int(rec[campi.index(campo_reg)]) not in REGIONI:
+                continue
+            parti = list(shp.parts) + [len(shp.points)]
+            for k in range(len(parti) - 1):
+                pts = np.array(shp.points[parti[k]:parti[k + 1]])
+                if len(pts) < 2:
+                    continue
+                lo, la = tr.transform(pts[:, 0], pts[:, 1])
+                dentro = (lo > lon0 - 0.05) & (lo < lon1 + 0.05) & (la > lat0 - 0.05) & (la < lat1 + 0.05)
+                if not dentro.any():
+                    continue
+                tieni = [0]
+                for j in range(1, len(lo)):
+                    if abs(lo[j] - lo[tieni[-1]]) + abs(la[j] - la[tieni[-1]]) > 0.0002 or j == len(lo) - 1:
+                        tieni.append(j)
+                linee.append([[round(float(lo[j]), 5), round(float(la[j]), 5)] for j in tieni])
+        out[chiave] = linee
+        print(f"ISTAT {chiave}: {len(linee)} linee, {sum(map(len, linee))} punti")
+    return out
+
+
 def scarica(url, tentativi=4):
     ultimo = None
     for n in range(tentativi):
@@ -225,6 +277,14 @@ def costruisci(cartella):
         except Exception as e:  # noqa: BLE001
             avvisi.append(f"{chiave}: {e}")
             risultato[chiave] = []
+    # confini dettagliati ISTAT: sostituiscono quelli semplificati dove ci sono
+    try:
+        dettaglio = strati_istat()
+        for k, v in dettaglio.items():
+            if v:
+                risultato[k] = v
+    except Exception as e:  # noqa: BLE001
+        avvisi.append(f"confini ISTAT: {e} (restano quelli semplificati)")
     arrays = {}
     for chiave, cfg in (("fine", DEM_FINE), ("largo", DEM_LARGO)):
         try:

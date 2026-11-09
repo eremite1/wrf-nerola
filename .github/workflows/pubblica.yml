@@ -83,13 +83,14 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/sfondo
-          key: sfondo-v2
+          key: sfondo-v3
 
       - name: Scarico confini e nomi dei paesi (solo la prima volta)
         id: sfondo
         if: steps.cache-sfondo.outputs.cache-hit != 'true'
         continue-on-error: true
         run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-pyshp python3-pyproj || pip install --break-system-packages -q pyshp pyproj
           python3 sfondo.py --scarica /home/runner/sfondo
           if [ -f /home/runner/sfondo/sfondo.json ]; then echo "completo=si" >> "$GITHUB_OUTPUT"; fi
 
@@ -98,7 +99,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /home/runner/sfondo
-          key: sfondo-v2
+          key: sfondo-v3
 
       - name: Mappe e meteogramma
         run: |

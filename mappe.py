@@ -30,6 +30,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib.ticker  # noqa: E402
 import matplotlib.transforms  # noqa: E402
 from matplotlib.collections import LineCollection  # noqa: E402
+
+# scala del vento: dal bianco (calma) al verde, poi giallo-arancio-rosso per il vento forte e viola per quello
+# violento; i colori caldi e scuri fanno risaltare subito i valori pericolosi (la scala monocolore li appiattiva)
+matplotlib.colormaps.register(mcolors.LinearSegmentedColormap.from_list("vento_mn", [
+    "#f4f9f4", "#c9ecc0", "#86d07f", "#3faf4f", "#f2e14c", "#f5a524", "#ec6a1c",
+    "#d7301f", "#a50f3c", "#c51b8a", "#7a1fa2", "#3f0f7a"]), force=True)
 from PIL import Image  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -470,7 +476,7 @@ PARAMETRI = [
     {"id": "temperatura", "titolo": "Temperatura a 2 m", "unita": "°C", "calcola": lambda d, i: d["T2"][i] - 273.15,
      "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
     {"id": "vento", "titolo": "Vento a 10 m", "unita": "km/h", "calcola": lambda d, i: np.hypot(d["U10"][i], d["V10"][i]) * 3.6,
-     "cmap": "viridis", "limiti": (0, 60), "passo": 3, "inizio": 0, "frecce": True},
+     "cmap": "vento_mn", "limiti": (0, 60), "passo": 3, "inizio": 0, "frecce": True},
     {"id": "umidita", "titolo": "Umidità relativa a 2 m", "unita": "%", "calcola": lambda d, i: rh2(d)[i],
      "cmap": "YlGnBu", "limiti": (20, 100), "passo": 3, "inizio": 0},
     {"id": "pressione", "titolo": "Pressione ridotta al livello del mare", "unita": "hPa",
@@ -539,13 +545,13 @@ PARAMETRI = [
      "cmap": "Spectral_r", "limiti": "auto", "passo": 3, "inizio": 0, "serve": "Z500", "isolinee": True,
      "nota": "forma dell'atmosfera in quota: vallate (basso) e promontori (alto) che guidano il tempo"},
     {"id": "vento_850", "titolo": "Vento a 850 hPa (circa 1500 m)", "unita": "km/h", "calcola": lambda d, i: np.hypot(d["U850"][i], d["V850"][i]) * 3.6,
-     "cmap": "viridis", "limiti": (0, 120), "passo": 3, "inizio": 0, "serve": "U850", "frecce": ("U850", "V850"), "scala_frecce": 250},
+     "cmap": "vento_mn", "limiti": (0, 120), "passo": 3, "inizio": 0, "serve": "U850", "frecce": ("U850", "V850"), "scala_frecce": 250},
     {"id": "vento_700", "titolo": "Vento a 700 hPa (circa 3000 m)", "unita": "km/h", "calcola": lambda d, i: np.hypot(d["U700"][i], d["V700"][i]) * 3.6,
-     "cmap": "viridis", "limiti": (0, 150), "passo": 3, "inizio": 0, "serve": "U700", "frecce": ("U700", "V700"), "scala_frecce": 300},
+     "cmap": "vento_mn", "limiti": (0, 150), "passo": 3, "inizio": 0, "serve": "U700", "frecce": ("U700", "V700"), "scala_frecce": 300},
     {"id": "vento_500", "titolo": "Vento a 500 hPa (circa 5500 m)", "unita": "km/h", "calcola": lambda d, i: np.hypot(d["U500"][i], d["V500"][i]) * 3.6,
-     "cmap": "viridis", "limiti": (0, 200), "passo": 3, "inizio": 0, "serve": "U500", "frecce": ("U500", "V500"), "scala_frecce": 400},
+     "cmap": "vento_mn", "limiti": (0, 200), "passo": 3, "inizio": 0, "serve": "U500", "frecce": ("U500", "V500"), "scala_frecce": 400},
     {"id": "vento_guida", "titolo": "Vento che guida i temporali (850-500 hPa)", "unita": "km/h", "calcola": lambda d, i: np.hypot(d["USTEER"][i], d["VSTEER"][i]) * 3.6,
-     "cmap": "viridis", "limiti": (0, 120), "passo": 3, "inizio": 0, "serve": "USTEER", "frecce": ("USTEER", "VSTEER"), "scala_frecce": 250,
+     "cmap": "vento_mn", "limiti": (0, 120), "passo": 3, "inizio": 0, "serve": "USTEER", "frecce": ("USTEER", "VSTEER"), "scala_frecce": 250,
      "nota": "media pesata del vento tra 850 e 500 hPa: la direzione verso cui si spostano le celle temporalesche"},
     {"id": "rh700", "titolo": "Umidità relativa a 700 hPa", "unita": "%", "calcola": lambda d, i: d["RH700"][i],
      "cmap": "YlGnBu", "limiti": (0, 100), "passo": 3, "inizio": 0, "serve": "RH700"},
@@ -554,7 +560,7 @@ PARAMETRI = [
      "nota": "positivo = aria che sale (nuvole e precipitazioni), negativo = aria che scende (cielo più sereno)"},
     {"id": "vento_max24", "titolo": "Vento massimo orario nelle 24 ore", "unita": "km/h",
      "calcola": lambda d, i: finestra(np.hypot(d["U10"], d["V10"]) * 3.6, i, 24, np.max),
-     "cmap": "viridis", "limiti": (0, 80), "passo": 3, "inizio": 24},
+     "cmap": "vento_mn", "limiti": (0, 80), "passo": 3, "inizio": 24},
     {"id": "pioggia_intensita24", "titolo": "Intensità massima di pioggia in 24 ore", "unita": "mm/h",
      "calcola": lambda d, i: np.max(np.diff(uscite.pioggia(d)[i - 24:i + 1], axis=0), axis=0),
      "classi": classi_pioggia(PIOGGIA[1]), "passo": 3, "inizio": 24,
