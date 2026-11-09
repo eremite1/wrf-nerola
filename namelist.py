@@ -139,6 +139,35 @@ def tre_domini(t):
     return t
 
 
+# metodi di calcolo ("fisica") per il confronto delle varianti: F1 e' quella della catena principale
+FISICHE = {
+    "F1": {},                                                                         # WSM6, MYNN, Noah
+    "F2": {"mp_physics": "8", "bl_pbl_physics": "1", "sf_sfclay_physics": "1"},       # Thompson, YSU
+    "F3": {"mp_physics": "10", "bl_pbl_physics": "7", "sf_sfclay_physics": "1",
+           "sf_surface_physics": "4"},                                                # Morrison, ACM2, Noah-MP
+    "F4": {"mp_physics": "8", "bl_pbl_physics": "2", "sf_sfclay_physics": "2"},       # Thompson, MYJ
+}
+
+
+def un_dominio(t):
+    """Solo il dominio a 3 km: ogni riga con un valore per dominio tiene il primo."""
+    out = []
+    for riga in t.splitlines():
+        m = re.match(r"^( *)(\w+)( *= *)(.+?),\s*$", riga)
+        if m and m.group(4).count(",") == 1:
+            riga = f"{m.group(1)}{m.group(2)}{m.group(3)}{m.group(4).split(',')[0].strip()},"
+        out.append(riga)
+    t = "\n".join(out) + "\n"
+    return t.replace(" max_dom = 2,", " max_dom = 1,").replace(" adaptation_domain = 2,", " adaptation_domain = 1,")
+
+
+def con_fisica(t, codice):
+    for chiave, valore in FISICHE[codice].items():
+        t = re.sub(rf"^( *{chiave} *= *)([^\n]*)$", lambda m: m.group(1) + ", ".join([valore] * m.group(2).count(",")) + ",",
+                   t, flags=re.M)
+    return t
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--corsa", required=True)
@@ -148,7 +177,8 @@ def main():
     ap.add_argument("--nsoil", type=int, default=4)
     ap.add_argument("--fisso", action="store_true",
                     help="passo di tempo fisso (18 s e 6 s) invece di quello adattivo: si usa se l'adattivo fallisce")
-    ap.add_argument("--domini", type=int, default=2, choices=(2, 3), help="3 = aggiunge il dominio a 333 m su Nerola")
+    ap.add_argument("--domini", type=int, default=2, choices=(1, 2, 3), help="1 = solo 3 km; 3 = aggiunge il dominio a 333 m su Nerola")
+    ap.add_argument("--fisica", default="F1", choices=sorted(FISICHE), help="metodo di calcolo (varianti di confronto)")
     a = ap.parse_args()
     if a.a <= a.da:
         sys.exit("--a deve essere maggiore di --da")
@@ -182,6 +212,9 @@ def main():
         t = t.replace("@" + k + "@", str(v))
     if a.domini == 3:
         t = tre_domini(t)
+    elif a.domini == 1:
+        t = un_dominio(t)
+    t = con_fisica(t, a.fisica)
     if "@" in t:
         sys.exit("segnaposto non sostituito: " + t[t.index("@"):t.index("@") + 20])
     sys.stdout.write(t)

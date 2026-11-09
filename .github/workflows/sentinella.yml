@@ -66,6 +66,15 @@ jobs:
                 gh workflow run previsione-catena.yml --repo "$GITHUB_REPOSITORY" --ref main -f catena="$c" -f corsa="$DISP" || true
               fi
             done
+            # varianti di fisica: una volta al giorno, quando la pubblicazione e' piu' vecchia di 20 ore
+            FIS=$(curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/fisica/indice.json" 2>/dev/null | grep -o '"aggiornato": "[^"]*"' | grep -o '20[0-9-]*T[0-9:]*' || true)
+            ETA=99999; [ -n "$FIS" ] && ETA=$(( ($(date +%s) - $(date -u -d "${FIS}" +%s 2>/dev/null || echo 0)) / 3600 ))
+            ATT_F=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow fisica.yml --limit 5 --json status --jq '.[] | select(.status != "completed") | .status' 2>/dev/null | grep -c . || true)
+            echo "   varianti di fisica: pubblicate da ${ETA} ore, in calcolo $ATT_F"
+            if [ "$ETA" -ge 20 ] && [ "$ATT_F" -eq 0 ] && [ "$(date -u +%H)" -ge 6 ]; then
+              echo "  -> faccio partire le varianti di fisica"
+              gh workflow run fisica.yml --repo "$GITHUB_REPOSITORY" --ref main -f giorno="$(date -u +%Y-%m-%d)" || true
+            fi
             sleep 900
           done
       - name: Riparto

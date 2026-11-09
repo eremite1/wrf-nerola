@@ -1,0 +1,221 @@
+name: "WRF con metodi di calcolo diversi"
+run-name: "Varianti di fisica ${{ inputs.giorno }}"
+
+# Per ognuno dei 4 modelli di partenza (ECMWF, GFS, ICON-EU, ICON-2I) gira il WRF a 3 km con 4 "ricette" di fisica
+# diverse (F1 = quella della catena principale). Niente mappe: si salvano solo i campi al suolo, che la pagella
+# confronta con le stazioni per capire quale combinazione modello + fisica sbaglia meno.
+# La fa partire la Sentinella una volta al giorno (corse delle 00 UTC).
+#   F1  WSM6 + MYNN + Noah        (come la catena principale)
+#   F2  Thompson + YSU + Noah
+#   F3  Morrison + ACM2 + Noah-MP
+#   F4  Thompson + MYJ + Noah
+on:
+  workflow_dispatch:
+    inputs:
+      giorno:
+        description: "etichetta (data), solo per riconoscere la corsa"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fisica
+  cancel-in-progress: false
+
+env:
+  ORE: "48"
+
+jobs:
+  dati:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        forzante: [ECMWF, GFS, ICONEU, ICON2I]
+    outputs:
+      corsa_ECMWF: ${{ steps.c.outputs.corsa_ECMWF }}
+      corsa_GFS: ${{ steps.c.outputs.corsa_GFS }}
+      corsa_ICONEU: ${{ steps.c.outputs.corsa_ICONEU }}
+      corsa_ICON2I: ${{ steps.c.outputs.corsa_ICON2I }}
+    env:
+      FORZANTE: ${{ matrix.forzante }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Programmi
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cdo libeccodes-tools python3-requests python3-numpy >/dev/null
+          case "$FORZANTE" in ICON*)
+            pip install -q omfiles fsspec s3fs pillow requests scipy
+            git clone -q --depth 1 https://github.com/eremite1/meteo-mappe /home/runner/meteo-mappe;;
+          esac
+      - name: Scelgo la corsa e scarico
+        id: c
+        run: |
+          MOD=$(echo "$FORZANTE" | tr A-Z a-z)
+          case "$FORZANTE" in
+            ECMWF) C=$(python3 scarica_ecmwf.py --trova --ore "$ORE");;
+            GFS)   C=$(python3 scarica_gfs.py --trova --ore "$ORE");;
+            *)     C=$(python3 intermedio_icon.py --modello "$MOD" --trova --ore "$ORE");;
+          esac
+          C=$(echo "$C" | tail -n 1)
+          echo "Corsa $FORZANTE: $C"
+          echo "corsa_$FORZANTE=$C" >> "$GITHUB_OUTPUT"
+          echo "$C" > corsa.txt
+          case "$FORZANTE" in
+            ECMWF) python3 scarica_ecmwf.py --corsa "$C" --ore "$ORE" --out /home/runner/grezzi
+                   bash prepara_grib.sh /home/runner/grezzi /home/runner/finali "$ORE";;
+            GFS)   python3 scarica_gfs.py --corsa "$C" --ore "$ORE" --out /home/runner/finali;;
+            *)     PYTHONPATH="$GITHUB_WORKSPACE" python3 intermedio_icon.py --modello "$MOD" --corsa "$C" --ore "$ORE" --out /home/runner/finali;;
+          esac
+          cp corsa.txt /home/runner/finali/
+          du -sh /home/runner/finali
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dati-${{ matrix.forzante }}
+          path: /home/runner/finali
+          retention-days: 1
+          compression-level: 0
+
+  wrf:
+    needs: dati
+    if: always()
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        forzante: [ECMWF, GFS, ICONEU, ICON2I]
+        fisica: [F1, F2, F3, F4]
+    env:
+      FORZANTE: ${{ matrix.forzante }}
+      FISICA: ${{ matrix.fisica }}
+      UCX_TLS: sm,self,tcp
+    steps:
+      - uses: actions/checkout@v4
+      - name: Programmi
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tcsh mpich \
+            libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev python3-numpy python3-netcdf4 >/dev/null
+      - uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/wrf-install
+          key: wrf-arm-v1-cerca
+          restore-keys: wrf-arm-v1-
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/geo_em
+          key: geo-em-cerca
+          restore-keys: geo-em-
+          fail-on-cache-miss: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: dati-${{ matrix.forzante }}
+          path: /home/runner/finali
+      - name: WPS (solo 3 km)
+        run: |
+          CORSA=$(cat /home/runner/finali/corsa.txt); echo "CORSA=$CORSA" >> "$GITHUB_ENV"
+          mkdir -p /home/runner/WPS && cp -a /home/runner/wrf-install/WPS/. /home/runner/WPS/
+          cp /home/runner/geo_em/geo_em.d01.nc /home/runner/WPS/
+          cp /home/runner/geo_em/namelist.wps /home/runner/WPS/namelist.wps
+          case "$FORZANTE" in
+            GFS) cp /home/runner/WPS/ungrib/Variable_Tables/Vtable.GFS /home/runner/WPS/Vtable;;
+            *)   cp Vtable.ECMWF01 /home/runner/WPS/Vtable;;
+          esac
+          cd /home/runner/WPS
+          EPOCH=$(date -u -d "${CORSA:0:8} ${CORSA:8:2}:00 UTC" +%s)
+          START=$(date -u -d @$EPOCH +%Y-%m-%d_%H:%M:%S); END=$(date -u -d @$((EPOCH + ORE*3600)) +%Y-%m-%d_%H:%M:%S)
+          sed -i "s/^ *max_dom.*/ max_dom = 1,/; s/^ *start_date.*/ start_date = '$START',/; s/^ *end_date.*/ end_date   = '$END',/" namelist.wps
+          rm -f GRIBFILE.* FILE:*
+          case "$FORZANTE" in
+            ICON*) for f in /home/runner/finali/ICON_*; do cp "$f" "FILE:${f##*/ICON_}"; done;;
+            *) ./link_grib.csh /home/runner/finali/*.grib2
+               ./ungrib.exe > ungrib.log 2>&1 || true
+               grep -q "Successful completion" ungrib.log || { tail -n 30 ungrib.log; exit 1; };;
+          esac
+          ./metgrid.exe > metgrid.log 2>&1 || true
+          grep -q "Successful completion" metgrid.log || { tail -n 30 metgrid.log; exit 1; }
+          echo "met_em: $(ls met_em.d01.* | wc -l)"
+          rm -rf /home/runner/finali FILE:*
+      - name: real.exe e wrf.exe
+        run: |
+          mkdir -p /home/runner/run && cd /home/runner/run
+          cp -aL /home/runner/wrf-install/WRF/run/. .
+          cp -L /home/runner/wrf-install/WRF/real.exe /home/runner/wrf-install/WRF/wrf.exe .
+          ln -sf /home/runner/WPS/met_em.d01* .
+          NLEV=$(python3 -c "from netCDF4 import Dataset;import glob;n=Dataset(sorted(glob.glob('met_em.d01.*'))[0]);print(len(n.dimensions['num_metgrid_levels']))")
+          NSOIL=$(python3 -c "from netCDF4 import Dataset;import glob;n=Dataset(sorted(glob.glob('met_em.d01.*'))[0]);print(int(n.getncattr('NUM_METGRID_SOIL_LEVELS')))")
+          ulimit -s unlimited || true
+          export OMP_NUM_THREADS=1
+          for TENTATIVO in adattivo fisso; do
+            OPZ=""; [ "$TENTATIVO" = fisso ] && OPZ="--fisso"
+            python3 "$GITHUB_WORKSPACE/namelist.py" --corsa "$CORSA" --da 0 --a "$ORE" --nlev "$NLEV" --nsoil "$NSOIL" --domini 1 --fisica "$FISICA" $OPZ > namelist.input
+            grep -E "mp_physics|bl_pbl|sf_sfclay|sf_surface" namelist.input
+            rm -f rsl.* wrfout_*
+            mpirun -np 1 ./real.exe > real.log 2>&1 || true
+            grep -q "SUCCESS COMPLETE REAL_EM" rsl.error.0000 || { tail -n 30 rsl.error.0000; exit 1; }
+            rm -f rsl.*
+            mpirun -np 4 ./wrf.exe > wrf.log 2>&1 || true
+            grep -q "SUCCESS COMPLETE WRF" rsl.error.0000 2>/dev/null && break
+            echo "wrf.exe non riuscito con passo $TENTATIVO"; tail -n 20 rsl.error.0000 || true
+          done
+          grep -q "SUCCESS COMPLETE WRF" rsl.error.0000
+      - name: Campi al suolo per la pagella
+        run: |
+          python3 postprocess.py --run /home/runner/run --blocco 1 --out /home/runner/uscite --domini 1
+          python3 - <<'EOF'
+          import numpy as np, glob, os
+          f = "/home/runner/uscite/d01_b1.npz"
+          z = np.load(f)
+          tieni = {k: z[k] for k in ("tempi", "lat", "lon", "hgt", "T2", "Q2", "PSFC", "U10", "V10", "RAINC", "RAINNC") if k in z}
+          os.makedirs("/home/runner/fis", exist_ok=True)
+          np.savez_compressed(f"/home/runner/fis/{os.environ['FORZANTE'].lower()}_{os.environ['FISICA'].lower()}.npz", **tieni)
+          print({k: v.shape for k, v in tieni.items()})
+          EOF
+          echo "$CORSA" > /home/runner/fis/corsa_${FORZANTE}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fis-${{ matrix.forzante }}-${{ matrix.fisica }}
+          path: /home/runner/fis
+          retention-days: 2
+
+  pubblica:
+    needs: wrf
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fis-*
+          path: /home/runner/fis
+          merge-multiple: true
+      - name: Pubblico nel ramo "fisica"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd /home/runner/fis
+          ls -la
+          python3 - <<'EOF'
+          import json, glob, os, datetime
+          corse = {os.path.basename(f)[6:-4].lower(): open(f).read().strip() for f in glob.glob("corsa_*.txt")}
+          varianti = {"f1": "WSM6 + MYNN + Noah (come la catena principale)", "f2": "Thompson + YSU + Noah",
+                      "f3": "Morrison + ACM2 + Noah-MP", "f4": "Thompson + MYJ + Noah"}
+          file = sorted(os.path.basename(f) for f in glob.glob("*.npz"))
+          json.dump({"aggiornato": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"), "corse": corse,
+                     "varianti": varianti, "file": file}, open("indice.json", "w"), indent=1)
+          print(open("indice.json").read())
+          EOF
+          rm -f corsa_*.txt
+          test -n "$(ls *.npz 2>/dev/null)" || { echo "nessuna variante riuscita"; exit 1; }
+          git init -q -b fisica
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Varianti di fisica $(date -u +%Y-%m-%d)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" fisica
