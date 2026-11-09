@@ -56,12 +56,17 @@ jobs:
         id: c
         run: |
           MOD=$(echo "$FORZANTE" | tr A-Z a-z)
-          case "$FORZANTE" in
-            ECMWF) C=$(python3 scarica_ecmwf.py --trova --ore "$ORE");;
-            GFS)   C=$(python3 scarica_gfs.py --trova --ore "$ORE");;
-            *)     C=$(python3 intermedio_icon.py --modello "$MOD" --trova --ore "$ORE");;
-          esac
-          C=$(echo "$C" | tail -n 1)
+          for TENTATIVO in 1 2 3 4; do
+            case "$FORZANTE" in
+              ECMWF) C=$(python3 scarica_ecmwf.py --trova --ore "$ORE" || true);;
+              GFS)   C=$(python3 scarica_gfs.py --trova --ore "$ORE" || true);;
+              *)     C=$(python3 intermedio_icon.py --modello "$MOD" --trova --ore "$ORE" || true);;
+            esac
+            C=$(echo "$C" | tail -n 1)
+            case "$C" in [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) break;; esac
+            echo "corsa non trovata (forse in pubblicazione), riprovo tra 5 minuti"; sleep 300
+          done
+          case "$C" in [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;; *) echo "ERRORE: nessuna corsa"; exit 1;; esac
           echo "Corsa $FORZANTE: $C"
           echo "corsa_$FORZANTE=$C" >> "$GITHUB_OUTPUT"
           echo "$C" > corsa.txt
