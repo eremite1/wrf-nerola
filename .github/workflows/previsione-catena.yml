@@ -7,12 +7,8 @@ run-name: "Catena ${{ inputs.catena || github.event.schedule }} ${{ inputs.corsa
 #   iconeu: come gfs ma con il modello tedesco ICON-EU (DWD), 48 ore
 #   icon2i: come gfs ma con il modello italiano ICON-2I (ItaliaMeteo); sopra 250 hPa e suolo da ICON-EU, 48 ore
 # Pubblicano nelle sottocartelle fine/ e gfs/ del ramo "risultati": la pagina le mostra come altri modelli.
+# Le fa partire la Sentinella WRF (sentinella.yml) appena esce una corsa nuova del modello di ogni catena.
 on:
-  schedule:
-    - cron: '10 5,17 * * *'      # GFS: le corse delle 00 e delle 12 sono complete circa 4-5 ore dopo
-    - cron: '25 8,20 * * *'      # fine: corse ECMWF delle 00 e delle 12
-    - cron: '40 4,16 * * *'      # iconeu: corse delle 00 e delle 12
-    - cron: '55 5,17 * * *'      # icon2i: corse delle 00 e delle 12
   workflow_dispatch:
     inputs:
       catena:

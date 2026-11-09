@@ -30,7 +30,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq python3-requests >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq python3-requests python3-numpy >/dev/null
+          git clone -q --depth 1 https://github.com/eremite1/meteo-mappe /tmp/meteo-mappe || true
           INIZIO=$(date +%s)
           while [ $(( ($(date +%s) - INIZIO) / 60 )) -lt 340 ]; do
             NUOVA=$(python3 scarica_ecmwf.py --trova --ore 72 2>/dev/null | tail -n 1 || true)
@@ -47,6 +48,24 @@ jobs:
               gh workflow run previsione-nerola.yml --repo "$GITHUB_REPOSITORY" --ref main -f ore=72 -f ore_blocco=24 -f corsa="$NUOVA" || true
               sleep 120
             fi
+            # altre catene (333 m, GFS, ICON-EU, ICON-2I): parte ognuna quando esce una corsa nuova del suo modello
+            for c in fine gfs iconeu icon2i; do
+              case "$c" in
+                fine) DISP=$(python3 scarica_ecmwf.py --trova --ore 36 2>/dev/null | tail -n 1);;
+                gfs)  DISP=$(python3 scarica_gfs.py --trova --ore 48 2>/dev/null | tail -n 1);;
+                *)    DISP=$(MOTORE_MAPPE=/tmp/meteo-mappe python3 intermedio_icon.py --modello "$c" --trova --ore 48 2>/dev/null | tail -n 1);;
+              esac
+              FATTA_C=$(curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/risultati/$c/LEGGIMI.md" 2>/dev/null \
+                        | grep -o '[0-9]\{10\}' | head -n 1 || true)
+              ATT_C=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow previsione-catena.yml --limit 20 --json status,displayTitle \
+                      --jq ".[] | select(.status != \"completed\") | select(.displayTitle | startswith(\"Catena $c \")) | .displayTitle" 2>/dev/null | grep -c . || true)
+              echo "   catena $c: disponibile ${DISP:-?}, online ${FATTA_C:-?}, in calcolo $ATT_C"
+              case "$DISP" in [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;; *) continue;; esac
+              if [ "$DISP" -gt "${FATTA_C:-0}" ] 2>/dev/null && [ "$ATT_C" -eq 0 ]; then
+                echo "  -> faccio partire la catena $c con la corsa $DISP"
+                gh workflow run previsione-catena.yml --repo "$GITHUB_REPOSITORY" --ref main -f catena="$c" -f corsa="$DISP" || true
+              fi
+            done
             sleep 900
           done
       - name: Riparto
