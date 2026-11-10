@@ -294,7 +294,8 @@ async function caricaCatene() {
         const voce = conPrefisso(v, c.cartella + "/");
         voce.etichetta = c.cartella === "fine" ? v.etichetta : v.etichetta + " · " + c.nome;
         voce.descr = c.descr || (k === "1km" ? "zona di Nerola, circa 73 km" : "area più ampia, circa 240 km");
-        voce.corsa = sub.corsa; voce.forzante = sub.forzante || c.nome;
+        voce.corsa = sub.corsa; voce.forzante = sub.forzante || (c.cartella === "fine" ? "ECMWF" : c.nome);
+        voce.elaborato = sub.elaborato || sub.creato;
         indice.domini[c.cartella + "-" + k] = voce;
       }
     } catch (e) { /* catena non ancora pubblicata */ }
@@ -327,7 +328,7 @@ async function carica() {
     b.onclick = () => { dom.value = k; dom.onchange(); };
     lm.appendChild(b);
   }
-  dom.onchange = () => { puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); evidenzia(); };
+  dom.onchange = () => { aggiornaContatore(); puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); evidenzia(); };
   $("parametro").onchange = () => { scegliParametro(); evidenzia(); };
   $("cursore").oninput = () => mostra(+$("cursore").value, false);
   $("indietro").onclick = () => { ferma(); mostra(posizione - 1); };
@@ -361,11 +362,14 @@ function durata(ms) {
 
 function aggiornaContatore() {
   if (!indice) return;
-  const c = indice.corsa, el = data(indice.elaborato || indice.creato), ora = Date.now();
+  // l'intestazione segue il modello scelto (ECMWF, ICON-2I, ...), non sempre quello principale
+  const sc = ($("dominio") && indice.domini[$("dominio").value]) || {};
+  const c = sc.corsa || indice.corsa, el = data(sc.elaborato || indice.elaborato || indice.creato), ora = Date.now();
+  const base = (sc.forzante || "ECMWF").replace(/^WRF\s*/i, "");
   const fmt = new Intl.DateTimeFormat("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
   const prossimo = el.getTime() + 6 * 3600000;
   const dopo = ora < prossimo ? `prossimo aggiornamento stimato tra ${durata(prossimo - ora)}` : "nuova corsa in elaborazione, aggiornamento atteso a breve";
-  $("info").innerHTML = `Corsa ECMWF delle ${c.slice(8, 10)} UTC del ${c.slice(6, 8)}/${c.slice(4, 6)} · WRF pronto ${fmt.format(el)}<br>` +
+  $("info").innerHTML = `Corsa ${base} delle ${c.slice(8, 10)} UTC del ${c.slice(6, 8)}/${c.slice(4, 6)} · WRF pronto ${fmt.format(el)}<br>` +
                         `<b>aggiornato ${durata(ora - el.getTime())} fa</b> · ${dopo}`;
 }
 

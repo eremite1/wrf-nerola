@@ -44,7 +44,7 @@ def scarica(url, tentativi=4):
     raise RuntimeError(f"download fallito: {ultimo}")
 
 
-NEROLA = (42.13, 12.77)
+NEROLA = (42.1606, 12.7856)   # centro del paese (prima era 3,5 km troppo a sud)
 RETI_METEOHUB = ("dpcn-lazio", "dpcn-umbria", "mnw")     # rete regionale Lazio e Umbria (Protezione Civile), MeteoNetwork
 BASE_MH = "https://meteohub.agenziaitaliameteo.it"
 # variabile BUFR, livello e tipo di elaborazione degli strumenti standard

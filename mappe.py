@@ -45,7 +45,7 @@ import sondaggi  # noqa: E402
 import uscite  # noqa: E402
 
 ROMA = ZoneInfo("Europe/Rome")
-NEROLA = (42.13, 12.77)
+NEROLA = (42.1606, 12.7856)   # centro del paese (prima era 3,5 km troppo a sud)
 FORZANTI = {"ECMWF": "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)",
             "GFS": "WRF su dati NOAA GFS 0,25° (pubblico dominio, dati modificati)",
             "ICONEU": "WRF su dati DWD ICON-EU via Open-Meteo (CC BY 4.0, dati modificati)",
