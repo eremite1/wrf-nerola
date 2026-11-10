@@ -781,6 +781,31 @@ def candidati_capoluoghi(lat, lon):
     return out
 
 
+PROVINCE_LAZIO = {"RM": "Roma", "VT": "Viterbo", "RI": "Rieti", "LT": "Latina", "FR": "Frosinone"}
+
+
+def elenco_luoghi(sf, lat, lon, cand):
+    """Per il meteogramma: TUTTI i comuni del Lazio dentro la zona del modello (con la provincia),
+    piu' i paesi gia' scelti per la mappa. Nerola sempre presente."""
+    out, visti = [], set()
+    def metti(p_, prov):
+        chiave = (p_["nome"], round(p_["lat"], 2), round(p_["lon"], 2))
+        if chiave in visti or p_["nome"] in {o["nome"] for o in out if o["prov"] == prov}:
+            return
+        visti.add(chiave)
+        out.append({"nome": p_["nome"], "lat": round(p_["lat"], 4), "lon": round(p_["lon"], 4),
+                    "quota": p_.get("quota"), "prov": prov})
+    metti({"nome": "Nerola", "lat": NEROLA[0], "lon": NEROLA[1], "quota": None}, "RM")
+    for p_ in sf.get("paesi", []):
+        if not (lat.min() < p_["lat"] < lat.max() and lon.min() < p_["lon"] < lon.max()):
+            continue
+        if p_.get("prov") in PROVINCE_LAZIO and (p_.get("sede") or p_.get("pop", 0) >= 800):
+            metti(p_, p_["prov"])
+    for p_ in cand[:150]:                         # paesi fuori dal Lazio (es. Umbria) gia' usati sulla mappa
+        metti(p_, p_.get("prov") if p_.get("prov") in PROVINCE_LAZIO else "")
+    return out
+
+
 def candidati(sf, lat, lon, vicini):
     """Paesi dentro la mappa, in ordine di importanza. Nerola e' sempre il primo."""
     elenco = [{"nome": "Nerola", "lat": NEROLA[0], "lon": NEROLA[1], "pop": 0, "sede": True, "quota": None}]
@@ -1162,8 +1187,7 @@ def main():
         campi = campi_serie(d)
         serie = np.stack([quantizza(arr, sc).reshape(arr.shape[0], -1) for _, _, _, sc, arr in campi])  # [campo, t, punto]
         np.ascontiguousarray(serie.transpose(2, 0, 1)).tofile(cart_dati / "serie.bin")                    # [punto, campo, t]
-        luoghi = [{"nome": p_["nome"], "lat": round(p_["lat"], 4), "lon": round(p_["lon"], 4), "quota": p_.get("quota")}
-                  for p_ in cand[:150]]
+        luoghi = elenco_luoghi(sf, d["lat"], d["lon"], cand)
         voce.update({
             "layout": {**layout, "estensione": [lon0, lon1, lat0, lat1], "ny": int(ny), "nx": int(nx)},
             "griglia": f"dati/{cartella_dom}/griglia.bin",

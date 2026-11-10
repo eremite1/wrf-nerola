@@ -202,7 +202,8 @@ def paesi():
                     quota = int(c[k])
                     break
             nome = "Roma" if c[1] == "Rome" else c[1]
-            out.append({"nome": nome, "lat": lat, "lon": lon, "pop": pop, "sede": sede, "quota": quota})
+            out.append({"nome": nome, "lat": lat, "lon": lon, "pop": pop, "sede": sede, "quota": quota,
+                        "prov": c[11] if len(c) > 11 else "", "reg": c[10] if len(c) > 10 else ""})
     out.sort(key=lambda p: (not p["sede"], -p["pop"]))
     return out
 

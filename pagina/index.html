@@ -979,10 +979,19 @@ async function iniziaMeteo() {
 function riempiLuoghiMeteo() {
   const D = indice.domini[$("meteo-zona").value], sel = $("meteo-luogo");
   sel.innerHTML = "";
+  // tutte le località, divise per provincia (Roma, Viterbo, Rieti, Latina, Frosinone, poi fuori Lazio)
+  const PROV = [["RM", "Provincia di Roma"], ["VT", "Provincia di Viterbo"], ["RI", "Provincia di Rieti"], ["LT", "Provincia di Latina"], ["FR", "Provincia di Frosinone"], ["", "Fuori dal Lazio / altre"]];
   const luoghi = [...(D.luoghi || [])].sort((a, b) => a.nome.localeCompare(b.nome, "it"));
-  luoghi.forEach((l) => sel.add(new Option(l.nome, JSON.stringify([l.lat, l.lon]))));
-  const n = luoghi.findIndex((l) => l.nome === "Nerola");
-  if (n >= 0) sel.selectedIndex = n;
+  const conProv = luoghi.some((l) => l.prov);
+  let scelta = null;
+  for (const [sig, titolo] of (conProv ? PROV : [["*", "Località"]])) {
+    const gruppo = luoghi.filter((l) => sig === "*" || (l.prov || "") === sig);
+    if (!gruppo.length) continue;
+    const og = document.createElement("optgroup"); og.label = titolo + (sig !== "*" ? ` (${gruppo.length})` : "");
+    for (const l of gruppo) { const o = new Option(l.nome, JSON.stringify([l.lat, l.lon])); og.appendChild(o); if (l.nome === "Nerola" && !scelta) scelta = o; }
+    sel.appendChild(og);
+  }
+  if (scelta) scelta.selected = true;
   disegnaMeteo();
 }
 
