@@ -138,6 +138,7 @@
       <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
       <button role="tab" id="s-pagella" aria-selected="false">🏆 Pagelle ↗</button>
       <button role="tab" id="s-corretto" aria-selected="false">WRF corretto (sperimentale)</button>
+      <button role="tab" id="s-confronto" aria-selected="false">Confronto di tutti i WRF</button>
     </div>
     <div class="sotto" id="info">Caricamento…</div>
   </div>
@@ -188,6 +189,27 @@
     <p>Temperatura e umidità del suolo vengono dal modello del suolo di WRF (l'umidità iniziale arriva da ECMWF). La pioggia è la somma di quella convettiva e a grande scala.</p>
   </details>
   <div class="tip nascosto" id="tip"></div>
+
+  <section id="vista-confronto" class="card nascosto">
+    <h2 style="margin:0 0 4px;font-size:1.1rem">Confronto di tutti i WRF</h2>
+    <p class="suggerimento" style="text-align:left" id="cf-intro">Caricamento…</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:6px 0 10px">
+      <label>Grandezza <select id="cf-var"><option value="T">Temperatura</option><option value="V">Vento</option><option value="P">Pioggia</option></select></label>
+      <label>Mostra <select id="cf-gruppo"><option value="tutti">tutti i WRF</option><option value="catene">solo le catene principali</option><option value="fisica">solo le varianti di fisica</option><option value="migliori">i 5 migliori</option></select></label>
+    </div>
+    <div id="cf-grafico"></div>
+    <div id="cf-legenda" style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.78rem;margin:2px 0 12px"></div>
+    <div id="cf-tabella" style="overflow-x:auto"></div>
+    <details class="info"><summary>Come leggere il confronto</summary>
+      <p>Qui ci sono <b>tutti</b> i WRF che girano: le catene principali (1 km e 3 km) su ECMWF, ICON-2I, GFS e ICON-EU, il 333 m su Nerola
+      e le <b>varianti di fisica</b>, cioè lo stesso WRF a 3 km calcolato con 4 "ricette" diverse (F1 = quella delle catene principali, F2-F4 = alternative).</p>
+      <p>Il grafico mostra l'ultima previsione di ciascuno per Nerola, con la stazione di Nerola in nero. La tabella dice quanto ognuno ha sbagliato,
+      in media, contro tutte le stazioni nelle prime 48 ore di previsione degli ultimi giorni: <b>più è basso l'errore, meglio è</b>.
+      Per la pioggia conta anche il «centrate»: la percentuale di volte in cui ha piovuto (più di 1 mm in 6 ore) e il modello lo aveva previsto.</p>
+      <p>Il 333 m copre solo una ventina di km intorno a Nerola, quindi è giudicato su pochissime stazioni: il suo numero non è confrontabile con gli altri.
+      Le varianti di fisica girano una volta al giorno: all'inizio hanno pochi confronti, la classifica diventa affidabile dopo una o due settimane.</p>
+    </details>
+  </section>
 
   <section id="vista-corretto" class="card nascosto">
     <h2 style="margin:0 0 4px;font-size:1.1rem">WRF corretto per Nerola (sperimentale)</h2>
@@ -347,6 +369,9 @@ async function carica() {
     else location.href = "https://www.meteonerola.it/modelli-meteo/#pagelle";
   };
   $("s-corretto").onclick = () => scheda("corretto");
+  $("s-confronto").onclick = () => scheda("confronto");
+  $("cf-var").onchange = disegnaConfronto;
+  $("cf-gruppo").onchange = disegnaConfronto;
   riempiParametri(true);
   caricaGriglia().catch(() => {});
   const img = $("mappa");
@@ -375,13 +400,60 @@ function aggiornaContatore() {
 
 function scheda(nome) {
   ferma();
-  for (const [id, n] of [["mappe", "vista-mappe"], ["meteo", "vista-meteo"], ["pagella", "vista-pagella"], ["corretto", "vista-corretto"]]) {
+  for (const [id, n] of [["mappe", "vista-mappe"], ["meteo", "vista-meteo"], ["pagella", "vista-pagella"], ["corretto", "vista-corretto"], ["confronto", "vista-confronto"]]) {
     $(n).classList.toggle("nascosto", id !== nome);
     $("s-" + id).setAttribute("aria-selected", id === nome);
   }
   if (nome === "pagella" && !pagella) caricaPagella();
   if (nome === "meteo" && !meteoPronto) iniziaMeteo();
   if (nome === "corretto") disegnaCorretto();
+  if (nome === "confronto") disegnaConfronto();
+}
+
+// ---------------------------------------------------------------- confronto di tutti i WRF
+const COL_FORZ = { ecmwf: "#e0482f", gfs: "#2a6cc7", icon2i: "#2e9d4a", iconeu: "#16a0a0" };
+function infoWrf(m) {
+  const forz = m === "wrf1" || m === "wrf3" || m === "wrf333" ? "ecmwf" : m.split("_")[1];
+  const fis = /_f\d$/.test(m), ris = m.startsWith("wrf333") ? "333m" : m.startsWith("wrf1") ? "1km" : "3km";
+  return { forz, fis, ris, colore: COL_FORZ[forz] || "#888" };
+}
+async function disegnaConfronto() {
+  if (!pagella) await caricaPagella();
+  const cf = pagella && pagella.confronto_wrf;
+  if (!cf || !Object.keys(cf.classifica || {}).length) { $("cf-intro").textContent = "Il confronto si riempie dalla prossima pagella (ogni 3 ore)."; return; }
+  const v = $("cf-var").value, gr = $("cf-gruppo").value, chiave = v === "P" ? "P6" : v;
+  const err = (m) => ((cf.classifica[m] || {})[chiave] || {}).mae;
+  let modelli = Object.keys(cf.classifica).filter((m) => m !== "wrf333" || gr !== "migliori");
+  if (gr === "catene") modelli = modelli.filter((m) => !infoWrf(m).fis);
+  if (gr === "fisica") modelli = modelli.filter((m) => infoWrf(m).fis);
+  modelli.sort((a, b) => (err(a) ?? 99) - (err(b) ?? 99));
+  if (gr === "migliori") modelli = modelli.filter((m) => err(m) !== undefined).slice(0, 5);
+  const tot = Object.keys(cf.classifica).length;
+  $("cf-intro").innerHTML = `WRF valutati: <b>${tot}</b>. Errore medio contro le stazioni nelle prime 48 ore, ultimi ${pagella.giorni} giorni. Aggiornato: ${pagella.aggiornato.replace("T", " ").replace("Z", " UTC")}.`;
+  // grafico per Nerola
+  const N = cf.nerola, unita = { T: "°C", V: "km/h", P: "mm/h" }[v], nomeV = { T: "Temperatura", V: "Vento", P: "Pioggia oraria" }[v];
+  const primi = new Set(modelli.slice(0, 3));
+  const serie = [{ v: N.oss[v], c: "#222", nome: "stazione di Nerola", spesso: 3 }];
+  for (const m of modelli) {
+    if (!N.prev[m]) continue;
+    const i = infoWrf(m);
+    serie.push({ v: N.prev[m][v], c: i.colore, nome: cf.modelli[m].nome, tratteggio: i.fis, spesso: primi.has(m) ? 2.4 : 1.1 });
+  }
+  $("cf-grafico").innerHTML = grafico(`${nomeV} a Nerola (${unita}) — ultima previsione di ogni WRF`, N.tempi.map((x) => new Date(x)), serie, v !== "T" ? { da0: true, alto: 240 } : { alto: 240 });
+  $("cf-legenda").innerHTML = [["#222", "stazione"], [COL_FORZ.ecmwf, "su ECMWF"], [COL_FORZ.icon2i, "su ICON-2I"], [COL_FORZ.gfs, "su GFS"], [COL_FORZ.iconeu, "su ICON-EU"]]
+    .map(([c, t]) => `<span><i style="display:inline-block;width:14px;height:3px;background:${c};vertical-align:middle"></i> ${t}</span>`).join("") +
+    '<span>linea spessa = i 3 migliori · tratteggio = varianti di fisica</span>';
+  // tabella
+  const f = (x, d = 1) => x === undefined || x === null ? "–" : nf1.format(+x.toFixed(d));
+  let t = '<table class="tab"><thead><tr><th>#</th><th>WRF</th><th>Temperatura<br><small>errore °C</small></th><th>Vento<br><small>errore km/h</small></th><th>Pioggia 6 h<br><small>errore mm · centrate</small></th><th>Corse<br><small>valutate</small></th></tr></thead><tbody>';
+  modelli.forEach((m, k) => {
+    const c = cf.classifica[m], p = c.P6 || {};
+    const evid = (q) => (q === chiave ? ' style="font-weight:700"' : "");
+    t += `<tr><td>${k + 1}</td><td style="text-align:left"><span style="color:${infoWrf(m).colore}">●</span> ${cf.modelli[m].nome}<br><small style="color:var(--testo2,#666)">${cf.modelli[m].nota}</small></td>` +
+      `<td${evid("T")}>${f((c.T || {}).mae)}</td><td${evid("V")}>${f((c.V || {}).mae)}</td>` +
+      `<td${evid("P6")}>${f(p.mae)}${p.pod !== undefined && p.pod !== null ? " · " + Math.round(p.pod * 100) + "%" : ""}</td><td>${c.corse}</td></tr>`;
+  });
+  $("cf-tabella").innerHTML = t + "</tbody></table>";
 }
 
 async function disegnaCorretto() {
@@ -389,10 +461,13 @@ async function disegnaCorretto() {
   if (!pagella) { $("cor-intro").textContent = "I dati del confronto non sono ancora disponibili."; return; }
   const ner = pagella.nerola;
   const wc = pagella.wrf_corretto || { base: "wrf1", nome_base: "WRF Nerola 1 km", punteggi: {} };
-  const base = ner.prev[wc.base] ? wc.base : "wrf1", nomeBase = wc.nome_base || "WRF 1 km";
+  const base = ner.prev[wc.base] ? wc.base : "wrf1";
+  const nomeBase = base === wc.base ? (wc.nome_base || "WRF 1 km") : "WRF 1 km · ECMWF";
+  const nomiCf = (pagella.confronto_wrf || {}).modelli || {};
   const pun = Object.entries(wc.punteggi || {}).filter(([, x]) => x.errore !== null).sort((a, b) => a[1].errore - b[1].errore)
-    .map(([m, x]) => `${(pagella.modelli[m] || { nome: m }).nome} ${nf1.format(x.errore * 100)}`).join(" · ");
-  $("cor-intro").innerHTML = `La correzione parte dal WRF che nelle ultime due settimane ha sbagliato meno: oggi è <b>${nomeBase}</b>. ` +
+    .slice(0, 6).map(([m, x]) => `${(nomiCf[m] || pagella.modelli[m] || { nome: m }).nome} ${nf1.format(x.errore * 100)}`).join(" · ");
+  $("cor-intro").innerHTML = `La correzione parte dal WRF che nelle ultime due settimane ha sbagliato meno: oggi è <b>${wc.nome_base || nomeBase}</b>` +
+    (base !== wc.base ? " (nei grafici sotto, per ora, il confronto è con il WRF 1 km su ECMWF)" : "") + ". " +
     (pun ? `Errore complessivo (temperatura, rugiada, vento e pioggia insieme; più basso è meglio): ${pun}. ` : "") +
     `Ultimo aggiornamento della pagella: ${pagella.aggiornato.replace("T", " ").replace("Z", " UTC")}.`;
   if (!ner || !ner.tempi.length || !ner.prev.wrfc) { $("cor-grafici").innerHTML = '<p class="suggerimento" style="text-align:left">La previsione corretta comparirà dopo la prossima corsa.</p>'; return; }

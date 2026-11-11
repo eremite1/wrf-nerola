@@ -35,6 +35,10 @@ jobs:
           print("CORSA=" + json.load(open("/home/runner/vecchio/indice.json"))["corsa"])
           PY
 
+      - name: Varianti di fisica (tutti i WRF con metodi di calcolo diversi)
+        run: |
+          git clone -q --depth 1 -b fisica "https://github.com/${GITHUB_REPOSITORY}.git" /home/runner/fisica 2>/dev/null || mkdir -p /home/runner/fisica
+
       - name: Recupero lo storico
         run: |
           if git clone -q --depth 1 -b storico "https://github.com/${GITHUB_REPOSITORY}.git" /home/runner/storico 2>/dev/null; then
@@ -58,7 +62,7 @@ jobs:
           METEOHUB_USERNAME: ${{ secrets.METEOHUB_USERNAME }}
           METEOHUB_PASSWORD: ${{ secrets.METEOHUB_PASSWORD }}
         run: |
-          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA" --stazione /home/runner/stazione --altri-modelli
+          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA" --stazione /home/runner/stazione --altri-modelli --fisica /home/runner/fisica
 
       - name: Aggiorno lo storico
         env:

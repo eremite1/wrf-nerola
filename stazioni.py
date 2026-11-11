@@ -271,11 +271,13 @@ def punto_vicino(lat, lon, la, lo):
     return int(i), int(j), float(np.sqrt(d[i, j]) * 111.0)
 
 
-def estrai_previsione(cartella_uscite, corsa, stazioni):
-    """Righe [corsa, valido, ore_dall_inizio, stazione, T, Td, V, h, P per d01, poi per d02]. P = pioggia dell'ora precedente (mm)."""
+def estrai_previsione(cartella_uscite, corsa, stazioni, file_dom=None):
+    """Righe [corsa, valido, ore_dall_inizio, stazione, T, Td, V, h, P per ogni dominio]. P = pioggia dell'ora precedente (mm).
+    file_dom: {suffisso: nome file npz}; di base d01 e d02 della catena principale (ECMWF)."""
+    file_dom = file_dom or {"d01": "d01_tutto.npz", "d02": "d02_tutto.npz"}
     campi = {}
-    for dom in ("d01", "d02"):
-        p = Path(cartella_uscite) / f"{dom}_tutto.npz"
+    for dom, nome in file_dom.items():
+        p = Path(cartella_uscite) / nome
         if not p.exists():
             continue
         z = np.load(p, allow_pickle=True)
@@ -296,7 +298,7 @@ def estrai_previsione(cartella_uscite, corsa, stazioni):
         return []
     inizio = datetime.strptime(corsa, "%Y%m%d%H").replace(tzinfo=timezone.utc)
     righe = []
-    base = campi.get("d01") or campi["d02"]
+    base = campi.get("d01") or next(iter(campi.values()))
     indici = {dom: {t: k for k, t in enumerate(c[6])} for dom, c in campi.items()}
     for s in stazioni.values():
         trovati = {}
@@ -308,7 +310,7 @@ def estrai_previsione(cartella_uscite, corsa, stazioni):
             continue
         for t in base[6]:
             riga = [corsa, ora_iso(t), int(round((t - inizio).total_seconds() / 3600)), s["id"]]
-            for dom in ("d01", "d02"):
+            for dom in file_dom:
                 if dom in trovati and t in indici[dom]:
                     lat, lon, hgt, t2, td, v, tempi, pr = campi[dom]
                     i, j, _ = trovati[dom]
@@ -325,12 +327,16 @@ def estrai_previsione(cartella_uscite, corsa, stazioni):
 CAMPI_PREV = ["corsa", "valido", "ore", "id", "T_d01", "Td_d01", "V_d01", "h_d01", "P_d01", "T_d02", "Td_d02", "V_d02", "h_d02", "P_d02"]
 
 
-def salva_previsione(cartella, corsa, righe):
-    p = Path(cartella) / "previsioni"
+def campi_prev(domini):
+    return ["corsa", "valido", "ore", "id"] + [f"{v}_{d}" for d in domini for v in ("T", "Td", "V", "h", "P")]
+
+
+def salva_previsione(cartella, corsa, righe, sotto="previsioni", domini=("d01", "d02")):
+    p = Path(cartella) / sotto
     p.mkdir(parents=True, exist_ok=True)
     with gzip.open(p / f"{corsa}.csv.gz", "wt", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(CAMPI_PREV)
+        w.writerow(campi_prev(domini))
         w.writerows(righe)
     vecchio = p / f"{corsa}.csv"
     if vecchio.exists():
@@ -341,10 +347,10 @@ def _apri(p):
     return gzip.open(p, "rt", newline="", encoding="utf-8") if str(p).endswith(".gz") else open(p, newline="", encoding="utf-8")
 
 
-def leggi_previsioni(cartella, giorni):
+def leggi_previsioni(cartella, giorni, sotto="previsioni"):
     limite = (datetime.now(timezone.utc) - timedelta(days=giorni)).strftime("%Y%m%d%H")
     out = []
-    cart = Path(cartella) / "previsioni"
+    cart = Path(cartella) / sotto
     for p in sorted(cart.glob("*.csv*")):
         corsa = p.name.split(".")[0]
         if corsa < limite:
@@ -485,6 +491,30 @@ NOMI_MODELLI = {
 }
 
 
+# Tutti gli altri WRF (oltre a wrf1/wrf3 su ECMWF): id -> (cartella previsioni nello storico, dominio, nome)
+FORZANTI = {"ecmwf": "ECMWF", "gfs": "GFS", "icon2i": "ICON-2I", "iconeu": "ICON-EU"}
+RICETTE = {"f1": "WSM6 + MYNN + Noah", "f2": "Thompson + YSU + Noah", "f3": "Morrison + ACM2 + Noah-MP", "f4": "Thompson + MYJ + Noah"}
+CATENE_EXTRA = {"gfs": ("prev_gfs", {"d01": "d01_tutto.npz", "d02": "d02_tutto.npz"}),
+                "icon2i": ("prev_icon2i", {"d01": "d01_tutto.npz", "d02": "d02_tutto.npz"}),
+                "iconeu": ("prev_iconeu", {"d01": "d01_tutto.npz", "d02": "d02_tutto.npz"}),
+                "fine": ("prev_fine", {"d03": "d03_tutto.npz"})}
+
+
+def registro_wrf():
+    """id modello -> (cartella previsioni, suffisso colonna, nome, nota). Comprende tutti i WRF che girano."""
+    r = {"wrf1": ("previsioni", "d02", "WRF 1 km · ECMWF", "catena principale"),
+         "wrf3": ("previsioni", "d01", "WRF 3 km · ECMWF", "catena principale"),
+         "wrf333": ("prev_fine", "d03", "WRF 333 m · ECMWF", "solo Nerola e dintorni (~20 km): poche stazioni")}
+    for k in ("icon2i", "gfs", "iconeu"):
+        r[f"wrf1_{k}"] = (f"prev_{k}", "d02", f"WRF 1 km · {FORZANTI[k]}", "catena su altri dati iniziali")
+        r[f"wrf3_{k}"] = (f"prev_{k}", "d01", f"WRF 3 km · {FORZANTI[k]}", "catena su altri dati iniziali")
+    for k in FORZANTI:
+        for f, ric in RICETTE.items():
+            r[f"wrf3_{k}_{f}"] = (f"prev_fis_{k}_{f}", "d01", f"WRF 3 km · {FORZANTI[k]} · {f.upper()}",
+                                  f"variante di fisica: {ric}, una corsa al giorno")
+    return r
+
+
 def fascia_di(ore):
     return next((f[2] for f in FASCE if f[0] <= ore < f[1]), None)
 
@@ -501,6 +531,27 @@ def campioni_wrf(prev_righe, limite):
             if all(x is None for x in vals.values()):
                 continue
             out[m].append((r["corsa"], r["id"], r["valido"], ore, vals))
+    return out
+
+
+def campioni_tutti_wrf(cart, giorni, limite):
+    """Campioni di TUTTI i WRF registrati (esclusi wrf1/wrf3 gia' letti dalla catena principale)."""
+    out, cache = {}, {}
+    for m, (sotto, suff, _, _) in registro_wrf().items():
+        if sotto == "previsioni":
+            continue
+        if sotto not in cache:
+            cache[sotto] = leggi_previsioni(cart, giorni, sotto) if (Path(cart) / sotto).exists() else []
+        lista = []
+        for r in cache[sotto]:
+            if r["valido"] < limite:
+                continue
+            vals = {v: num(r.get(f"{v}_{suff}")) for v in VARS}
+            if all(x is None for x in vals.values()):
+                continue
+            lista.append((r["corsa"], r["id"], r["valido"], int(r["ore"]), vals))
+        if lista:
+            out[m] = lista
     return out
 
 
@@ -615,12 +666,16 @@ def wrf_migliore_per_corsa(campioni_per_modello, oss, giorni=14, minimo=200):
         i, j = bisect.bisect_left(chiavi[m], da), bisect.bisect_left(chiavi[m], a)
         sel = pt[m][i:j]
         return (sum(x[1] for x in sel) / len(sel), len(sel)) if sel else (None, 0)
+    corse_di = {m: {c[0] for c in camp} for m, camp in campioni_per_modello.items()}
     for corsa in corse:
         inizio = datetime.strptime(corsa, "%Y%m%d%H").replace(tzinfo=timezone.utc)
         da, a = ora_iso(inizio - timedelta(days=giorni)), ora_iso(inizio)
-        voti = {m: media(m, da, a) for m in pt}
+        voti = {m: media(m, da, a) for m in pt if corsa in corse_di.get(m, ())}
         validi = {m: x for m, (x, n) in voti.items() if x is not None and n >= minimo}
-        scelta[corsa] = min(validi, key=validi.get) if validi else "wrf1"
+        if validi:
+            scelta[corsa] = min(validi, key=validi.get)
+        elif corsa in corse_di.get("wrf1", ()):
+            scelta[corsa] = "wrf1"
     adesso = ora_iso(datetime.now(timezone.utc) + timedelta(hours=1))
     punteggio = {}
     for m in pt:
@@ -699,6 +754,40 @@ def riepilogo(campioni_per_modello, oss, solo=None):
     return out
 
 
+def confronto_wrf(camp, oss, adesso):
+    """Classifica di TUTTI i WRF contro le stazioni (prime 48 ore) e ultime previsioni per Nerola."""
+    reg = registro_wrf()
+    wrf = {m: c for m, c in camp.items() if m in reg and c}
+    classifica = {}
+    for m, c in wrf.items():
+        cop = _coppie({m: c}, {k: v for k, v in oss.items() if k[0] != "NEROLA" or m == "wrf333"})
+        voce = {}
+        for v in ("T", "V", "P6"):
+            lista = [x for f in NOMI_FASCE for d in cop[v][f].get(m, {}).values() for x in d]
+            st = _stat(lista, v == "P6")
+            if st:
+                voce[v] = st
+        voce["corse"] = len({x[0] for x in c})
+        voce["ultima"] = max(x[0] for x in c)
+        classifica[m] = voce
+    # Nerola: ultima previsione di ogni WRF, da 24 ore fa in avanti
+    t0 = ora_iso(adesso - timedelta(hours=24))
+    ultimo = {}
+    for m, c in wrf.items():
+        u = {}
+        for corsa, sid, valido, ore, vals in c:
+            if sid == "NEROLA" and valido >= t0 and (valido not in u or corsa > u[valido][0]):
+                u[valido] = (corsa, vals)
+        if u:
+            ultimo[m] = u
+    tempi = sorted({t for u in ultimo.values() for t in u} | {k[1] for k in oss if k[0] == "NEROLA" and k[1] >= t0})
+    nerola = {"tempi": tempi,
+              "oss": {v: [pulisci(num(oss[("NEROLA", t)][v])) if ("NEROLA", t) in oss else None for t in tempi] for v in ("T", "V", "P")},
+              "prev": {m: {v: [pulisci(u[t][1][v]) if t in u else None for t in tempi] for v in ("T", "V", "P")} for m, u in ultimo.items()}}
+    return {"modelli": {m: {"nome": reg[m][2], "nota": reg[m][3]} for m in reg},
+            "classifica": classifica, "nerola": nerola}
+
+
 def errori_orari(campioni, oss):
     """Errore medio del WRF per fascia di 3 ore (UTC), solo previsioni entro 48 ore."""
     acc = {v: [[] for _ in range(8)] for v in ("T", "Td", "V")}
@@ -713,7 +802,7 @@ def errori_orari(campioni, oss):
     return {v: [_stat(c) for c in lista] for v, lista in acc.items()}
 
 
-def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIORNI_FINESTRA):
+def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIORNI_FINESTRA, extra_wrf=None):
     oss = {(r["id"], r["ora"]): r for r in oss_righe}
     stazioni = {}
     for r in oss_righe:
@@ -722,8 +811,11 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
     limite = ora_iso(adesso - timedelta(days=giorni))
     camp = campioni_wrf(prev_righe, limite)
     camp.update(campioni_om(snap_righe, limite))
+    camp.update(extra_wrf or {})
+    confronto = confronto_wrf(camp, oss, adesso)
     # WRF corretto: per ogni corsa parte dal WRF che nelle due settimane precedenti ha sbagliato meno
-    candidati = {m: camp[m] for m in camp if m.startswith("wrf") and camp[m]}
+    # (escluso il 333 m: copre solo i dintorni di Nerola, il suo punteggio non e' confrontabile)
+    candidati = {m: camp[m] for m in camp if m.startswith("wrf") and m != "wrf333" and camp[m]}
     scelta, punteggio_wrf = wrf_migliore_per_corsa(candidati, oss)
     corretti = []
     for m, lista in candidati.items():
@@ -805,7 +897,8 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
         "errori_orari": stima,
         "nerola": ner,
         "stazioni": elenco,
-        "wrf_corretto": {"base": base_attuale, "nome_base": NOMI_MODELLI.get(base_attuale, (base_attuale,))[0],
+        "confronto_wrf": confronto,
+        "wrf_corretto": {"base": base_attuale, "nome_base": registro_wrf().get(base_attuale, (0, 0, base_attuale))[2],
                          "punteggi": punteggio_wrf},
     }
 
@@ -813,6 +906,7 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--storico", required=True, help="cartella dello storico (osservazioni, previsioni, pagella.json)")
+    ap.add_argument("--fisica", default="", help="cartella con le varianti di fisica (ramo 'fisica')")
     ap.add_argument("--uscite", default="", help="cartella con d01_tutto.npz e d02_tutto.npz dell'ultima corsa")
     ap.add_argument("--corsa", default="", help="AAAAMMGGHH della corsa in --uscite")
     ap.add_argument("--ore", type=int, default=72, help="ore di osservazioni da scaricare")
@@ -852,6 +946,31 @@ def main():
         print("previsioni estratte:", len(righe))
         if righe:
             salva_previsione(cart, a.corsa, righe)
+    # tutte le altre catene WRF (GFS, ICON-2I, ICON-EU, 333 m) e le varianti di fisica
+    if a.uscite:
+        for sub, (sotto, file_dom) in CATENE_EXTRA.items():
+            try:
+                c = json.loads((Path(a.uscite) / sub / "indice.json").read_text())["corsa"]
+                r_ = estrai_previsione(Path(a.uscite) / sub, c, stazioni, file_dom)
+                if r_:
+                    salva_previsione(cart, c, r_, sotto, tuple(file_dom))
+                print(f"WRF {sub}: corsa {c}, righe {len(r_)}")
+            except Exception as e:  # noqa: BLE001
+                print(f"ATTENZIONE: WRF {sub} non letto: {e}", file=sys.stderr)
+    if a.fisica:
+        try:
+            ind = json.loads((Path(a.fisica) / "indice.json").read_text())
+            for nome in ind.get("file", []):
+                k, f = nome[:-4].split("_")
+                c = ind["corse"].get(k)
+                if not c:
+                    continue
+                r_ = estrai_previsione(a.fisica, c, stazioni, {"d01": nome})
+                if r_:
+                    salva_previsione(cart, c, r_, f"prev_fis_{k}_{f}", ("d01",))
+                print(f"variante {k} {f}: corsa {c}, righe {len(r_)}")
+        except Exception as e:  # noqa: BLE001
+            print("ATTENZIONE: varianti di fisica non lette:", e, file=sys.stderr)
     if a.altri_modelli and not ultimo_snapshot_vecchio(cart):
         try:
             adesso = datetime.now(timezone.utc)
@@ -861,7 +980,11 @@ def main():
                 salva_snapshot(cart, adesso, righe)
         except Exception as e:  # noqa: BLE001
             print("ATTENZIONE: altri modelli non scaricati:", e, file=sys.stderr)
-    pag = calcola_pagella(oss_tutte, leggi_previsioni(cart, GIORNI_FINESTRA + 3), leggi_snapshot(cart, GIORNI_FINESTRA + 3), vicine)
+    limite = ora_iso(datetime.now(timezone.utc) - timedelta(days=GIORNI_FINESTRA))
+    extra = campioni_tutti_wrf(cart, GIORNI_FINESTRA + 3, limite)
+    print("altri WRF in pagella:", {m: len(c) for m, c in extra.items()})
+    pag = calcola_pagella(oss_tutte, leggi_previsioni(cart, GIORNI_FINESTRA + 3), leggi_snapshot(cart, GIORNI_FINESTRA + 3), vicine,
+                          extra_wrf=extra)
     (cart / "pagella.json").write_text(json.dumps(pag, ensure_ascii=False, separators=(",", ":"), default=pulisci))
     print("pagella scritta:", len(pag["stazioni"]), "stazioni")
 
