@@ -18,8 +18,8 @@ jobs:
     steps:
       - name: Programmi di sistema
         run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=5 \
             gfortran gcc g++ make m4 csh perl file \
             mpich libmpich-dev \
             libnetcdf-dev libnetcdff-dev netcdf-bin \

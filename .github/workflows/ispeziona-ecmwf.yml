@@ -9,8 +9,8 @@ jobs:
     steps:
       - name: Installa strumenti per leggere i dati meteo
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libeccodes-tools cdo
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo apt-get install -y -o Acquire::Retries=5 libeccodes-tools cdo
           grib_ls -V || true
           cdo --version 2>&1 | head -3 || true
 

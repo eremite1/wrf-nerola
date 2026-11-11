@@ -63,8 +63,8 @@ jobs:
 
       - name: Programmi necessari
         run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cdo libeccodes-tools python3-requests
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=5 cdo libeccodes-tools python3-requests
 
       - name: Scelgo la corsa ECMWF
         id: scelta
@@ -117,8 +117,8 @@ jobs:
 
       - name: Programmi necessari
         run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tcsh mpich \
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=5 tcsh mpich \
             libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev python3-numpy python3-netcdf4
 
       - name: Recupero WRF e WPS compilati per ARM

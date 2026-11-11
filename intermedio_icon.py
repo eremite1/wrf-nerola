@@ -222,8 +222,10 @@ def corse(modello, ore, corsa=None):
     candidati = [rif] if rif else []
     if not rif:
         t = datetime.strptime(base["reference_time"][:16], "%Y-%m-%dT%H:%M")
-        passo = 12 if modello == "icon2i" else 6
-        candidati = [(t - timedelta(hours=passo * k)).strftime("%Y-%m-%dT%H:%M") for k in range(4)]
+        # ICON-EU esce ogni 3 ore, ma le corse 03/09/15/21 arrivano solo a +30 h: provo a ritroso ogni 3 ore
+        # (prima il passo era 6 ore e, partendo da una corsa "corta", trovava solo corse corte)
+        passo, quante = (12, 4) if modello == "icon2i" else (3, 9)
+        candidati = [(t - timedelta(hours=passo * k)).strftime("%Y-%m-%dT%H:%M") for k in range(quante)]
     for c in candidati:
         info = {d: fonti.info_corsa(d, c) for d in ds}
         if any(v is None for v in info.values()):

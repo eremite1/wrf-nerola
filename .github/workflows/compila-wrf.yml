@@ -14,8 +14,8 @@ jobs:
     steps:
       - name: Installa i programmi necessari
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gfortran gcc g++ make m4 perl tcsh flex bison cmake \
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo apt-get install -y -o Acquire::Retries=5 gfortran gcc g++ make m4 perl tcsh flex bison cmake \
             mpich libmpich-dev libnetcdf-dev libnetcdff-dev netcdf-bin \
             zlib1g-dev libpng-dev libjpeg-dev libtirpc-dev
           gfortran --version | head -1

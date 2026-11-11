@@ -26,8 +26,8 @@ jobs:
 
       - name: Installa strumenti
         run: |
-          sudo apt-get update
-          sudo apt-get install -y netcdf-bin libnetcdf-dev libnetcdff-dev mpich python3-numpy python3-matplotlib python3-netcdf4
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo apt-get install -y -o Acquire::Retries=5 netcdf-bin libnetcdf-dev libnetcdff-dev mpich python3-numpy python3-matplotlib python3-netcdf4
 
       - name: Recupera WRF compilato
         uses: actions/cache/restore@v4

@@ -10,8 +10,8 @@ jobs:
     steps:
       - name: Installa strumenti
         run: |
-          sudo apt-get update
-          sudo apt-get install -y tcsh cdo libeccodes-tools netcdf-bin libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo apt-get install -y -o Acquire::Retries=5 tcsh cdo libeccodes-tools netcdf-bin libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev
 
       - name: Recupera WPS compilato
         uses: actions/cache/restore@v4

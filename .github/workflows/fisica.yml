@@ -46,8 +46,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Programmi
         run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cdo libeccodes-tools python3-requests python3-numpy >/dev/null
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=5 cdo libeccodes-tools python3-requests python3-numpy >/dev/null
           case "$FORZANTE" in ICON*)
             pip install -q omfiles fsspec s3fs pillow requests scipy
             git clone -q --depth 1 https://github.com/eremite1/meteo-mappe /home/runner/meteo-mappe;;
@@ -104,8 +104,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Programmi
         run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tcsh mpich \
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=5 tcsh mpich \
             libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev python3-numpy python3-netcdf4 >/dev/null
       - uses: actions/cache/restore@v4
         with:
