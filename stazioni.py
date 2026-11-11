@@ -476,7 +476,7 @@ SOGLIA_PIOGGIA = 1.0     # mm in 6 ore: sopra questa soglia "ha piovuto"
 NOMI_MODELLI = {
     "wrf1": ("WRF Nerola 1 km", "il nostro modello, risoluzione 1 km"),
     "wrf3": ("WRF Nerola 3 km", "il nostro modello, dominio esterno 3 km"),
-    "wrfc": ("WRF 1 km corretto", "esperimento: WRF 1 km con correzione statistica degli errori passati (vedi sotto)"),
+    "wrfc": ("WRF corretto", "esperimento: il WRF che sbaglia meno, con correzione statistica degli errori passati, pioggia compresa (vedi sotto)"),
     "icon2i": ("ICON-2I", "ItaliaMeteo-ARPAE, 2 km"),
     "arome": ("AROME", "Meteo-France, 1,3 km"),
     "ecmwf": ("ECMWF IFS", "Centro europeo, 9 km"),
@@ -518,7 +518,7 @@ def campioni_om(snap_righe, limite):
     return out
 
 
-def correggi_wrf(campioni, oss, giorni=14, min_staz=4, min_tot=40):
+def correggi_wrf(campioni, oss, giorni=14, min_staz=4, min_tot=40, solo_corse=None):
     """WRF 1 km corretto: toglie al modello l'errore medio che aveva *prima* dell'inizio della corsa,
     per la stessa stazione e la stessa fascia di 3 ore del giorno (temperatura e punto di rugiada: differenza;
     vento: rapporto). Non usa mai dati successivi alla corsa: e' una vera previsione corretta."""
@@ -533,10 +533,17 @@ def correggi_wrf(campioni, oss, giorni=14, min_staz=4, min_tot=40):
             if p is not None and ob is not None:
                 storia.setdefault((sid, b, v), []).append((valido, p, ob))
                 storia.setdefault((None, b, v), []).append((valido, p, ob))
+        # pioggia: conto solo le ore in cui almeno uno dei due (modello o stazione) ha pioggia
+        p, ob = vals.get("P"), num(o.get("P"))
+        if p is not None and ob is not None and (p > 0.05 or ob > 0.05):
+            storia.setdefault((sid, "P"), []).append((valido, p, ob))
+            storia.setdefault((None, "P"), []).append((valido, p, ob))
     for lista in storia.values():
         lista.sort()
     out = []
     for corsa, sid, valido, ore, vals in campioni:
+        if solo_corse is not None and corsa not in solo_corse:
+            continue                     # la storia usa tutte le corse, ma correggo solo quelle richieste
         inizio = datetime.strptime(corsa, "%Y%m%d%H").replace(tzinfo=timezone.utc)
         fine = ora_iso(inizio)
         da = ora_iso(inizio - timedelta(days=giorni))
@@ -555,8 +562,71 @@ def correggi_wrf(campioni, oss, giorni=14, min_staz=4, min_tot=40):
                     else:
                         nuovi[v] = vals[v] - sum(x[1] - x[2] for x in prec) / len(prec)
                     break
+        # pioggia: rapporto tra pioggia osservata e prevista nelle due settimane prima della corsa
+        # (prima la stazione, se ha abbastanza ore piovose, altrimenti tutte le stazioni insieme)
+        if vals.get("P") is not None:
+            for chiave, minimo in (((sid, "P"), MIN_ORE_PIOGGIA_STAZ), ((None, "P"), MIN_ORE_PIOGGIA_TOT)):
+                prec = [x for x in storia.get(chiave, []) if da <= x[0] < fine]
+                sp = sum(x[1] for x in prec)
+                if len(prec) >= minimo and sp >= 2.0:
+                    fattore = min(2.5, max(0.3, sum(x[2] for x in prec) / sp))
+                    nuovi["P"] = vals["P"] * fattore
+                    break
         out.append((corsa, sid, valido, ore, nuovi))
     return out
+
+
+MIN_ORE_PIOGGIA_STAZ = 8      # ore piovose (modello o stazione) per usare il fattore della singola stazione
+MIN_ORE_PIOGGIA_TOT = 30      # ... per usare quello di tutte le stazioni insieme
+SCALA_ERRORE = {"T": 1.5, "Td": 2.0, "V": 2.5, "P": 0.6}   # errore "tipico" di ogni grandezza: le rende confrontabili
+
+
+def punteggi_wrf(campioni_per_modello, oss):
+    """Per ogni WRF: lista ordinata di (valido, errore normalizzato) su tutte le grandezze, pioggia compresa."""
+    out = {}
+    for m, camp in campioni_per_modello.items():
+        lista = []
+        for corsa, sid, valido, ore, vals in camp:
+            o = oss.get((sid, valido))
+            if not o or sid == "NEROLA" or ore >= 49:
+                continue
+            e, n = 0.0, 0
+            for v, sc in SCALA_ERRORE.items():
+                p, ob = vals.get(v), num(o.get(v))
+                if p is not None and ob is not None:
+                    e += abs(p - ob) / sc
+                    n += 1
+            if n:
+                lista.append((valido, e / n))
+        lista.sort()
+        out[m] = lista
+    return out
+
+
+def wrf_migliore_per_corsa(campioni_per_modello, oss, giorni=14, minimo=200):
+    """Per ogni corsa sceglie il WRF con l'errore medio piu' basso nelle due settimane PRIMA della corsa
+    (mai dati futuri). Ritorna {corsa: modello} e il punteggio attuale di ogni WRF."""
+    import bisect
+    pt = punteggi_wrf(campioni_per_modello, oss)
+    chiavi = {m: [x[0] for x in l] for m, l in pt.items()}
+    corse = sorted({c[0] for camp in campioni_per_modello.values() for c in camp})
+    scelta = {}
+    def media(m, da, a):
+        i, j = bisect.bisect_left(chiavi[m], da), bisect.bisect_left(chiavi[m], a)
+        sel = pt[m][i:j]
+        return (sum(x[1] for x in sel) / len(sel), len(sel)) if sel else (None, 0)
+    for corsa in corse:
+        inizio = datetime.strptime(corsa, "%Y%m%d%H").replace(tzinfo=timezone.utc)
+        da, a = ora_iso(inizio - timedelta(days=giorni)), ora_iso(inizio)
+        voti = {m: media(m, da, a) for m in pt}
+        validi = {m: x for m, (x, n) in voti.items() if x is not None and n >= minimo}
+        scelta[corsa] = min(validi, key=validi.get) if validi else "wrf1"
+    adesso = ora_iso(datetime.now(timezone.utc) + timedelta(hours=1))
+    punteggio = {}
+    for m in pt:
+        x, n = media(m, ora_iso(datetime.now(timezone.utc) - timedelta(days=giorni)), adesso)
+        punteggio[m] = {"errore": None if x is None else round(x, 3), "n": n}
+    return scelta, punteggio
 
 
 def _coppie(campioni_per_modello, oss, solo=None):
@@ -652,7 +722,14 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
     limite = ora_iso(adesso - timedelta(days=giorni))
     camp = campioni_wrf(prev_righe, limite)
     camp.update(campioni_om(snap_righe, limite))
-    camp["wrfc"] = correggi_wrf([c for c in camp["wrf1"]], oss)
+    # WRF corretto: per ogni corsa parte dal WRF che nelle due settimane precedenti ha sbagliato meno
+    candidati = {m: camp[m] for m in camp if m.startswith("wrf") and camp[m]}
+    scelta, punteggio_wrf = wrf_migliore_per_corsa(candidati, oss)
+    corretti = []
+    for m, lista in candidati.items():
+        corretti += correggi_wrf(lista, oss, solo_corse={c for c, b in scelta.items() if b == m})
+    camp["wrfc"] = corretti
+    base_attuale = scelta[max(scelta)] if scelta else "wrf1"
     ordine = ["wrf1", "wrf3", "wrfc", "icon2i", "arome", "ecmwf", "ukmo", "iconeu"]
     camp = {m: camp[m] for m in ordine if camp.get(m)}
     riep = {"tutte": riepilogo(camp, {k: v for k, v in oss.items() if k[0] != "NEROLA"}),
@@ -728,6 +805,8 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
         "errori_orari": stima,
         "nerola": ner,
         "stazioni": elenco,
+        "wrf_corretto": {"base": base_attuale, "nome_base": NOMI_MODELLI.get(base_attuale, (base_attuale,))[0],
+                         "punteggi": punteggio_wrf},
     }
 
 

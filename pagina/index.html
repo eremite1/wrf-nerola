@@ -388,22 +388,31 @@ async function disegnaCorretto() {
   if (!pagella) await caricaPagella();
   if (!pagella) { $("cor-intro").textContent = "I dati del confronto non sono ancora disponibili."; return; }
   const ner = pagella.nerola;
-  $("cor-intro").textContent = `Previsione WRF 1 km per Nerola, normale e corretta, contro la stazione di Nerola. Ultimo aggiornamento della pagella: ${pagella.aggiornato.replace("T", " ").replace("Z", " UTC")}.`;
+  const wc = pagella.wrf_corretto || { base: "wrf1", nome_base: "WRF Nerola 1 km", punteggi: {} };
+  const base = ner.prev[wc.base] ? wc.base : "wrf1", nomeBase = wc.nome_base || "WRF 1 km";
+  const pun = Object.entries(wc.punteggi || {}).filter(([, x]) => x.errore !== null).sort((a, b) => a[1].errore - b[1].errore)
+    .map(([m, x]) => `${(pagella.modelli[m] || { nome: m }).nome} ${nf1.format(x.errore * 100)}`).join(" · ");
+  $("cor-intro").innerHTML = `La correzione parte dal WRF che nelle ultime due settimane ha sbagliato meno: oggi è <b>${nomeBase}</b>. ` +
+    (pun ? `Errore complessivo (temperatura, rugiada, vento e pioggia insieme; più basso è meglio): ${pun}. ` : "") +
+    `Ultimo aggiornamento della pagella: ${pagella.aggiornato.replace("T", " ").replace("Z", " UTC")}.`;
   if (!ner || !ner.tempi.length || !ner.prev.wrfc) { $("cor-grafici").innerHTML = '<p class="suggerimento" style="text-align:left">La previsione corretta comparirà dopo la prossima corsa.</p>'; return; }
   const tempi = ner.tempi.map(data);
   let h = "";
-  for (const v of ["T", "Td", "V"]) {
-    const serie = [{ v: ner.oss[v], c: COL_MOD.oss, nome: "osservato", spesso: 3 }, { v: ner.prev.wrf1[v], c: COL_MOD.wrf1, nome: "WRF 1 km", tratteggio: true }, { v: ner.prev.wrfc[v], c: "#1f7a3d", nome: "WRF 1 km corretto", spesso: 2.6 }];
-    h += grafico(`${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`, tempi, serie, v === "V" ? { da0: true } : {});
+  for (const v of ["T", "Td", "V", "P"]) {
+    if (!ner.prev[base][v] || !ner.prev.wrfc[v]) continue;
+    const serie = [{ v: ner.oss[v], c: COL_MOD.oss, nome: "osservato", spesso: 3 }, { v: ner.prev[base][v], c: COL_MOD[base] || COL_MOD.wrf1, nome: nomeBase, tratteggio: true }, { v: ner.prev.wrfc[v], c: "#1f7a3d", nome: "WRF corretto", spesso: 2.6 }];
+    h += grafico(`${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`, tempi, serie, v === "V" || v === "P" ? { da0: true } : {});
   }
-  h += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;margin:2px 0 8px">' + [["#222", "osservato (stazione di Nerola)"], [COL_MOD.wrf1, "WRF 1 km (tratteggiato)"], ["#1f7a3d", "WRF 1 km corretto"]].map(([c, n]) => `<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c};margin-right:5px"></span>${n}</span>`).join("") + "</div>";
+  h += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;margin:2px 0 8px">' + [["#222", "osservato (stazione di Nerola)"], [COL_MOD[base] || COL_MOD.wrf1, nomeBase + " (tratteggiato)"], ["#1f7a3d", "WRF corretto"]].map(([c, n]) => `<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c};margin-right:5px"></span>${n}</span>`).join("") + "</div>";
   $("cor-grafici").innerHTML = h;
   // quanto migliora, su tutte le stazioni
   const rie = pagella.riepilogo.tutte, fasce = Object.keys(rie.T);
-  let t = '<h3 style="font-size:.95rem;margin:14px 0 4px">Quanto migliora, su tutte le stazioni (errore medio: normale → corretto)</h3><div style="overflow-x:auto"><table class="tab"><thead><tr><th></th>' + fasce.map((f) => `<th>${f}</th>`).join("") + "</tr></thead><tbody>";
-  for (const v of ["T", "Td", "V"]) {
-    t += `<tr><th>${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})</th>` + fasce.map((f) => {
-      const a = rie[v][f].wrf1, b = rie[v][f].wrfc;
+  let t = '<h3 style="font-size:.95rem;margin:14px 0 4px">Quanto migliora, su tutte le stazioni (errore medio: WRF di partenza → corretto)</h3><div style="overflow-x:auto"><table class="tab"><thead><tr><th></th>' + fasce.map((f) => `<th>${f}</th>`).join("") + "</tr></thead><tbody>";
+  for (const v of ["T", "Td", "V", "P6"]) {
+    if (!rie[v]) continue;
+    const etich = v === "P6" ? "Pioggia in 6 ore (mm)" : `${NOMI_VAR[v][0]} (${NOMI_VAR[v][1]})`;
+    t += `<tr><th>${etich}</th>` + fasce.map((f) => {
+      const a = (rie[v][f] || {})[base] || (rie[v][f] || {}).wrf1, b = (rie[v][f] || {}).wrfc;
       if (!a || !b || a.n < 5) return "<td>–</td>";
       const mig = b.mae < a.mae;
       return `<td>${nf1.format(a.mae)} → <b style="color:${mig ? "#1f7a3d" : "#b3261e"}">${nf1.format(b.mae)}</b></td>`;
@@ -661,7 +670,7 @@ async function scegliPunto(k, fx, fy) {
 
 let pagella = null;
 const URL_PAGELLA = "https://raw.githubusercontent.com/eremite1/wrf-nerola/storico/pagella.json";
-const NOMI_VAR = { T: ["Temperatura", "°C"], Td: ["Punto di rugiada", "°C"], V: ["Vento", "km/h"], P6: ["Pioggia su 6 ore", "mm"] };
+const NOMI_VAR = { T: ["Temperatura", "°C"], Td: ["Punto di rugiada", "°C"], V: ["Vento", "km/h"], P6: ["Pioggia su 6 ore", "mm"], P: ["Pioggia oraria", "mm"] };
 const COL_MOD = { oss: "#222222", wrf1: "#e0482f", wrf3: "#2a6cc7", wrfc: "#c49a00", icon2i: "#2e9d4a", arome: "#8e44ad", ecmwf: "#6c7a89", ukmo: "#d9822b", iconeu: "#16a0a0" };
 
 async function caricaPagella() {
@@ -734,7 +743,7 @@ function stimaErrori() {
       return `<td><b>${f(a)}</b><small style="display:block;color:var(--muto)">(${f(b)})</small></td>`;
     }).join("") + "</tr>";
   }
-  h += '</tbody></table></div><p class="suggerimento" style="text-align:left">«WRF 1 km corretto» nelle tabelle sopra è un esperimento: a ogni previsione toglie l\'errore medio che il modello aveva, nelle due settimane <i>precedenti</i> la corsa, in quella stazione e in quella fascia di 3 ore (per il vento moltiplica per il rapporto osservato/previsto). Non usa mai dati futuri, quindi la sua pagella è onesta. Il modello fisico non viene toccato: la correzione si applicherà alle mappe solo se, col passare delle settimane, risulterà davvero migliore.</p>';
+  h += '</tbody></table></div><p class="suggerimento" style="text-align:left">«WRF corretto» nelle tabelle sopra è un esperimento: parte dal WRF che nelle due settimane precedenti ha sbagliato meno e a ogni previsione toglie l\'errore medio che il modello aveva, nelle due settimane <i>precedenti</i> la corsa, in quella stazione e in quella fascia di 3 ore (per il vento moltiplica per il rapporto osservato/previsto). Non usa mai dati futuri, quindi la sua pagella è onesta. Il modello fisico non viene toccato: la correzione si applicherà alle mappe solo se, col passare delle settimane, risulterà davvero migliore.</p>';
   $("pag-stima").innerHTML = h;
 }
 
