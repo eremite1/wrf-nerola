@@ -25,7 +25,10 @@ BASI = [
 ]
 # campi usati da WPS (vedi Vtable.ECMWF01)
 CAMPI = {
-    "pl": {"gh", "t", "u", "v", "r"},
+    # umidita' SPECIFICA (q), non relativa (r): la "r" di ECMWF sotto zero e' riferita al ghiaccio, il WRF la leggeva
+    # come riferita all'acqua e partiva con uno stato incoerente che nelle prime ore si asciugava (poca pioggia).
+    # Con q, l'umidita' relativa la calcola ungrib con la stessa formula del WRF.
+    "pl": {"gh", "t", "u", "v", "q"},
     "sfc": {"2t", "2d", "10u", "10v", "msl", "sp", "skt", "lsm", "z", "sot", "vsw"},
 }
 MINIMO = {"pl": 30, "sfc": 8}      # sotto questo numero di voci l'indice non e' quello atteso
