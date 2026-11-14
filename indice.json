@@ -1,0 +1,33 @@
+{
+ "aggiornato": "2026-11-14T08:25Z",
+ "corse": {
+  "ecmwf": "2026111318",
+  "gfs": "2026111400",
+  "icon2i": "2026111400",
+  "iconeu": "2026111400"
+ },
+ "varianti": {
+  "f1": "WSM6 + MYNN + Noah (come la catena principale)",
+  "f2": "Thompson + YSU + Noah",
+  "f3": "Morrison + ACM2 + Noah-MP",
+  "f4": "Thompson + MYJ + Noah"
+ },
+ "file": [
+  "ecmwf_f1.npz",
+  "ecmwf_f2.npz",
+  "ecmwf_f3.npz",
+  "ecmwf_f4.npz",
+  "gfs_f1.npz",
+  "gfs_f2.npz",
+  "gfs_f3.npz",
+  "gfs_f4.npz",
+  "icon2i_f1.npz",
+  "icon2i_f2.npz",
+  "icon2i_f3.npz",
+  "icon2i_f4.npz",
+  "iconeu_f1.npz",
+  "iconeu_f2.npz",
+  "iconeu_f3.npz",
+  "iconeu_f4.npz"
+ ]
+}
