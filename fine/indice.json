@@ -1,0 +1,2203 @@
+{
+ "corsa": "2026111318",
+ "forzante": "ECMWF",
+ "creato": "2026-11-14T16:24Z",
+ "elaborato": "2026-11-14T16:24Z",
+ "fonte": "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)",
+ "crediti": "Rilievo: Terrain Tiles (SRTM/GMTED) · Confini: ISTAT, Natural Earth · Nomi: GeoNames",
+ "domini": {
+  "300m": {
+   "etichetta": "333 m",
+   "parametri": {
+    "temperatura": {
+     "titolo": "Temperatura a 2 m",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/temperatura/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/temperatura/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/temperatura.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Temperatura a 2 m"
+    },
+    "vento": {
+     "titolo": "Vento a 10 m",
+     "unita": "km/h",
+     "immagini": [
+      {
+       "file": "mappe/300m/vento/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/vento/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/vento.bin",
+     "scala": 10,
+     "unita_dato": "km/h",
+     "etichetta_dato": "Vento a 10 m"
+    },
+    "umidita": {
+     "titolo": "Umidità relativa a 2 m",
+     "unita": "%",
+     "immagini": [
+      {
+       "file": "mappe/300m/umidita/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/umidita/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/umidita.bin",
+     "scala": 10,
+     "unita_dato": "%",
+     "etichetta_dato": "Umidità relativa a 2 m"
+    },
+    "pioggia_1h": {
+     "titolo": "Pioggia nelle ultime 1 ora",
+     "unita": "mm",
+     "immagini": [
+      {
+       "file": "mappe/300m/pioggia_1h/20261113_19.png",
+       "valido_utc": "2026-11-13T19:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261113_20.png",
+       "valido_utc": "2026-11-13T20:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261113_22.png",
+       "valido_utc": "2026-11-13T22:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261113_23.png",
+       "valido_utc": "2026-11-13T23:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_01.png",
+       "valido_utc": "2026-11-14T01:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_02.png",
+       "valido_utc": "2026-11-14T02:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_04.png",
+       "valido_utc": "2026-11-14T04:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_05.png",
+       "valido_utc": "2026-11-14T05:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_07.png",
+       "valido_utc": "2026-11-14T07:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_08.png",
+       "valido_utc": "2026-11-14T08:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_10.png",
+       "valido_utc": "2026-11-14T10:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_11.png",
+       "valido_utc": "2026-11-14T11:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_13.png",
+       "valido_utc": "2026-11-14T13:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_14.png",
+       "valido_utc": "2026-11-14T14:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_16.png",
+       "valido_utc": "2026-11-14T16:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_17.png",
+       "valido_utc": "2026-11-14T17:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_19.png",
+       "valido_utc": "2026-11-14T19:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_20.png",
+       "valido_utc": "2026-11-14T20:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_22.png",
+       "valido_utc": "2026-11-14T22:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261114_23.png",
+       "valido_utc": "2026-11-14T23:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261115_01.png",
+       "valido_utc": "2026-11-15T01:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261115_02.png",
+       "valido_utc": "2026-11-15T02:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261115_04.png",
+       "valido_utc": "2026-11-15T04:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261115_05.png",
+       "valido_utc": "2026-11-15T05:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_1h/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/pioggia_1h.bin",
+     "scala": 10,
+     "unita_dato": "mm",
+     "etichetta_dato": "Pioggia nelle ultime 1 ora"
+    },
+    "pioggia_3h": {
+     "titolo": "Pioggia nelle ultime 3 ore",
+     "unita": "mm",
+     "immagini": [
+      {
+       "file": "mappe/300m/pioggia_3h/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_3h/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/pioggia_3h.bin",
+     "scala": 10,
+     "unita_dato": "mm",
+     "etichetta_dato": "Pioggia nelle ultime 3 ore"
+    },
+    "pioggia_6h": {
+     "titolo": "Pioggia nelle ultime 6 ore",
+     "unita": "mm",
+     "immagini": [
+      {
+       "file": "mappe/300m/pioggia_6h/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_6h/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/pioggia_6h.bin",
+     "scala": 10,
+     "unita_dato": "mm",
+     "etichetta_dato": "Pioggia nelle ultime 6 ore"
+    },
+    "pioggia_24h": {
+     "titolo": "Pioggia nelle ultime 24 ore",
+     "unita": "mm",
+     "immagini": [
+      {
+       "file": "mappe/300m/pioggia_24h/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_24h/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_24h/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_24h/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_24h/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/pioggia_24h.bin",
+     "scala": 10,
+     "unita_dato": "mm",
+     "etichetta_dato": "Pioggia nelle ultime 24 ore"
+    },
+    "pioggia_totale": {
+     "titolo": "Pioggia totale dall'inizio",
+     "unita": "mm",
+     "immagini": [
+      {
+       "file": "mappe/300m/pioggia_totale/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pioggia_totale/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/pioggia_totale.bin",
+     "scala": 10,
+     "unita_dato": "mm",
+     "etichetta_dato": "Pioggia totale dall'inizio"
+    },
+    "disagio": {
+     "titolo": "Disagio da freddo o da caldo",
+     "unita": "",
+     "immagini": [
+      {
+       "file": "mappe/300m/disagio/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/disagio/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/disagio.bin",
+     "scala": 1,
+     "unita_dato": "",
+     "etichetta_dato": "Disagio da freddo o da caldo",
+     "classi_etichette": [
+      "gelo intenso",
+      "molto freddo",
+      "freddo",
+      "fresco",
+      "gradevole",
+      "caldo",
+      "molto caldo",
+      "caldo pericoloso"
+     ]
+    },
+    "t_superficie": {
+     "titolo": "Temperatura della superficie (terreno, prato, asfalto)",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/t_superficie/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261113_19.png",
+       "valido_utc": "2026-11-13T19:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261113_20.png",
+       "valido_utc": "2026-11-13T20:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261113_22.png",
+       "valido_utc": "2026-11-13T22:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261113_23.png",
+       "valido_utc": "2026-11-13T23:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_01.png",
+       "valido_utc": "2026-11-14T01:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_02.png",
+       "valido_utc": "2026-11-14T02:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_04.png",
+       "valido_utc": "2026-11-14T04:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_05.png",
+       "valido_utc": "2026-11-14T05:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_07.png",
+       "valido_utc": "2026-11-14T07:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_08.png",
+       "valido_utc": "2026-11-14T08:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_10.png",
+       "valido_utc": "2026-11-14T10:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_11.png",
+       "valido_utc": "2026-11-14T11:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_13.png",
+       "valido_utc": "2026-11-14T13:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_14.png",
+       "valido_utc": "2026-11-14T14:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_16.png",
+       "valido_utc": "2026-11-14T16:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_17.png",
+       "valido_utc": "2026-11-14T17:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_19.png",
+       "valido_utc": "2026-11-14T19:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_20.png",
+       "valido_utc": "2026-11-14T20:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_22.png",
+       "valido_utc": "2026-11-14T22:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261114_23.png",
+       "valido_utc": "2026-11-14T23:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261115_01.png",
+       "valido_utc": "2026-11-15T01:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261115_02.png",
+       "valido_utc": "2026-11-15T02:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261115_04.png",
+       "valido_utc": "2026-11-15T04:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261115_05.png",
+       "valido_utc": "2026-11-15T05:00Z"
+      },
+      {
+       "file": "mappe/300m/t_superficie/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/t_superficie.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Temperatura della superficie (terreno, prato, asfalto)"
+    },
+    "inversione": {
+     "titolo": "Inversione termica nei primi 200 m",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/inversione/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261113_19.png",
+       "valido_utc": "2026-11-13T19:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261113_20.png",
+       "valido_utc": "2026-11-13T20:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261113_22.png",
+       "valido_utc": "2026-11-13T22:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261113_23.png",
+       "valido_utc": "2026-11-13T23:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_01.png",
+       "valido_utc": "2026-11-14T01:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_02.png",
+       "valido_utc": "2026-11-14T02:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_04.png",
+       "valido_utc": "2026-11-14T04:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_05.png",
+       "valido_utc": "2026-11-14T05:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_07.png",
+       "valido_utc": "2026-11-14T07:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_08.png",
+       "valido_utc": "2026-11-14T08:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_10.png",
+       "valido_utc": "2026-11-14T10:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_11.png",
+       "valido_utc": "2026-11-14T11:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_13.png",
+       "valido_utc": "2026-11-14T13:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_14.png",
+       "valido_utc": "2026-11-14T14:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_16.png",
+       "valido_utc": "2026-11-14T16:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_17.png",
+       "valido_utc": "2026-11-14T17:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_19.png",
+       "valido_utc": "2026-11-14T19:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_20.png",
+       "valido_utc": "2026-11-14T20:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_22.png",
+       "valido_utc": "2026-11-14T22:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261114_23.png",
+       "valido_utc": "2026-11-14T23:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261115_01.png",
+       "valido_utc": "2026-11-15T01:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261115_02.png",
+       "valido_utc": "2026-11-15T02:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261115_04.png",
+       "valido_utc": "2026-11-15T04:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261115_05.png",
+       "valido_utc": "2026-11-15T05:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/inversione.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Inversione termica nei primi 200 m"
+    },
+    "inversione_500": {
+     "titolo": "Inversione termica nei primi 500 m",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/inversione_500/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/inversione_500/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/inversione_500.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Inversione termica nei primi 500 m"
+    },
+    "tdew": {
+     "titolo": "Punto di rugiada a 2 m",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/tdew/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/tdew/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/tdew.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Punto di rugiada a 2 m"
+    },
+    "nuv_bassa": {
+     "titolo": "Nuvole basse (sotto 700 hPa, circa 3000 m)",
+     "unita": "%",
+     "immagini": [
+      {
+       "file": "mappe/300m/nuv_bassa/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/nuv_bassa/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/nuv_bassa.bin",
+     "scala": 10,
+     "unita_dato": "%",
+     "etichetta_dato": "Nuvole basse (sotto 700 hPa, circa 3000 m)"
+    },
+    "delta_t24": {
+     "titolo": "Variazione di temperatura rispetto a 24 ore prima",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/delta_t24/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/delta_t24/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/delta_t24/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/delta_t24/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/delta_t24/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/delta_t24.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Variazione di temperatura rispetto a 24 ore prima"
+    },
+    "radiazione": {
+     "titolo": "Radiazione solare al suolo",
+     "unita": "W/m²",
+     "immagini": [
+      {
+       "file": "mappe/300m/radiazione/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/radiazione/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/radiazione.bin",
+     "scala": 10,
+     "unita_dato": "W/m²",
+     "etichetta_dato": "Radiazione solare al suolo"
+    },
+    "pbl": {
+     "titolo": "Altezza dello strato limite",
+     "unita": "m",
+     "immagini": [
+      {
+       "file": "mappe/300m/pbl/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/pbl/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/pbl.bin",
+     "scala": 10,
+     "unita_dato": "m",
+     "etichetta_dato": "Altezza dello strato limite"
+    },
+    "tipo_prec": {
+     "titolo": "Tipo di precipitazione",
+     "unita": "",
+     "immagini": [
+      {
+       "file": "mappe/300m/tipo_prec/20261113_19.png",
+       "valido_utc": "2026-11-13T19:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261113_20.png",
+       "valido_utc": "2026-11-13T20:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261113_22.png",
+       "valido_utc": "2026-11-13T22:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261113_23.png",
+       "valido_utc": "2026-11-13T23:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_01.png",
+       "valido_utc": "2026-11-14T01:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_02.png",
+       "valido_utc": "2026-11-14T02:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_04.png",
+       "valido_utc": "2026-11-14T04:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_05.png",
+       "valido_utc": "2026-11-14T05:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_07.png",
+       "valido_utc": "2026-11-14T07:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_08.png",
+       "valido_utc": "2026-11-14T08:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_10.png",
+       "valido_utc": "2026-11-14T10:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_11.png",
+       "valido_utc": "2026-11-14T11:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_13.png",
+       "valido_utc": "2026-11-14T13:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_14.png",
+       "valido_utc": "2026-11-14T14:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_16.png",
+       "valido_utc": "2026-11-14T16:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_17.png",
+       "valido_utc": "2026-11-14T17:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_19.png",
+       "valido_utc": "2026-11-14T19:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_20.png",
+       "valido_utc": "2026-11-14T20:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_22.png",
+       "valido_utc": "2026-11-14T22:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261114_23.png",
+       "valido_utc": "2026-11-14T23:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261115_01.png",
+       "valido_utc": "2026-11-15T01:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261115_02.png",
+       "valido_utc": "2026-11-15T02:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261115_04.png",
+       "valido_utc": "2026-11-15T04:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261115_05.png",
+       "valido_utc": "2026-11-15T05:00Z"
+      },
+      {
+       "file": "mappe/300m/tipo_prec/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/tipo_prec.bin",
+     "scala": 1,
+     "unita_dato": "",
+     "etichetta_dato": "Tipo di precipitazione",
+     "classi_etichette": [
+      "nessuna",
+      "pioggia",
+      "mista",
+      "neve",
+      "gelicidio",
+      "granuli"
+     ]
+    },
+    "vento_max24": {
+     "titolo": "Vento massimo orario nelle 24 ore",
+     "unita": "km/h",
+     "immagini": [
+      {
+       "file": "mappe/300m/vento_max24/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/vento_max24/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/vento_max24/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/vento_max24/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/vento_max24/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/vento_max24.bin",
+     "scala": 10,
+     "unita_dato": "km/h",
+     "etichetta_dato": "Vento massimo orario nelle 24 ore"
+    },
+    "ghiaccio_strade": {
+     "titolo": "Rischio ghiaccio su strade (ore, ultime 24 ore)",
+     "unita": "ore",
+     "immagini": [
+      {
+       "file": "mappe/300m/ghiaccio_strade/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/ghiaccio_strade/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/ghiaccio_strade/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/ghiaccio_strade/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/ghiaccio_strade/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/ghiaccio_strade.bin",
+     "scala": 10,
+     "unita_dato": "ore",
+     "etichetta_dato": "Rischio ghiaccio su strade (ore, ultime 24 ore)"
+    },
+    "tmin24": {
+     "titolo": "Temperatura minima a 2 m nelle ultime 24 ore",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/tmin24/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/tmin24/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/tmin24/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/tmin24/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/tmin24/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/tmin24.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Temperatura minima a 2 m nelle ultime 24 ore"
+    },
+    "tmax24": {
+     "titolo": "Temperatura massima a 2 m nelle ultime 24 ore",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/tmax24/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/tmax24/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/tmax24/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/tmax24/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/tmax24/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/tmax24.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Temperatura massima a 2 m nelle ultime 24 ore"
+    },
+    "tprato24": {
+     "titolo": "Temperatura minima della superficie del suolo (ultime 24 ore)",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/tprato24/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/tprato24/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/tprato24/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/tprato24/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/tprato24/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/tprato24.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Temperatura minima della superficie del suolo (ultime 24 ore)"
+    },
+    "gelata_ora": {
+     "titolo": "Brina e gelate in questo momento",
+     "unita": "",
+     "immagini": [
+      {
+       "file": "mappe/300m/gelata_ora/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata_ora/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/gelata_ora.bin",
+     "scala": 1,
+     "unita_dato": "",
+     "etichetta_dato": "Brina / gelata in questo momento",
+     "classi_etichette": [
+      "nessuna",
+      "brina",
+      "gelata",
+      "gelata forte"
+     ]
+    },
+    "gelata": {
+     "titolo": "Brina e gelate (massima nelle 24 ore)",
+     "unita": "",
+     "immagini": [
+      {
+       "file": "mappe/300m/gelata/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/gelata/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/gelata.bin",
+     "scala": 1,
+     "unita_dato": "",
+     "etichetta_dato": "Brina / gelata (massima nelle 24 ore)",
+     "classi_etichette": [
+      "nessuna",
+      "brina",
+      "gelata",
+      "gelata forte"
+     ]
+    },
+    "nebbia": {
+     "titolo": "Nebbia: visibilità stimata",
+     "unita": "",
+     "immagini": [
+      {
+       "file": "mappe/300m/nebbia/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/nebbia/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/nebbia.bin",
+     "scala": 1,
+     "unita_dato": "m",
+     "etichetta_dato": "Visibilità stimata"
+    },
+    "suolo_temp": {
+     "titolo": "Temperatura del suolo (0-10 cm)",
+     "unita": "°C",
+     "immagini": [
+      {
+       "file": "mappe/300m/suolo_temp/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_temp/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/suolo_temp.bin",
+     "scala": 10,
+     "unita_dato": "°C",
+     "etichetta_dato": "Temperatura del suolo (0-10 cm)"
+    },
+    "suolo_umidita_10": {
+     "titolo": "Umidità del suolo (0-10 cm)",
+     "unita": "% volume",
+     "immagini": [
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261113_18.png",
+       "valido_utc": "2026-11-13T18:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261113_21.png",
+       "valido_utc": "2026-11-13T21:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261114_00.png",
+       "valido_utc": "2026-11-14T00:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261114_03.png",
+       "valido_utc": "2026-11-14T03:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261114_06.png",
+       "valido_utc": "2026-11-14T06:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261114_09.png",
+       "valido_utc": "2026-11-14T09:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261114_12.png",
+       "valido_utc": "2026-11-14T12:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261114_15.png",
+       "valido_utc": "2026-11-14T15:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261114_18.png",
+       "valido_utc": "2026-11-14T18:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261114_21.png",
+       "valido_utc": "2026-11-14T21:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261115_00.png",
+       "valido_utc": "2026-11-15T00:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261115_03.png",
+       "valido_utc": "2026-11-15T03:00Z"
+      },
+      {
+       "file": "mappe/300m/suolo_umidita_10/20261115_06.png",
+       "valido_utc": "2026-11-15T06:00Z"
+      }
+     ],
+     "dati": "dati/300m/suolo_umidita_10.bin",
+     "scala": 10,
+     "unita_dato": "% volume",
+     "etichetta_dato": "Umidità del suolo (0-10 cm)"
+    }
+   },
+   "layout": {
+    "asse": [
+     0.04856,
+     0.10714,
+     0.72253,
+     0.74286
+    ],
+    "pixel": [
+     757,
+     735
+    ],
+    "estensione": [
+     12.650482177734375,
+     12.889495849609375,
+     42.04143142700195,
+     42.21849822998047
+    ],
+    "ny": 60,
+    "nx": 60
+   },
+   "griglia": "dati/300m/griglia.bin",
+   "serie": {
+    "file": "dati/300m/serie.bin",
+    "n_t": 37,
+    "tempi": [
+     "2026-11-13T18:00Z",
+     "2026-11-13T19:00Z",
+     "2026-11-13T20:00Z",
+     "2026-11-13T21:00Z",
+     "2026-11-13T22:00Z",
+     "2026-11-13T23:00Z",
+     "2026-11-14T00:00Z",
+     "2026-11-14T01:00Z",
+     "2026-11-14T02:00Z",
+     "2026-11-14T03:00Z",
+     "2026-11-14T04:00Z",
+     "2026-11-14T05:00Z",
+     "2026-11-14T06:00Z",
+     "2026-11-14T07:00Z",
+     "2026-11-14T08:00Z",
+     "2026-11-14T09:00Z",
+     "2026-11-14T10:00Z",
+     "2026-11-14T11:00Z",
+     "2026-11-14T12:00Z",
+     "2026-11-14T13:00Z",
+     "2026-11-14T14:00Z",
+     "2026-11-14T15:00Z",
+     "2026-11-14T16:00Z",
+     "2026-11-14T17:00Z",
+     "2026-11-14T18:00Z",
+     "2026-11-14T19:00Z",
+     "2026-11-14T20:00Z",
+     "2026-11-14T21:00Z",
+     "2026-11-14T22:00Z",
+     "2026-11-14T23:00Z",
+     "2026-11-15T00:00Z",
+     "2026-11-15T01:00Z",
+     "2026-11-15T02:00Z",
+     "2026-11-15T03:00Z",
+     "2026-11-15T04:00Z",
+     "2026-11-15T05:00Z",
+     "2026-11-15T06:00Z"
+    ],
+    "campi": [
+     {
+      "id": "T2",
+      "titolo": "Temperatura a 2 m",
+      "unita": "°C",
+      "scala": 10
+     },
+     {
+      "id": "UMID",
+      "titolo": "Umidità relativa a 2 m",
+      "unita": "%",
+      "scala": 10
+     },
+     {
+      "id": "VENTO",
+      "titolo": "Vento a 10 m",
+      "unita": "km/h",
+      "scala": 10
+     },
+     {
+      "id": "PIOGGIA",
+      "titolo": "Pioggia dall'inizio",
+      "unita": "mm",
+      "scala": 10
+     },
+     {
+      "id": "PRESS",
+      "titolo": "Pressione al livello del mare",
+      "unita": "hPa",
+      "scala": 10
+     },
+     {
+      "id": "TW",
+      "titolo": "Temperatura di bulbo umido",
+      "unita": "°C",
+      "scala": 10
+     },
+     {
+      "id": "TPRATO",
+      "titolo": "Temperatura della superficie del suolo",
+      "unita": "°C",
+      "scala": 10
+     },
+     {
+      "id": "TD",
+      "titolo": "Punto di rugiada",
+      "unita": "°C",
+      "scala": 10
+     },
+     {
+      "id": "PERC",
+      "titolo": "Temperatura percepita",
+      "unita": "°C",
+      "scala": 10
+     },
+     {
+      "id": "NUV",
+      "titolo": "Nuvolosità",
+      "unita": "%",
+      "scala": 1
+     },
+     {
+      "id": "RAD",
+      "titolo": "Radiazione solare",
+      "unita": "W/m²",
+      "scala": 1
+     },
+     {
+      "id": "DIR",
+      "titolo": "Direzione del vento (da)",
+      "unita": "°",
+      "scala": 1
+     },
+     {
+      "id": "GELO",
+      "titolo": "Classe di gelo oraria",
+      "unita": "",
+      "scala": 1
+     },
+     {
+      "id": "PBL",
+      "titolo": "Altezza strato limite",
+      "unita": "m",
+      "scala": 1
+     },
+     {
+      "id": "CAPE",
+      "titolo": "CAPE",
+      "unita": "J/kg",
+      "scala": 1
+     },
+     {
+      "id": "TSUOLO",
+      "titolo": "Temperatura del suolo 0-10 cm",
+      "unita": "°C",
+      "scala": 10
+     },
+     {
+      "id": "UMSUOLO",
+      "titolo": "Umidità del suolo 0-10 cm",
+      "unita": "% vol",
+      "scala": 10
+     }
+    ]
+   },
+   "luoghi": [
+    {
+     "nome": "Nerola",
+     "lat": 42.1606,
+     "lon": 12.7856,
+     "quota": null,
+     "prov": "RM"
+    },
+    {
+     "nome": "Palombara Sabina",
+     "lat": 42.0691,
+     "lon": 12.7668,
+     "quota": 297,
+     "prov": "RM"
+    },
+    {
+     "nome": "Montelibretti",
+     "lat": 42.1355,
+     "lon": 12.7387,
+     "quota": 230,
+     "prov": "RM"
+    },
+    {
+     "nome": "Moricone",
+     "lat": 42.1166,
+     "lon": 12.7723,
+     "quota": 293,
+     "prov": "RM"
+    },
+    {
+     "nome": "Poggio Moiano",
+     "lat": 42.2041,
+     "lon": 12.8814,
+     "quota": 528,
+     "prov": "RI"
+    },
+    {
+     "nome": "Montorio Romano",
+     "lat": 42.1374,
+     "lon": 12.804,
+     "quota": 569,
+     "prov": "RM"
+    },
+    {
+     "nome": "Monteflavio",
+     "lat": 42.1093,
+     "lon": 12.8308,
+     "quota": 804,
+     "prov": "RM"
+    },
+    {
+     "nome": "Scandriglia",
+     "lat": 42.1613,
+     "lon": 12.841,
+     "quota": 486,
+     "prov": "RI"
+    },
+    {
+     "nome": "Poggio Nativo",
+     "lat": 42.2178,
+     "lon": 12.7969,
+     "quota": 419,
+     "prov": "RI"
+    },
+    {
+     "nome": "Toffia",
+     "lat": 42.213,
+     "lon": 12.755,
+     "quota": 264,
+     "prov": "RI"
+    },
+    {
+     "nome": "Fara in Sabina",
+     "lat": 42.2081,
+     "lon": 12.7296,
+     "quota": 469,
+     "prov": "RI"
+    },
+    {
+     "nome": "Castel Chiodato",
+     "lat": 42.0562,
+     "lon": 12.6976,
+     "quota": 171,
+     "prov": "RM"
+    },
+    {
+     "nome": "Cretone",
+     "lat": 42.0712,
+     "lon": 12.7036,
+     "quota": 150,
+     "prov": "RM"
+    },
+    {
+     "nome": "Borgo Quinzio",
+     "lat": 42.1634,
+     "lon": 12.7126,
+     "quota": 178,
+     "prov": "RI"
+    },
+    {
+     "nome": "Talocci",
+     "lat": 42.1898,
+     "lon": 12.6962,
+     "quota": 125,
+     "prov": "RI"
+    }
+   ],
+   "sondaggi": {
+    "file": "dati/300m/sondaggi.bin",
+    "livelli": [
+     1000,
+     975,
+     950,
+     925,
+     900,
+     875,
+     850,
+     825,
+     800,
+     775,
+     750,
+     725,
+     700,
+     650,
+     600,
+     550,
+     500,
+     450,
+     400,
+     350,
+     300,
+     250,
+     200,
+     150,
+     100
+    ],
+    "n_suolo": 6,
+    "n_livello": 5,
+    "tempi": [
+     "2026-11-13T18:00Z",
+     "2026-11-13T21:00Z",
+     "2026-11-14T00:00Z",
+     "2026-11-14T03:00Z",
+     "2026-11-14T06:00Z",
+     "2026-11-14T09:00Z",
+     "2026-11-14T12:00Z",
+     "2026-11-14T15:00Z",
+     "2026-11-14T18:00Z",
+     "2026-11-14T21:00Z",
+     "2026-11-15T00:00Z",
+     "2026-11-15T03:00Z",
+     "2026-11-15T06:00Z"
+    ]
+   }
+  }
+ }
+}

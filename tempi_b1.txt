@@ -1,0 +1,1 @@
+blocco 1: da +0 h a +24 h, 6990 secondi (116 minuti), uscita 0, passo adattivo
