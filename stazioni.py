@@ -161,14 +161,136 @@ def leggi_metar(ore=72):
             continue
         v = m.get("wspd")
         td = m.get("dewp")
-        migliori[chiave] = (dist, {
+        classe = classe_metar(m)
+        migliori[chiave] = (dist, {"C": "" if classe is None else classe,
             "id": m["icaoId"], "nome": (m.get("name") or m["icaoId"]).split(",")[0].strip(), "lat": m["lat"], "lon": m["lon"],
             "quota": m.get("elev"), "ora": ora_iso(ora), "T": m["temp"], "Td": "" if td is None else td,
             "V": "" if v is None else round(float(v) * KT, 1), "P": ""})
     return [r for _, r in migliori.values()]
 
 
-CAMPI_OSS = ["id", "nome", "lat", "lon", "quota", "ora", "T", "Td", "V", "P"]
+CAMPI_OSS = ["id", "nome", "lat", "lon", "quota", "ora", "T", "Td", "V", "P", "C"]
+
+# ---------------------------------------------------------------- "Che tempo fa": classi (come la mappa del WRF)
+# 0 sereno, 1 poco nuvoloso, 2 nuvoloso, 3 coperto, 4 foschia, 5 nebbia, 6 pioviggine, 7 pioggia debole, 8 pioggia,
+# 9 temporale, 10 neve
+NOMI_TEMPO = ["sereno", "poco nuvoloso", "nuvoloso", "coperto", "foschia", "nebbia", "pioviggine", "pioggia debole",
+              "pioggia", "temporale", "neve"]
+# gruppi per il confronto con i METAR: cielo sereno/poco nuvoloso, nuvoloso/coperto, nebbia/foschia, pioviggine/pioggia,
+# temporale/neve
+GRUPPI_TEMPO = [0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4]
+NOMI_GRUPPI = ["sereno o poco nuvoloso", "nuvoloso o coperto", "nebbia o foschia", "pioviggine o pioggia", "temporale o neve"]
+
+
+def classe_metar(m):
+    """Classe del tempo da un METAR (fenomeni, visibilita', nubi). None se mancano i dati."""
+    wx = (m.get("wxString") or "").upper()
+    vis = m.get("visib")
+    try:
+        vis_m = 10000.0 if str(vis).strip().endswith("+") else float(vis) * 1609.0
+    except (TypeError, ValueError):
+        vis_m = None
+    if "TS" in wx:
+        return 9
+    if "SN" in wx or "SG" in wx:
+        return 10
+    if "RA" in wx or "SH" in wx:
+        return 8 if ("+RA" in wx or "+SH" in wx) else 7
+    if "DZ" in wx:
+        return 6
+    if "FG" in wx or (vis_m is not None and vis_m < 1000):
+        return 5
+    if "BR" in wx or "HZ" in wx or (vis_m is not None and vis_m < 5000):
+        return 4
+    copre = {"SKC": 0, "CLR": 0, "NSC": 0, "CAVOK": 0, "FEW": 1, "SCT": 1, "BKN": 2, "OVC": 3, "OVX": 3}
+    nubi = [copre.get((c.get("cover") or "").upper()) for c in (m.get("clouds") or []) if isinstance(c, dict)]
+    nubi = [x for x in nubi if x is not None]
+    if nubi:
+        return max(nubi)
+    if "CAVOK" in (m.get("rawOb") or ""):
+        return 0
+    return None
+
+
+def classe_tempo(nub, basse, qc1, t2k, q2, psfc, pr, cape=None):
+    """Classe del tempo previsto in un punto (stessa logica della mappa «Che tempo fa» di mappe.py), serie orarie."""
+    t = t2k - 273.15
+    rho = psfc / (287.05 * t2k)
+    lwc = np.maximum(qc1 * rho * 1000.0, 0)
+    vis = np.where(lwc > 1e-4, 1000.0 * 0.027 / np.maximum(lwc, 1e-4) ** 0.88, 99999.0)
+    e = q2 * psfc / 100.0 / (0.622 + q2)
+    es = 6.112 * np.exp(17.67 * t / (t + 243.5))
+    rh = np.clip(100 * e / es, 1, 100)
+    td = 243.5 * np.log(np.maximum(e, 1e-3) / 6.112) / (17.67 - np.log(np.maximum(e, 1e-3) / 6.112))
+    vis_rh = 1609.0 * 6000.0 * np.maximum((t - td) * 1.8, 0) / rh ** 1.75
+    vis_rh = np.where(rh >= 99.5, 400.0, np.maximum(vis_rh, 400.0))
+    vis = np.minimum(vis, vis_rh)
+    p = np.nan_to_num(pr)
+    vis = np.where(p > 0.02, np.minimum(vis, 10000.0 / (1.0 + 2.0 * p)), vis)
+    out = np.select([nub < 15, nub < 45, nub < 80], [0, 1, 2], 3).astype("float64")
+    out = np.where((vis < 5000) & (nub >= 30), 4, out)
+    out = np.where(vis < 1000, 5, out)
+    out = np.where((p >= 0.02) & (p < 0.3) & (basse >= 60) & (rh >= 88), 6, out)
+    out = np.where(p >= 0.3, 7, out)
+    out = np.where(p >= 2.0, 8, out)
+    if cape is not None:
+        out = np.where((p >= 1.0) & (cape >= 400), 9, out)
+    out = np.where((p >= 0.1) & (t <= 0.5), 10, out)
+    return np.where(np.isnan(pr), np.nan, out)
+
+
+def classe_pioggia(x):
+    """0 asciutto, 1 pioviggine, 2 pioggia debole, 3 pioggia (da mm in un'ora)."""
+    return 0 if x < 0.1 else 1 if x < 0.3 else 2 if x < 2 else 3
+
+
+def pioggia_da_classe(c):
+    return {6: 1, 7: 2, 8: 3, 9: 3, 10: 2}.get(int(c), 0)
+
+
+def pagella_tempo(campioni_per_modello, oss):
+    """Pagella del «Che tempo fa»: pioggia ora per ora su tutte le stazioni e, dove ci sono i METAR degli aeroporti,
+    anche cielo, nebbia, foschia e pioviggine."""
+    out = {}
+    for m, camp in campioni_per_modello.items():
+        pc_giuste = pc_vicine = pc_n = 0
+        g_giuste = g_n = 0
+        per_gruppo = {k: [0, 0] for k in range(len(NOMI_GRUPPI))}      # [previsto giusto, osservato]
+        piov = {"a": 0, "b": 0, "c": 0}
+        for _, sid, valido, ore, vals in camp:
+            c = vals.get("C")
+            o = oss.get((sid, valido))
+            if c is None or not o or ore > 48:
+                continue
+            po = num(o.get("P"))
+            if po is not None:
+                cp, co = pioggia_da_classe(c), classe_pioggia(po)
+                pc_n += 1
+                pc_giuste += cp == co
+                pc_vicine += abs(cp - co) <= 1
+                piov["a"] += cp >= 2 and co >= 2
+                piov["b"] += cp >= 2 and co < 2
+                piov["c"] += cp < 2 and co >= 2
+            cm = num(o.get("C"))
+            if cm is not None:
+                gp, go = GRUPPI_TEMPO[int(c)], GRUPPI_TEMPO[int(cm)]
+                g_n += 1
+                g_giuste += gp == go
+                per_gruppo[go][1] += 1
+                per_gruppo[go][0] += gp == go
+        if pc_n < 50:
+            continue
+        a, b, cc = piov["a"], piov["b"], piov["c"]
+        voce = {"n": pc_n, "pioggia_esatta": round(100 * pc_giuste / pc_n), "pioggia_quasi": round(100 * pc_vicine / pc_n),
+                "pioggia_csi": round(a / (a + b + cc), 2) if a + b + cc else None}
+        if g_n >= 30:
+            voce.update({"n_metar": g_n, "cielo_esatto": round(100 * g_giuste / g_n),
+                         "gruppi": {NOMI_GRUPPI[k]: {"osservati": v[1], "presi": round(100 * v[0] / v[1]) if v[1] else None}
+                                    for k, v in per_gruppo.items()}})
+        # voto unico 0-100: pioggia (peso 2) e cielo dai METAR (peso 1)
+        voce["voto"] = round((2 * voce["pioggia_quasi"] + voce.get("cielo_esatto", voce["pioggia_quasi"])) / 3)
+        out[m] = voce
+    return dict(sorted(out.items(), key=lambda kv: -kv[1]["voto"]))
 VARS = ("T", "Td", "V", "P")
 
 
@@ -293,7 +415,13 @@ def estrai_previsione(cartella_uscite, corsa, stazioni, file_dom=None):
                     pr[k] = np.maximum(cum[k] - cum[k - 1], 0)
         else:
             pr = np.full(t2.shape, np.nan)
-        campi[dom] = (z["lat"], z["lon"], z["hgt"], t2, td, v, tempi, pr)
+        tempo = None
+        try:
+            if all(k in z.files for k in ("NUVT", "NUVB", "QCLOUD1")):
+                tempo = (z["NUVT"], z["NUVB"], z["QCLOUD1"], z["T2"], z["Q2"], z["PSFC"], z["CAPE"] if "CAPE" in z.files else None)
+        except Exception:  # noqa: BLE001
+            tempo = None
+        campi[dom] = (z["lat"], z["lon"], z["hgt"], t2, td, v, tempi, pr, tempo)
     if not campi:
         return []
     inizio = datetime.strptime(corsa, "%Y%m%d%H").replace(tzinfo=timezone.utc)
@@ -308,18 +436,26 @@ def estrai_previsione(cartella_uscite, corsa, stazioni, file_dom=None):
                 trovati[dom] = pv
         if not trovati:
             continue
+        classi = {}
+        for dom, (i, j, _) in trovati.items():
+            tp = campi[dom][8]
+            if tp is not None:
+                nub, bas, qc, tk, q2, ps, cape = tp
+                classi[dom] = classe_tempo(nub[:, i, j], bas[:, i, j], qc[:, i, j], tk[:, i, j], q2[:, i, j], ps[:, i, j],
+                                           campi[dom][7][:, i, j], None if cape is None else cape[:, i, j])
         for t in base[6]:
             riga = [corsa, ora_iso(t), int(round((t - inizio).total_seconds() / 3600)), s["id"]]
             for dom in file_dom:
                 if dom in trovati and t in indici[dom]:
-                    lat, lon, hgt, t2, td, v, tempi, pr = campi[dom]
+                    lat, lon, hgt, t2, td, v, tempi, pr, _ = campi[dom]
                     i, j, _ = trovati[dom]
                     kk = indici[dom][t]
                     p = float(pr[kk, i, j])
+                    c = classi[dom][kk] if dom in classi else float("nan")
                     riga += [round(float(t2[kk, i, j]), 2), round(float(td[kk, i, j]), 2), round(float(v[kk, i, j]), 1), round(float(hgt[i, j])),
-                             "" if math.isnan(p) else round(p, 2)]
+                             "" if math.isnan(p) else round(p, 2), "" if math.isnan(c) else int(c)]
                 else:
-                    riga += ["", "", "", "", ""]
+                    riga += ["", "", "", "", "", ""]
             righe.append(riga)
     return righe
 
@@ -328,7 +464,7 @@ CAMPI_PREV = ["corsa", "valido", "ore", "id", "T_d01", "Td_d01", "V_d01", "h_d01
 
 
 def campi_prev(domini):
-    return ["corsa", "valido", "ore", "id"] + [f"{v}_{d}" for d in domini for v in ("T", "Td", "V", "h", "P")]
+    return ["corsa", "valido", "ore", "id"] + [f"{v}_{d}" for d in domini for v in ("T", "Td", "V", "h", "P", "C")]
 
 
 def salva_previsione(cartella, corsa, righe, sotto="previsioni", domini=("d01", "d02")):
@@ -530,6 +666,7 @@ def campioni_wrf(prev_righe, limite):
             vals = {v: num(r.get(f"{v}_{suff}")) for v in VARS}
             if all(x is None for x in vals.values()):
                 continue
+            vals["C"] = num(r.get(f"C_{suff}"))
             out[m].append((r["corsa"], r["id"], r["valido"], ore, vals))
     return out
 
@@ -549,6 +686,7 @@ def campioni_tutti_wrf(cart, giorni, limite):
             vals = {v: num(r.get(f"{v}_{suff}")) for v in VARS}
             if all(x is None for x in vals.values()):
                 continue
+            vals["C"] = num(r.get(f"C_{suff}"))
             lista.append((r["corsa"], r["id"], r["valido"], int(r["ore"]), vals))
         if lista:
             out[m] = lista
@@ -822,6 +960,22 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
         corretti += correggi_wrf(lista, oss, solo_corse={c for c, b in scelta.items() if b == m})
     camp["wrfc"] = corretti
     base_attuale = scelta[max(scelta)] if scelta else "wrf1"
+    # pagella del «Che tempo fa» di tutti i WRF, e la sua previsione a Nerola dal WRF che va meglio
+    try:
+        tempo_pag = pagella_tempo({m: c for m, c in camp.items() if m != "wrfc" and m not in MODELLI_OM}, oss)
+    except Exception as e:  # noqa: BLE001
+        print("ATTENZIONE: pagella del tempo non calcolata:", e, file=sys.stderr)
+        tempo_pag = {}
+    tempo_ner = {}
+    migliore_tempo = next(iter(tempo_pag), None)
+    if migliore_tempo:
+        ner_c = [x for x in camp[migliore_tempo] if x[1] == "NEROLA" and x[4].get("C") is not None]
+        if not ner_c:      # nessun punto Nerola: il punto della griglia piu' vicino e' quello delle stazioni vicine
+            vic = [v if isinstance(v, str) else (v.get("id") if isinstance(v, dict) else None) for v in (vicine_nerola or [])][:1]
+            ner_c = [x for x in camp[migliore_tempo] if x[1] in vic and x[4].get("C") is not None]
+        if ner_c:
+            ultima = max(x[0] for x in ner_c)
+            tempo_ner = {x[2]: int(x[4]["C"]) for x in ner_c if x[0] == ultima}
     ordine = ["wrf1", "wrf3", "wrfc", "icon2i", "arome", "ecmwf", "ukmo", "iconeu"]
     camp = {m: camp[m] for m in ordine if camp.get(m)}
     riep = {"tutte": riepilogo(camp, {k: v for k, v in oss.items() if k[0] != "NEROLA"}),
@@ -900,6 +1054,8 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
         "confronto_wrf": confronto,
         "wrf_corretto": {"base": base_attuale, "nome_base": registro_wrf().get(base_attuale, (0, 0, base_attuale))[2],
                          "punteggi": punteggio_wrf},
+        "tempo": {"pagella": {m: dict(v, nome=registro_wrf().get(m, (0, 0, NOMI_MODELLI.get(m, (m,))[0]))[2]) for m, v in tempo_pag.items()},
+                  "migliore": migliore_tempo, "nerola": tempo_ner, "classi": NOMI_TEMPO},
     }
 
 
@@ -993,7 +1149,9 @@ def main():
         leggero = {"aggiornato": pag.get("aggiornato"), "tempi": ner.get("tempi", []),
                    "wrfc": (ner.get("prev") or {}).get("wrfc", {}),
                    "base": (pag.get("wrf_corretto") or {}).get("nome_base"),
-                   "errori": (pag.get("riepilogo") or {}).get("tutte", {})}
+                   "errori": (pag.get("riepilogo") or {}).get("tutte", {}),
+                   "tempo": pag.get("tempo") or {},
+                   "tempo_voto": ((pag.get("tempo") or {}).get("pagella") or {}).get((pag.get("tempo") or {}).get("migliore") or "", {})}
         (cart / "nerola_prev.json").write_text(json.dumps(leggero, ensure_ascii=False, separators=(",", ":"), default=pulisci))
     except Exception as e:  # noqa: BLE001
         print("ATTENZIONE: nerola_prev.json non scritto:", e, file=sys.stderr)

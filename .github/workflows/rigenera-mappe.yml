@@ -76,11 +76,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          REMOTO="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # le altre catene si riprendono dal ramo com'e' ADESSO (nel frattempo possono aver pubblicato una corsa nuova)
+          ORA=/home/runner/ora && rm -rf "$ORA" && mkdir -p "$ORA"
+          ( cd "$ORA" && git init -q && git fetch -q --depth 1 "$REMOTO" risultati && git archive FETCH_HEAD | tar -x ) || true
+          GIA=$(grep -o '[0-9]\{10\}' "$ORA/LEGGIMI.md" 2>/dev/null | head -n 1 || true)
+          if [ -n "$GIA" ] && [ "$GIA" -gt "$CORSA" ] 2>/dev/null; then
+            echo "Nel frattempo e' uscita la corsa $GIA: la catena principale non si tocca, la rigenerazione non serve piu'."
+            exit 0
+          fi
+          for c in fine gfs iconeu icon2i; do
+            if [ -d "$ORA/$c" ]; then rm -rf "/home/runner/pubblico/$c" && cp -a "$ORA/$c" /home/runner/pubblico/; fi
+          done
           cd /home/runner/pubblico
           git init -q -b risultati
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -q -m "Mappe e pagina rigenerate, corsa ECMWF $CORSA"
-          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" risultati
+          git push -q -f "$REMOTO" risultati
           echo "Pubblicato: https://github.com/${GITHUB_REPOSITORY}/tree/risultati"
