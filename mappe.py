@@ -53,10 +53,10 @@ FORZANTI = {"ECMWF": "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)",
 NOME_FORZANTE = "ECMWF"
 FONTE = FORZANTI[NOME_FORZANTE]
 # parametri della catena a 333 m: solo quelli che hanno senso a quella risoluzione
-ESSENZIALI = ["temperatura", "delta_t24", "disagio", "umidita", "tdew", "t_superficie", "inversione", "inversione_500",
+ESSENZIALI = ["tempo", "temperatura", "delta_t24", "disagio", "umidita", "tdew", "t_superficie", "inversione",
               "vento", "vento_max24", "pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_24h", "pioggia_totale", "tipo_prec",
-              "nebbia", "gelata_ora", "gelata", "tmin24", "tmax24", "tprato24", "ghiaccio_strade", "nuv_bassa", "radiazione",
-              "pbl", "suolo_temp", "suolo_umidita_10"]
+              "nebbia", "gelata_ora", "gelata", "tmin24", "tmax24", "ghiaccio_strade", "nuv_bassa", "radiazione",
+              "suolo_temp", "suolo_umidita_10"]
 CREDITI = "Rilievo: Terrain Tiles (SRTM/GMTED) · Confini: ISTAT, Natural Earth · Nomi: GeoNames"
 DOMINI = (("d02", "1km", "1 km"), ("d01", "3km", "3 km"))
 
@@ -101,12 +101,33 @@ def pressione_mare(d):
     return d["PSFC"] / 100.0 * np.exp(9.80665 * h / (287.05 * (d["T2"] + 0.0065 * h / 2)))
 
 
+_CACHE_VIS = {}
+
+
 def visibilita(d):
-    """Visibilita' stimata (metri) dall'acqua liquida del primo livello del modello (formula di Kunkel)."""
+    k = (id(d), d["T2"].shape, float(d["T2"][0].flat[0]))
+    if k not in _CACHE_VIS:
+        _CACHE_VIS.clear()
+        _CACHE_VIS[k] = _visibilita(d)
+    return _CACHE_VIS[k]
+
+
+def _visibilita(d):
+    """Visibilita' stimata (metri): la minore tra quella dall'acqua delle nubi nel primo livello del modello
+    (formula di Kunkel, nebbia vera) e quella dall'umidita' dell'aria (formula del NOAA/FSL, foschia e aria satura),
+    ridotta ancora se piove o pioviggina."""
     rho = d["PSFC"] / (287.05 * d["T2"])
     lwc = np.maximum(d["QCLOUD1"] * rho * 1000.0, 0)  # g/m3
     with np.errstate(divide="ignore"):
         vis = np.where(lwc > 1e-4, 1000.0 * 0.027 / np.maximum(lwc, 1e-4) ** 0.88, 99999.0)
+    rh = np.clip(rh2(d), 1, 100)
+    tf = (d["T2"] - 273.15) * 1.8 + 32
+    tdf = punto_rugiada(d) * 1.8 + 32
+    vis_rh = 1609.0 * 6000.0 * np.maximum(tf - tdf, 0) / rh ** 1.75
+    vis_rh = np.where(rh >= 99.5, 400.0, np.maximum(vis_rh, 400.0))   # aria satura senza acqua di nube: foschia densa
+    vis = np.minimum(vis, vis_rh)
+    pr = np.diff(uscite.pioggia(d), axis=0, prepend=uscite.pioggia(d)[:1])
+    vis = np.where(pr > 0.02, np.minimum(vis, 10000.0 / (1.0 + 2.0 * pr)), vis)   # pioggia e pioviggine
     return np.minimum(vis, 99999.0)
 
 
@@ -198,7 +219,7 @@ _CACHE_NUV = {}
 
 def nuvolosita(d):
     """Indice di nuvolosita' 0-100 % dalla radiazione a onda lunga verso il basso (GLW) confrontata con cielo sereno (Brutsaert) e coperto."""
-    k = id(d)
+    k = (id(d), d["T2"].shape, float(d["T2"][0].flat[0]))
     if k not in _CACHE_NUV:
         _CACHE_NUV.clear()
         tk = d["T2"]
@@ -243,6 +264,29 @@ def tipo_precipitazione(d, i):
     return np.where(piove, colonna.classifica(d["AFUS"][i], d["ARIG"][i], d["TW2"][i]) + 1, 0).astype("float64")
 
 
+def tempo_previsto(d, i):
+    """Il tempo in una parola, ora per ora: 0 sereno, 1 poco nuvoloso, 2 nuvoloso, 3 coperto, 4 foschia, 5 nebbia,
+    6 pioviggine, 7 pioggia debole, 8 pioggia, 9 temporale, 10 neve."""
+    pr = uscite.pioggia(d)
+    p = np.maximum(pr[i] - pr[max(i - 1, 0)], 0)
+    nub = d["NUVT"][i]
+    basse = d["NUVB"][i]
+    vis = visibilita(d)[i]
+    rh = rh2(d)[i]
+    out = np.select([nub < 15, nub < 45, nub < 80], [0, 1, 2], 3).astype("float64")
+    out = np.where((vis < 5000) & (nub >= 30), 4, out)
+    out = np.where(vis < 1000, 5, out)
+    out = np.where((p >= 0.02) & (p < 0.3) & (basse >= 60) & (rh >= 88), 6, out)
+    out = np.where(p >= 0.3, 7, out)
+    out = np.where(p >= 2.0, 8, out)
+    if "CAPE" in d:
+        out = np.where((p >= 1.0) & (d["CAPE"][i] >= 400), 9, out)
+    if "AFUS" in d:
+        neve = colonna.classifica(d["AFUS"][i], d["ARIG"][i], d["TW2"][i]) >= 2
+        out = np.where((p >= 0.1) & neve, 10, out)
+    return out
+
+
 SOGLIA_NOTTE = 15.0    # W/m2: sotto questa radiazione solare e' notte
 NEVE_COL = ["#ffffff", "#e3f0ff", "#c2dcff", "#9ec5ff", "#7aa8f5", "#8a8ae0", "#a46ad0", "#c050c0", "#d83aa0"]
 
@@ -264,7 +308,7 @@ def classi_pioggia(soglie):
 
 
 PIOGGIA = {
-    1: [0.1, 0.5, 1, 2, 4, 8, 15, 30],
+    1: [0.03, 0.1, 0.5, 1, 2, 4, 8, 15, 30],
     3: [0.1, 0.5, 1, 2, 5, 10, 20, 40],
     6: [0.2, 1, 2, 5, 10, 20, 40, 60],
     12: [0.2, 1, 5, 10, 20, 40, 60, 100],
@@ -433,10 +477,15 @@ def ore_trattamento_24(d, i):
 
 
 def praticabilita_suolo(d, i):
-    """0-100: terreno non troppo bagnato (0-10 cm) e senza pioggia recente. Alto = si puo' lavorare e passare con i mezzi."""
+    """Classi 0 fango, 1 molto umido, 2 umido, 3 praticabile.
+    Conta l'acqua nei primi 10 cm del suolo (i terreni argillosi della Sabina restano fangosi gia' sopra il 33-34 %)
+    e la pioggia degli ultimi 3 giorni (quella di ieri pesa piu' di quella dell'altro ieri)."""
     pr = uscite.pioggia(d)
-    pioggia = pr[i] - pr[max(i - 24, 0)]
-    return 100.0 * rampa(d["SMOIS"][i, 0], 0.40, 0.28) * (1.0 - rampa(pioggia, 2.0, 10.0))
+    def tra(a, b):
+        return np.maximum(pr[max(i - a, 0)] - pr[max(i - b, 0)], 0)
+    pioggia = tra(0, 24) + 0.6 * tra(24, 48) + 0.35 * tra(48, 72)
+    indice = rampa(d["SMOIS"][i, 0], 0.36, 0.22) * (1.0 - rampa(pioggia, 1.0, 12.0))
+    return np.digitize(indice, [0.25, 0.5, 0.75]).astype("float64")
 
 
 def peronospora(d, i):
@@ -473,6 +522,14 @@ def pericolo_incendi(d, i):
 
 
 PARAMETRI = [
+    {"id": "tempo", "titolo": "Che tempo fa: cielo, nebbia, pioviggine, pioggia", "unita": "", "calcola": tempo_previsto, "passo": 1, "inizio": 1,
+     "serve": "NUVT",
+     "classi": {"bordi": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5],
+                "colori": ["#fff3b0", "#d9ecf7", "#b8c4cc", "#8a959c", "#cfc6b8", "#9b9488", "#8fd0c8", "#5aa9e6", "#1f5fbf", "#b0207a", "#ffffff"],
+                "etichette": ["sereno", "poco nuvoloso", "nuvoloso", "coperto", "foschia", "nebbia", "pioviggine", "pioggia debole", "pioggia", "temporale", "neve"],
+                "nascondi": set()},
+     "scala": 1, "unita_dato": "", "etichetta_dato": "Tempo previsto",
+     "nota": "sintesi di nuvole, visibilità, pioviggine, pioggia, temporali e neve"},
     {"id": "temperatura", "titolo": "Temperatura a 2 m", "unita": "°C", "calcola": lambda d, i: d["T2"][i] - 273.15,
      "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
     {"id": "vento", "titolo": "Vento a 10 m", "unita": "km/h", "calcola": lambda d, i: np.hypot(d["U10"][i], d["V10"][i]) * 3.6,
@@ -494,14 +551,8 @@ PARAMETRI = [
     {"id": "inversione", "titolo": "Inversione termica nei primi 200 m", "unita": "°C",
      "calcola": lambda d, i: d["T200M"][i] - d["T2"][i], "cmap": "RdBu_r", "limiti": (-6, 6), "passo": 1, "inizio": 0, "serve": "T200M",
      "nota": "temperatura a 200 m dal suolo meno quella a 2 m: rosso = inversione (più caldo in alto, aria ferma e fredda nelle valli), blu = normale calo con la quota"},
-    {"id": "inversione_500", "titolo": "Inversione termica nei primi 500 m", "unita": "°C",
-     "calcola": lambda d, i: d["T500M"][i] - d["T2"][i], "cmap": "RdBu_r", "limiti": (-8, 8), "passo": 3, "inizio": 0, "serve": "T500M",
-     "nota": "temperatura a 500 m dal suolo meno quella a 2 m: rosso = inversione, blu = normale calo con la quota (circa −3 °C)"},
     {"id": "tdew", "titolo": "Punto di rugiada a 2 m", "unita": "°C", "calcola": lambda d, i: punto_rugiada(d)[i],
      "cmap": "YlGnBu", "limiti": "auto", "passo": 3, "inizio": 0, "isolinee": True},
-    {"id": "nuvolosita", "titolo": "Nuvolosità (stima dall'infrarosso)", "unita": "%", "calcola": lambda d, i: nuvolosita(d)[i],
-     "cmap": "Greys", "limiti": (0, 100), "passo": 3, "inizio": 1,
-     "nota": "stimata dalla radiazione infrarossa che arriva al suolo: 0 cielo sereno, 100 coperto"},
     {"id": "nuv_totale", "titolo": "Nuvolosità totale (dal modello)", "unita": "%", "calcola": lambda d, i: d["NUVT"][i],
      "cmap": "Greys", "limiti": (0, 100), "passo": 3, "inizio": 0, "serve": "NUVT",
      "nota": "copertura del cielo ricavata da acqua e ghiaccio delle nuvole in tutta la colonna d'aria"},
@@ -516,9 +567,6 @@ PARAMETRI = [
      "nota": "temperatura a 2 m adesso meno quella della stessa ora del giorno prima: rosso = più caldo, blu = più freddo"},
     {"id": "radiazione", "titolo": "Radiazione solare al suolo", "unita": "W/m²", "calcola": lambda d, i: d["SWDOWN"][i],
      "cmap": "YlOrRd", "limiti": (0, 900), "passo": 3, "inizio": 0},
-    {"id": "pbl", "titolo": "Altezza dello strato limite", "unita": "m", "calcola": lambda d, i: d["PBLH"][i],
-     "cmap": "viridis", "limiti": (0, 2500), "passo": 3, "inizio": 0, "serve": "PBLH",
-     "nota": "spessore dello strato d'aria rimescolato vicino al suolo: ventilazione e moti convettivi"},
     {"id": "neve_24h", "titolo": "Neve nelle ultime 24 ore", "unita": "mm", "calcola": lambda d, i: d["SNOWNC"][i] - d["SNOWNC"][i - 24],
      "classi": classi_neve([0.1, 0.5, 1, 2, 5, 10, 20, 40]), "passo": 3, "inizio": 24, "serve": "SNOWNC",
      "nota": "mm di acqua equivalente: circa 10 cm di neve fresca per ogni 10 mm"},
@@ -531,9 +579,6 @@ PARAMETRI = [
     {"id": "quota_neve", "titolo": "Quota neve", "unita": "m", "calcola": lambda d, i: d["ZNEVE"][i],
      "cmap": "RdYlBu_r", "limiti": (0, 3500), "passo": 3, "inizio": 0, "serve": "ZNEVE",
      "nota": "quota più bassa a cui un fiocco arrivato dall'alto resta neve (bulbo umido ≤ 2 °C e fusione sopra di lui sotto la soglia di Bourgouin)"},
-    {"id": "zero_tw", "titolo": "Quota del bulbo umido 0 °C", "unita": "m", "calcola": lambda d, i: d["ZTW0"][i],
-     "cmap": "RdYlBu_r", "limiti": (0, 3500), "passo": 3, "inizio": 0, "serve": "ZTW0",
-     "nota": "quota sopra la quale il bulbo umido resta sotto 0 °C: non coincide con la quota neve"},
     {"id": "zero_termico", "titolo": "Zero termico (isoterma 0 °C)", "unita": "m", "calcola": lambda d, i: d["ZT0"][i],
      "cmap": "RdYlBu_r", "limiti": (0, 4500), "passo": 3, "inizio": 0, "serve": "ZT0",
      "nota": "quota sopra la quale la temperatura dell'aria è sotto 0 °C (non coincide con la quota neve)"},
@@ -553,11 +598,6 @@ PARAMETRI = [
     {"id": "vento_guida", "titolo": "Vento che guida i temporali (850-500 hPa)", "unita": "km/h", "calcola": lambda d, i: np.hypot(d["USTEER"][i], d["VSTEER"][i]) * 3.6,
      "cmap": "vento_mn", "limiti": (0, 120), "passo": 3, "inizio": 0, "serve": "USTEER", "frecce": ("USTEER", "VSTEER"), "scala_frecce": 250,
      "nota": "media pesata del vento tra 850 e 500 hPa: la direzione verso cui si spostano le celle temporalesche"},
-    {"id": "rh700", "titolo": "Umidità relativa a 700 hPa", "unita": "%", "calcola": lambda d, i: d["RH700"][i],
-     "cmap": "YlGnBu", "limiti": (0, 100), "passo": 3, "inizio": 0, "serve": "RH700"},
-    {"id": "w700", "titolo": "Moto verticale a 700 hPa", "unita": "m/s", "calcola": lambda d, i: d["W700"][i],
-     "cmap": "PuOr", "limiti": (-1.5, 1.5), "passo": 3, "inizio": 0, "serve": "W700",
-     "nota": "positivo = aria che sale (nuvole e precipitazioni), negativo = aria che scende (cielo più sereno)"},
     {"id": "vento_max24", "titolo": "Vento massimo orario nelle 24 ore", "unita": "km/h",
      "calcola": lambda d, i: finestra(np.hypot(d["U10"], d["V10"]) * 3.6, i, 24, np.max),
      "cmap": "vento_mn", "limiti": (0, 80), "passo": 3, "inizio": 24},
@@ -565,12 +605,6 @@ PARAMETRI = [
      "calcola": lambda d, i: np.max(np.diff(uscite.pioggia(d)[i - 24:i + 1], axis=0), axis=0),
      "classi": classi_pioggia(PIOGGIA[1]), "passo": 3, "inizio": 24,
      "nota": "la pioggia oraria più forte caduta nelle 24 ore fino a quell'ora"},
-    {"id": "gradi_giorno", "titolo": "Gradi-giorno (base 10 °C, ultime 24 ore)", "unita": "°C·giorno", "calcola": gradi_giorno_24,
-     "cmap": "YlOrRd", "limiti": (0, 15), "passo": 3, "inizio": 24, "terra": True,
-     "nota": "calore utile alla crescita delle piante: sommati giorno per giorno dicono quando fioriscono e maturano le colture"},
-    {"id": "ore_freddo", "titolo": "Ore di freddo (0-7,2 °C, ultime 24 ore)", "unita": "ore", "calcola": ore_freddo_24,
-     "cmap": "Blues", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
-     "nota": "ore utili a fruttiferi e vite per il riposo invernale"},
     {"id": "bagnatura", "titolo": "Ore di bagnatura delle foglie (ultime 24 ore)", "unita": "ore", "calcola": ore_bagnatura_24,
      "cmap": "GnBu", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
      "nota": "ore con umidità almeno 90 % o pioggia: le foglie restano bagnate"},
@@ -586,16 +620,16 @@ PARAMETRI = [
      "nota": "ore con radiazione solare sopra 120 W/m²"},
     {"id": "energia_solare", "titolo": "Energia solare (ultime 24 ore)", "unita": "kWh/m²", "calcola": energia_solare_24, "cmap": "YlOrRd", "limiti": (0, 8), "passo": 3, "inizio": 24,
      "nota": "utile per il fotovoltaico: energia che arriva su un metro quadro orizzontale"},
-    {"id": "gradi_giorno_risc", "titolo": "Gradi-giorno di riscaldamento (base 18 °C)", "unita": "°C·giorno", "calcola": gradi_giorno_risc_24, "cmap": "Blues", "limiti": (0, 18), "passo": 3, "inizio": 24,
-     "nota": "quanto serve riscaldare: più alto = più freddo (consumi di gas e legna)"},
     {"id": "ghiaccio_strade", "titolo": "Rischio ghiaccio su strade (ore, ultime 24 ore)", "unita": "ore", "calcola": ore_ghiaccio_stradale_24, "cmap": "PuBu", "limiti": (0, 12), "passo": 3, "inizio": 24, "serve": "TSK",
      "nota": "ore con superficie a 0 °C o meno e bagnata, quindi ghiaccio probabile su asfalto e piazzali"},
     {"id": "bilancio_idrico", "titolo": "Bilancio idrico (pioggia meno evapotraspirazione, 24 ore)", "unita": "mm", "calcola": bilancio_idrico_24, "cmap": "BrBG", "limiti": (-6, 6), "passo": 3, "inizio": 24, "terra": True,
      "nota": "positivo: il terreno guadagna acqua; negativo: si asciuga e serve irrigare"},
     {"id": "trattamenti", "titolo": "Ore adatte ai trattamenti (ultime 24 ore)", "unita": "ore", "calcola": ore_trattamento_24, "cmap": "YlGn", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
      "nota": "vento sotto 15 km/h, nessuna pioggia nell'ora e in quella prima, temperatura tra 5 e 28 °C"},
-    {"id": "praticabilita", "titolo": "Praticabilità del terreno (lavorazioni e mezzi)", "unita": "indice 0-100", "calcola": praticabilita_suolo, "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 0, "serve": "SMOIS", "terra": True,
-     "nota": "alto = terreno non troppo bagnato e senza pioggia recente: si può lavorare e passare con i mezzi"},
+    {"id": "praticabilita", "titolo": "Terreno: si può entrare nei campi?", "unita": "", "calcola": praticabilita_suolo, "passo": 3, "inizio": 0, "serve": "SMOIS", "terra": True,
+     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#7a4a1f", "#c08a4a", "#e8d27a", "#7cc46b"], "etichette": ["fango", "molto umido", "umido", "praticabile"], "nascondi": set()},
+     "scala": 1, "unita_dato": "", "etichetta_dato": "Stato del terreno",
+     "nota": "acqua nei primi 10 cm del suolo e pioggia degli ultimi 3 giorni"},
     {"id": "peronospora", "titolo": "Rischio peronospora (vite e altre colture)", "unita": "", "calcola": peronospora, "passo": 3, "inizio": 24, "terra": True,
      "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#ffffff", "#f6e27a", "#f08a24", "#c0392b"], "etichette": ["nullo", "basso", "medio", "alto"], "nascondi": {0}},
      "scala": 1, "unita_dato": "", "etichetta_dato": "Rischio peronospora",
@@ -607,19 +641,6 @@ PARAMETRI = [
     {"id": "funghi_estivi", "titolo": "Meteo funghi estivi (porcini estivi, finferli)", "unita": "indice 0-100", "calcola": lambda d, i: favorevolezza_funghi(d, i, (10, 15, 23, 28)),
      "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "TSLB", "terra": True,
      "nota": "come l'indice generale ma con suolo ideale tra 15 e 23 °C"},
-    {"id": "funghi_prato", "titolo": "Meteo funghi di prato (prataioli)", "unita": "indice 0-100", "calcola": lambda d, i: favorevolezza_funghi(d, i, (8, 12, 20, 25)),
-     "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "TSLB", "terra": True,
-     "nota": "come l'indice generale ma con suolo ideale tra 12 e 20 °C"},
-    {"id": "vpd", "titolo": "Deficit di pressione di vapore", "unita": "kPa",
-     "calcola": lambda d, i: np.maximum(0.6108 * np.exp(17.27 * (d["T2"][i] - 273.15) / (d["T2"][i] - 273.15 + 237.3))
-                                        - d["Q2"][i] * (d["PSFC"][i] / 1000.0) / (0.622 + d["Q2"][i]), 0),
-     "cmap": "YlOrRd", "limiti": (0, 3), "passo": 3, "inizio": 0, "terra": True,
-     "nota": "quanto è «assetata» l'aria: valori alti = le piante traspirano e il terreno si asciuga in fretta"},
-    {"id": "flusso_sensibile", "titolo": "Flusso di calore sensibile", "unita": "W/m²", "calcola": lambda d, i: d["HFX"][i],
-     "cmap": "RdBu_r", "limiti": (-150, 450), "passo": 3, "inizio": 0, "serve": "HFX",
-     "nota": "calore che il suolo cede all'aria (positivo) o toglie all'aria (negativo)"},
-    {"id": "flusso_latente", "titolo": "Flusso di calore latente (evaporazione)", "unita": "W/m²", "calcola": lambda d, i: d["LH"][i],
-     "cmap": "YlGnBu", "limiti": (0, 400), "passo": 3, "inizio": 0, "serve": "LH"},
     {"id": "cape", "titolo": "Energia dei temporali (CAPE)", "unita": "J/kg", "calcola": lambda d, i: d["CAPE"][i],
      "cmap": "YlOrRd", "limiti": (0, 2000), "passo": 3, "inizio": 0, "serve": "CAPE"},
     {"id": "grandine", "titolo": "Rischio grandine (SHIP)", "unita": "", "calcola": ship, "passo": 3, "inizio": 0, "serve": "U500",
@@ -637,14 +658,6 @@ PARAMETRI = [
     {"id": "tmax24", "titolo": "Temperatura massima a 2 m nelle ultime 24 ore", "unita": "°C",
      "calcola": lambda d, i: finestra(gelo(d)[0], i, 24, np.max), "cmap": "RdYlBu_r", "limiti": "auto",
      "passo": 3, "inizio": 24, "isolinee": True},
-    {"id": "twmin24", "titolo": "Temperatura minima di bulbo umido (ultime 24 ore)", "unita": "°C",
-     "calcola": lambda d, i: finestra(gelo(d)[1], i, 24, np.min), "cmap": "RdYlBu_r", "limiti": "auto",
-     "passo": 3, "inizio": 24, "isolinee": True,
-     "nota": "bulbo umido: temperatura a cui scende l'aria evaporando acqua; vicino a 0 °C con aria secca c'è rischio di gelo"},
-    {"id": "tprato24", "titolo": "Temperatura minima della superficie del suolo (ultime 24 ore)", "unita": "°C",
-     "calcola": lambda d, i: finestra(gelo(d)[2], i, 24, np.min), "cmap": "RdYlBu_r", "limiti": "auto",
-     "passo": 3, "inizio": 24, "isolinee": True,
-     "nota": "temperatura della superficie del suolo calcolata dal modello (WRF, campo TSK)"},
     {"id": "gelata_ora", "titolo": "Brina e gelate in questo momento", "unita": "",
      "calcola": lambda d, i: gelo(d)[3][i], "passo": 3, "inizio": 0,
      "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#ffffff", "#8fd8f2", "#2f6fd6", "#6a2c91"],
