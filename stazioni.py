@@ -987,6 +987,16 @@ def main():
                           extra_wrf=extra)
     (cart / "pagella.json").write_text(json.dumps(pag, ensure_ascii=False, separators=(",", ":"), default=pulisci))
     print("pagella scritta:", len(pag["stazioni"]), "stazioni")
+    # file leggero per la previsione del sito: serie del "WRF corretto" a Nerola ed errori medi di ogni modello
+    try:
+        ner = pag.get("nerola") or {}
+        leggero = {"aggiornato": pag.get("aggiornato"), "tempi": ner.get("tempi", []),
+                   "wrfc": (ner.get("prev") or {}).get("wrfc", {}),
+                   "base": (pag.get("wrf_corretto") or {}).get("nome_base"),
+                   "errori": (pag.get("riepilogo") or {}).get("tutte", {})}
+        (cart / "nerola_prev.json").write_text(json.dumps(leggero, ensure_ascii=False, separators=(",", ":"), default=pulisci))
+    except Exception as e:  # noqa: BLE001
+        print("ATTENZIONE: nerola_prev.json non scritto:", e, file=sys.stderr)
 
 
 if __name__ == "__main__":
