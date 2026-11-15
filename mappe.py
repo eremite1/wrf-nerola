@@ -53,10 +53,15 @@ FORZANTI = {"ECMWF": "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)",
 NOME_FORZANTE = "ECMWF"
 FONTE = FORZANTI[NOME_FORZANTE]
 # parametri della catena a 333 m: solo quelli che hanno senso a quella risoluzione
-ESSENZIALI = ["tempo", "temperatura", "delta_t24", "disagio", "umidita", "tdew", "t_superficie", "inversione",
-              "vento", "vento_max24", "pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_24h", "pioggia_totale", "tipo_prec",
-              "nebbia", "gelata_ora", "gelata", "tmin24", "tmax24", "ghiaccio_strade", "nuv_bassa", "radiazione",
-              "suolo_temp", "suolo_umidita_10"]
+ESSENZIALI = ["tempo", "temperatura", "delta_t24", "disagio", "umidita", "tdew", "pressione", "t_superficie", "inversione",
+              "nuv_totale", "nuv_bassa", "nuv_media", "nuv_alta", "radiazione",
+              "vento", "vento_max24", "pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale",
+              "pioggia_intensita24", "tipo_prec", "neve_24h", "quota_neve", "cape",
+              "nebbia", "gelata_ora", "gelata", "tmin24", "tmax24", "ghiaccio_strade",
+              "escursione", "ore_caldo", "ore_sole", "energia_solare", "bucato",
+              "praticabilita", "raccolta_olive", "trattamenti", "bilancio_idrico", "bagnatura", "rischio_funghi_colture",
+              "peronospora", "occhio_pavone", "mosca_olivo", "incendi", "suolo_temp", "suolo_umidita_10", "suolo_umidita_40",
+              "et0_24h", "funghi", "funghi_estivi"]
 CREDITI = "Rilievo: Terrain Tiles (SRTM/GMTED) · Confini: ISTAT, Natural Earth · Nomi: GeoNames"
 DOMINI = (("d02", "1km", "1 km"), ("d01", "3km", "3 km"))
 
@@ -401,9 +406,9 @@ def favorevolezza_funghi(d, i, t=(4, 9, 17, 22)):
     suolo 0-10 cm (t = estremi della fascia ideale: 0 sotto t[0], 1 tra t[1] e t[2], 0 sopra t[3]), umidita' del suolo
     0-40 cm (da secco a umido), umidita' media dell'aria nelle 24 ore (ideale oltre 85 %); poi si riduce se gela nelle
     24 ore e se il vento medio e' forte."""
-    ts = d["TSLB"][i, 0] - 273.15
+    ts = suolo(d, "TSLB", i) - 273.15
     f_t = np.minimum(rampa(ts, t[0], t[1]), rampa(ts, t[3], t[2]))
-    sm = 0.5 * (d["SMOIS"][i, 0] + d["SMOIS"][i, 1])
+    sm = 0.5 * (suolo(d, "SMOIS", i, 0) + suolo(d, "SMOIS", i, 1))
     f_s = rampa(sm, 0.22, 0.36)
     f_u = rampa(rh2(d)[i - 23:i + 1].mean(axis=0), 60, 85)
     tmin = (d["T2"][i - 23:i + 1] - 273.15).min(axis=0)
@@ -476,16 +481,111 @@ def ore_trattamento_24(d, i):
     return (asciutto & (vento < 15.0) & (t >= 5.0) & (t <= 28.0)).sum(axis=0).astype("float64")
 
 
-def praticabilita_suolo(d, i):
-    """Classi 0 fango, 1 molto umido, 2 umido, 3 praticabile.
-    Conta l'acqua nei primi 10 cm del suolo (i terreni argillosi della Sabina restano fangosi gia' sopra il 33-34 %)
-    e la pioggia degli ultimi 3 giorni (quella di ieri pesa piu' di quella dell'altro ieri)."""
+def _sfoca_box(a, r, asse):
+    """Media mobile larga 2r+1 lungo un asse (con le somme cumulate: veloce anche con raggi grandi)."""
+    if r < 1:
+        return a
+    a = np.moveaxis(a, asse, 0)
+    pad = np.concatenate([np.repeat(a[:1], r, 0), a, np.repeat(a[-1:], r, 0)], 0)
+    c = np.cumsum(pad, axis=0, dtype="float64")
+    c = np.concatenate([np.zeros((1,) + c.shape[1:]), c], 0)
+    out = (c[2 * r + 1:] - c[:-2 * r - 1]) / (2 * r + 1)
+    return np.moveaxis(out, 0, asse)
+
+
+def sfoca(z, km, d, maschera=None):
+    """Sfocatura gaussiana (tre medie mobili) di circa `km` chilometri, solo sui punti validi della maschera."""
+    dy = abs(float(d["lat"][1, 0] - d["lat"][0, 0])) * 111.2 or 1.0
+    sigma = km / dy
+    if sigma < 0.7:
+        return z
+    r = max(1, int(round((np.sqrt(12 * sigma * sigma / 3 + 1) - 1) / 2)))
+    m = np.isfinite(z) if maschera is None else (maschera & np.isfinite(z))
+    num = np.where(m, z, 0.0).astype("float64")
+    den = m.astype("float64")
+    for _ in range(3):
+        for asse in (0, 1):
+            num = _sfoca_box(num, r, asse)
+            den = _sfoca_box(den, r, asse)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(den > 1e-6, num / den, z)
+
+
+_CACHE_SUOLO = {}
+
+
+def suolo(d, nome, i, livello=0):
+    """Campo del suolo (SMOIS o TSLB) addolcito su circa 10 km. Il WRF parte dal suolo dei modelli globali, che ha celle
+    di 10-25 km: senza addolcirlo le mappe del suolo vengono a quadretti."""
+    k = (id(d), d["T2"].shape, nome, i, livello)
+    if k not in _CACHE_SUOLO:
+        if len(_CACHE_SUOLO) > 64:
+            _CACHE_SUOLO.clear()
+        terra = d["landmask"] > 0.5 if "landmask" in d else None
+        _CACHE_SUOLO[k] = sfoca(np.asarray(d[nome][i, livello], dtype="float64"), 10.0, d, terra)
+    return _CACHE_SUOLO[k]
+
+
+def indice_terreno(d, i):
+    """0 fango ... 1 asciutto: acqua nei primi 10 cm del suolo (addolcita) e pioggia degli ultimi 3 giorni."""
     pr = uscite.pioggia(d)
     def tra(a, b):
         return np.maximum(pr[max(i - a, 0)] - pr[max(i - b, 0)], 0)
-    pioggia = tra(0, 24) + 0.6 * tra(24, 48) + 0.35 * tra(48, 72)
-    indice = rampa(d["SMOIS"][i, 0], 0.36, 0.22) * (1.0 - rampa(pioggia, 1.0, 12.0))
-    return np.digitize(indice, [0.25, 0.5, 0.75]).astype("float64")
+    pioggia = sfoca(tra(0, 24) + 0.6 * tra(24, 48) + 0.35 * tra(48, 72), 3.0, d)
+    return rampa(suolo(d, "SMOIS", i), 0.36, 0.22) * (1.0 - rampa(pioggia, 1.0, 12.0))
+
+
+def praticabilita_suolo(d, i):
+    """Classi 0 fango, 1 molto umido, 2 umido, 3 asciutto (vedi indice_terreno)."""
+    return np.digitize(indice_terreno(d, i), [0.25, 0.5, 0.75]).astype("float64")
+
+
+def foglie_bagnate(d, i):
+    """Vero dove le foglie sono probabilmente bagnate adesso: pioggia nelle ultime 6 ore, oppure aria quasi satura
+    (rugiada, nebbia) adesso o nelle 2 ore prima."""
+    pr = uscite.pioggia(d)
+    piov6 = pr[i] - pr[max(i - 6, 0)]
+    rh = rh2(d)
+    umido = (rh[i] >= 92) | (rh[max(i - 1, 0)] >= 95) | (rh[max(i - 2, 0)] >= 97)
+    return (piov6 >= 0.3) | umido
+
+
+def raccolta_olive(d, i):
+    """0 no, 1 sconsigliata, 2 possibile, 3 ottima: niente pioggia, foglie asciutte (con l'abbacchiatore non ci si
+    bagna), terreno non fangoso, aria non troppo umida, vento non forte."""
+    pr = uscite.pioggia(d)
+    piove = (pr[i] - pr[max(i - 1, 0)]) >= 0.2
+    ter = indice_terreno(d, i)
+    rh = rh2(d)[i]
+    vento = np.hypot(d["U10"][i], d["V10"][i]) * 3.6
+    v = np.full(ter.shape, 3.0)
+    v = np.where((ter < 0.5) | (rh >= 88) | (vento >= 30), np.minimum(v, 2), v)
+    v = np.where(foglie_bagnate(d, i) | (ter < 0.25) | (vento >= 45), np.minimum(v, 1), v)
+    return np.where(piove, 0, v)
+
+
+def occhio_pavone(d, i):
+    """Rischio di infezione dell'occhio di pavone dell'olivo nelle ultime 24 ore: ore con foglie bagnate e temperatura
+    tra 8 e 24 gradi (ottimo 15-20). 0 nullo, 1 basso, 2 medio, 3 alto."""
+    pr = uscite.pioggia(d)
+    t = d["T2"][i - 23:i + 1] - 273.15
+    bagnato = (rh2(d)[i - 23:i + 1] >= 90) | (np.diff(pr[i - 24:i + 1], axis=0) >= 0.1)
+    adatte = (bagnato & (t >= 8) & (t <= 24)).sum(axis=0)
+    return np.digitize(adatte, [6, 12, 18]).astype("float64")
+
+
+def bucato(d, i):
+    """Il bucato steso all'aperto si asciuga? 0 piove, 1 lento, 2 discreto, 3 veloce: aria secca, vento e sole."""
+    pr = uscite.pioggia(d)
+    piove = (pr[i] - pr[max(i - 1, 0)]) >= 0.1
+    t = d["T2"][i] - 273.15
+    es = 0.6108 * np.exp(17.27 * t / (t + 237.3))
+    ea = d["Q2"][i] * (d["PSFC"][i] / 1000.0) / (0.622 + d["Q2"][i])
+    vpd = np.maximum(es - ea, 0)
+    vento = np.hypot(d["U10"][i], d["V10"][i]) * 3.6
+    sole = d["SWDOWN"][i] if "SWDOWN" in d else 0
+    x = vpd * (1 + np.minimum(vento, 30) / 15.0) + sole / 600.0
+    return np.where(piove, 0, 1 + np.digitize(x, [0.45, 1.1])).astype("float64")
 
 
 def peronospora(d, i):
@@ -516,7 +616,7 @@ def pericolo_incendi(d, i):
     ea = d["Q2"][i] * (d["PSFC"][i] / 1000.0) / (0.622 + d["Q2"][i])
     vpd = np.maximum(es - ea, 0)
     vento = np.hypot(d["U10"][i], d["V10"][i]) * 3.6
-    secco = rampa(d["SMOIS"][i, 0], 0.30, 0.12)
+    secco = rampa(suolo(d, "SMOIS", i), 0.30, 0.12)
     pioggia = np.sum(_pioggia_oraria(d, i), axis=0)
     return 100.0 * np.cbrt(rampa(vpd, 0.8, 3.0) * (0.3 + 0.7 * rampa(vento, 5, 35)) * secco) * (1.0 - rampa(pioggia, 0.5, 5.0))
 
@@ -626,10 +726,24 @@ PARAMETRI = [
      "nota": "positivo: il terreno guadagna acqua; negativo: si asciuga e serve irrigare"},
     {"id": "trattamenti", "titolo": "Ore adatte ai trattamenti (ultime 24 ore)", "unita": "ore", "calcola": ore_trattamento_24, "cmap": "YlGn", "limiti": (0, 24), "passo": 3, "inizio": 24, "terra": True,
      "nota": "vento sotto 15 km/h, nessuna pioggia nell'ora e in quella prima, temperatura tra 5 e 28 °C"},
-    {"id": "praticabilita", "titolo": "Terreno: si può entrare nei campi?", "unita": "", "calcola": praticabilita_suolo, "passo": 3, "inizio": 0, "serve": "SMOIS", "terra": True,
-     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#7a4a1f", "#c08a4a", "#e8d27a", "#7cc46b"], "etichette": ["fango", "molto umido", "umido", "praticabile"], "nascondi": set()},
+    {"id": "praticabilita", "titolo": "Stato del terreno: fango, umido o asciutto", "unita": "", "calcola": praticabilita_suolo, "passo": 3, "inizio": 0, "serve": "SMOIS", "terra": True,
+     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#7a4a1f", "#c08a4a", "#e8d27a", "#7cc46b"], "etichette": ["fango", "molto umido", "umido", "asciutto"], "nascondi": set()},
      "scala": 1, "unita_dato": "", "etichetta_dato": "Stato del terreno",
      "nota": "acqua nei primi 10 cm del suolo e pioggia degli ultimi 3 giorni"},
+    {"id": "raccolta_olive", "titolo": "Raccolta delle olive: si può raccogliere?", "unita": "", "calcola": raccolta_olive, "passo": 3,
+     "inizio": 6, "serve": "SMOIS", "terra": True,
+     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#5b6b8c", "#e8a33a", "#d9e27a", "#3f9e4a"], "etichette": ["no (piove)", "sconsigliata", "possibile", "ottima"], "nascondi": set()},
+     "scala": 1, "unita_dato": "", "etichetta_dato": "Raccolta olive",
+     "nota": "niente pioggia, foglie asciutte, terreno non fangoso, aria non troppo umida, vento non forte"},
+    {"id": "occhio_pavone", "titolo": "Occhio di pavone dell'olivo: rischio di infezione (24 ore)", "unita": "", "calcola": occhio_pavone, "passo": 3,
+     "inizio": 24, "terra": True,
+     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#ffffff", "#f6e27a", "#f08a24", "#c0392b"], "etichette": ["nullo", "basso", "medio", "alto"], "nascondi": {0}},
+     "scala": 1, "unita_dato": "", "etichetta_dato": "Occhio di pavone",
+     "nota": "ore con foglie bagnate e temperatura tra 8 e 24 °C nelle ultime 24 ore (6, 12, 18 ore = basso, medio, alto)"},
+    {"id": "bucato", "titolo": "Bucato all'aperto: si asciuga?", "unita": "", "calcola": bucato, "passo": 3, "inizio": 1, "terra": True,
+     "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#5b6b8c", "#c9d3dc", "#9fd0ef", "#f2c230"], "etichette": ["piove", "lentamente", "discretamente", "velocemente"], "nascondi": set()},
+     "scala": 1, "unita_dato": "", "etichetta_dato": "Bucato",
+     "nota": "aria secca, vento e sole fanno asciugare; con la pioggia no"},
     {"id": "peronospora", "titolo": "Rischio peronospora (vite e altre colture)", "unita": "", "calcola": peronospora, "passo": 3, "inizio": 24, "terra": True,
      "classi": {"bordi": [0.5, 1.5, 2.5], "colori": ["#ffffff", "#f6e27a", "#f08a24", "#c0392b"], "etichette": ["nullo", "basso", "medio", "alto"], "nascondi": {0}},
      "scala": 1, "unita_dato": "", "etichetta_dato": "Rischio peronospora",
@@ -675,13 +789,13 @@ PARAMETRI = [
      "unita_dato": "m", "etichetta_dato": "Visibilità stimata", "scala": 1, "clip": 30000,
      "nota": "stimata dall'acqua delle nubi nel primo livello del modello; nelle prime ore il modello parte senza nubi"},
     {"id": "suolo_temp", "titolo": "Temperatura del suolo (0-10 cm)", "unita": "°C",
-     "calcola": lambda d, i: d["TSLB"][i, 0] - 273.15, "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0,
+     "calcola": lambda d, i: suolo(d, "TSLB", i) - 273.15, "cmap": "RdYlBu_r", "limiti": "auto", "passo": 3, "inizio": 0,
      "serve": "TSLB", "terra": True, "isolinee": True},
     {"id": "suolo_umidita_10", "titolo": "Umidità del suolo (0-10 cm)", "unita": "% volume",
-     "calcola": lambda d, i: d["SMOIS"][i, 0] * 100, "cmap": "YlGnBu", "limiti": (5, 50), "passo": 3, "inizio": 0,
+     "calcola": lambda d, i: suolo(d, "SMOIS", i, 0) * 100, "cmap": "YlGnBu", "limiti": (5, 50), "passo": 3, "inizio": 0,
      "serve": "SMOIS", "terra": True},
     {"id": "suolo_umidita_40", "titolo": "Umidità del suolo (10-40 cm)", "unita": "% volume",
-     "calcola": lambda d, i: d["SMOIS"][i, 1] * 100, "cmap": "YlGnBu", "limiti": (5, 50), "passo": 3, "inizio": 0,
+     "calcola": lambda d, i: suolo(d, "SMOIS", i, 1) * 100, "cmap": "YlGnBu", "limiti": (5, 50), "passo": 3, "inizio": 0,
      "serve": "SMOIS", "terra": True},
 ]
 for _p in PARAMETRI:
