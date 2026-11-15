@@ -56,7 +56,7 @@ FONTE = FORZANTI[NOME_FORZANTE]
 ESSENZIALI = ["tempo", "temperatura", "delta_t24", "disagio", "umidita", "tdew", "pressione", "t_superficie", "inversione",
               "nuv_totale", "nuv_bassa", "nuv_media", "nuv_alta", "radiazione",
               "vento", "vento_max24", "pioggia_1h", "pioggia_3h", "pioggia_6h", "pioggia_12h", "pioggia_24h", "pioggia_totale",
-              "pioggia_intensita24", "tipo_prec", "neve_24h", "quota_neve", "cape",
+              "pioggia_intensita24", "tipo_prec", "neve_24h", "quota_neve", "temporali", "cape",
               "nebbia", "gelata_ora", "gelata", "tmin24", "tmax24", "ghiaccio_strade",
               "escursione", "ore_caldo", "ore_sole", "energia_solare", "bucato",
               "praticabilita", "raccolta_olive", "trattamenti", "bilancio_idrico", "bagnatura", "rischio_funghi_colture",
@@ -285,7 +285,7 @@ def tempo_previsto(d, i):
     out = np.where(p >= 0.3, 7, out)
     out = np.where(p >= 2.0, 8, out)
     if "CAPE" in d:
-        out = np.where((p >= 1.0) & (d["CAPE"][i] >= 400), 9, out)
+        out = np.where((p >= 0.5) & (indice_temporali(d, i) >= 40), 9, out)     # stesso indice della mappa dei temporali
     if "AFUS" in d:
         neve = colonna.classifica(d["AFUS"][i], d["ARIG"][i], d["TW2"][i]) >= 2
         out = np.where((p >= 0.1) & neve, 10, out)
@@ -330,6 +330,27 @@ def p_pioggia(n):
     return {"id": "pioggia_totale" if n == 0 else f"pioggia_{n}h", "titolo": titolo, "unita": "mm", "calcola": f,
             "classi": classi_pioggia(PIOGGIA[n]), "passo": 1 if n == 1 else 3, "inizio": max(n, 1) if n else 3,
             "nota": "pioggia convettiva e a grande scala"}
+
+
+def indice_temporali(d, i):
+    """Probabilita' di temporali (0-100 %), «Indice temporali MeteoNerola»: stessi ingredienti delle mappe dei modelli
+    (meteo-mappe, calcoli.indice_temporali). Instabilita' dal CAPE e dal gradiente 850-500 hPa, umidita' a 700 hPa,
+    innesco dalla pioggia convettiva dell'ultima ora e dal moto verso l'alto a 700 hPa (che il WRF calcola davvero)."""
+    if "CAPE" not in d:
+        return np.full(d["lat"].shape, np.nan)
+    cape = np.clip(np.nan_to_num(d["CAPE"][i]), 0, None)
+    inst = rampa(cape, 50.0, 800.0)
+    if "T850" in d and "T500" in d:
+        inst = np.maximum(inst, 0.7 * rampa(np.nan_to_num(d["T850"][i] - d["T500"][i]), 26.0, 32.0) * rampa(cape, 0.0, 150.0))
+    umido = 0.3 + 0.7 * rampa(np.nan_to_num(d["RH700"][i], nan=50.0), 30.0, 70.0) if "RH700" in d else 1.0
+    pr = uscite.pioggia(d)
+    p1 = np.maximum(pr[i] - pr[max(i - 1, 0)], 0)
+    if "RAINC" in d:
+        p1 = np.maximum(p1 * 0.5, np.maximum(d["RAINC"][i] - d["RAINC"][max(i - 1, 0)], 0))
+    innesco = np.maximum(0.25, rampa(p1, 0.1, 2.0))
+    if "W700" in d:
+        innesco = np.maximum(innesco, rampa(np.nan_to_num(d["W700"][i]), 0.05, 0.5))
+    return np.clip(100.0 * inst * umido * innesco, 0, 100)
 
 
 def ship(d, i):
@@ -755,7 +776,10 @@ PARAMETRI = [
     {"id": "funghi_estivi", "titolo": "Meteo funghi estivi (porcini estivi, finferli)", "unita": "indice 0-100", "calcola": lambda d, i: favorevolezza_funghi(d, i, (10, 15, 23, 28)),
      "cmap": "YlGn", "limiti": (0, 100), "passo": 3, "inizio": 24, "serve": "TSLB", "terra": True,
      "nota": "come l'indice generale ma con suolo ideale tra 15 e 23 °C"},
-    {"id": "cape", "titolo": "Energia dei temporali (CAPE)", "unita": "J/kg", "calcola": lambda d, i: d["CAPE"][i],
+    {"id": "temporali", "titolo": "Probabilità di temporali", "unita": "%", "calcola": indice_temporali, "cmap": "YlOrRd",
+     "limiti": (5, 90), "passo": 1, "inizio": 1, "serve": "CAPE",
+     "nota": "indice MeteoNerola: instabilità (CAPE e gradiente in quota), umidità a 700 hPa, innesco (pioggia convettiva e moto verso l'alto)"},
+    {"id": "cape", "titolo": "Energia dei temporali (CAPE, per esperti)", "unita": "J/kg", "calcola": lambda d, i: d["CAPE"][i],
      "cmap": "YlOrRd", "limiti": (0, 2000), "passo": 3, "inizio": 0, "serve": "CAPE"},
     {"id": "grandine", "titolo": "Rischio grandine (SHIP)", "unita": "", "calcola": ship, "passo": 3, "inizio": 0, "serve": "U500",
      "classi": {"bordi": [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3],

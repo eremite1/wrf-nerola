@@ -233,8 +233,9 @@ def classe_tempo(nub, basse, qc1, t2k, q2, psfc, pr, cape=None):
     out = np.where((p >= 0.02) & (p < 0.3) & (basse >= 60) & (rh >= 88), 6, out)
     out = np.where(p >= 0.3, 7, out)
     out = np.where(p >= 2.0, 8, out)
-    if cape is not None:
-        out = np.where((p >= 1.0) & (cape >= 400), 9, out)
+    if cape is not None:     # indice dei temporali semplificato (solo CAPE e pioggia), come in mappe.indice_temporali
+        idx = 100 * np.clip((cape - 50) / 750, 0, 1) * np.maximum(0.25, np.clip((p - 0.1) / 1.9, 0, 1))
+        out = np.where((p >= 0.5) & (idx >= 40), 9, out)
     out = np.where((p >= 0.1) & (t <= 0.5), 10, out)
     return np.where(np.isnan(pr), np.nan, out)
 
