@@ -154,6 +154,7 @@
   <div class="griglia-pagina" id="vista-mappe">
     <section class="card barra-scelte" aria-label="Scelte">
       <div class="riga-scelte"><span class="etich">Modello</span><div id="lista-modelli" class="chips" role="group" aria-label="Modello"></div></div>
+      <div class="riga-scelte" id="riga-corsa" hidden><span class="etich">Corsa</span><select id="corsa-arch" style="font:inherit;padding:6px 8px;border-radius:8px;max-width:260px" title="Rivedi una corsa precedente (le mappe principali, ogni 3 ore fino a 78 ore)"></select></div>
       <div class="riga-scelte"><span class="etich">Categoria</span><div id="lista-cat" class="chips" role="group" aria-label="Categoria"></div></div>
       <div class="riga-scelte"><span class="etich">Mappa</span><div id="lista-param" class="chips" role="group" aria-label="Parametro"></div></div>
     </section>
@@ -423,10 +424,12 @@ async function carica() {
     b.type = "button";
     b.title = v.descr || (k === "1km" ? "zona di Nerola, circa 73 km" : "area più ampia, circa 240 km");
     b.innerHTML = `<b>WRF ${v.etichetta}</b><small>${b.title}</small>`;
-    b.onclick = () => { dom.value = k; dom.onchange(); };
+    b.onclick = () => { domBase = null; dom.value = k; dom.onchange(); };
     lm.appendChild(b);
   }
-  dom.onchange = () => { aggiornaContatore(); puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); evidenzia(); };
+  dom.onchange = () => { if (!dom.value.includes("@")) domBase = null; aggiornaContatore(); puntoScelto = null; $("marcatore").classList.add("nascosto"); $("punto").classList.add("nascosto"); riempiParametri(); caricaGriglia().catch(() => {}); evidenzia(); riempiCorse(); };
+  $("corsa-arch").onchange = scegliCorsa;
+  caricaArchivio();
   $("parametro").onchange = () => { scegliParametro(); evidenzia(); };
   $("cursore").oninput = () => mostra(+$("cursore").value, false);
   $("indietro").onclick = () => { ferma(); mostra(posizione - 1); };
@@ -574,6 +577,46 @@ async function disegnaCorretto() {
 
 function dominioAttuale() { return indice.domini[$("dominio").value]; }
 
+// CORSE PRECEDENTI: il sito ne conserva le mappe principali (archivio di meteonerola.it, ogni 3 ore fino a +78 h).
+// Una corsa scelta diventa un "dominio" in piu' (chiave "1km@2026111512") con le sole mappe archiviate.
+const ARCH = /meteonerola\.it$/.test(location.hostname) ? location.origin + "/wp-content/uploads/meteonerola/archivio/" : null;
+let archivio = null, domBase = null;
+function fonteArch(k) {
+  const [cat, d] = k.includes("-") ? k.split("-") : ["", k];
+  if (cat === "fine") return "w333";
+  return (d === "1km" ? "w1_" : "w3_") + (cat || "ecmwf");
+}
+const fmtCorsa = (c) => c ? `${c.slice(6, 8)}/${c.slice(4, 6)} ore ${c.slice(8, 10)} UTC` : "";
+async function caricaArchivio() {
+  if (!ARCH) return;
+  try { const r = await fetch(ARCH + "indice.json?t=" + Date.now(), { cache: "no-store" }); if (r.ok) archivio = await r.json(); } catch (e) { /* archivio non raggiungibile */ }
+  riempiCorse();
+}
+function riempiCorse() {
+  const sel = $("corsa-arch"); if (!sel || !indice) return;
+  const k = domBase || $("dominio").value, v = indice.domini[k];
+  const f = archivio && archivio.fonti[fonteArch(k)], ult = v && v.corsa;
+  const lista = f ? Object.keys(f.corse || {}).sort().reverse().filter((c) => c !== ult) : [];
+  $("riga-corsa").hidden = !lista.length;
+  sel.innerHTML = `<option value="">ultima: ${fmtCorsa(ult)}</option>` + lista.map((c) => `<option value="${c}">${fmtCorsa(c)}</option>`).join("");
+  sel.value = $("dominio").value.includes("@") ? $("dominio").value.split("@")[1] : "";
+}
+function scegliCorsa() {
+  const sel = $("corsa-arch"), dom = $("dominio"), base = domBase || dom.value;
+  if (!sel.value) { domBase = null; dom.value = base; dom.onchange(); return; }
+  const key = base + "@" + sel.value;
+  if (!indice.domini[key]) {
+    const v = indice.domini[base], cr = archivio.fonti[fonteArch(base)].corse[sel.value], par = {};
+    for (const [p, ore] of Object.entries(cr)) {
+      if (!v.parametri[p]) continue;
+      par[p] = { ...v.parametri[p], dati: null, immagini: Object.keys(ore).sort().map((t) => ({ file: ARCH + ore[t], valido_utc: t })) };
+    }
+    indice.domini[key] = { ...v, parametri: par, corsa: sel.value, etichetta: v.etichetta + " · corsa precedente" };
+    dom.add(new Option("Dominio " + v.etichetta + " · corsa " + fmtCorsa(sel.value), key));
+  }
+  domBase = base; dom.value = key; dom.onchange();
+}
+
 async function leggiBin(url, tipo) {
   if (cacheBin[url]) return cacheBin[url];
   const r = await fetch(url + "?v=" + encodeURIComponent(verDi(url)));
@@ -683,7 +726,7 @@ function mostraSpiegazione() {
 function evidenzia() {
   document.querySelectorAll("#lista-param .voce").forEach((b) => b.setAttribute("aria-pressed", b.dataset.id === $("parametro").value));
   document.querySelectorAll("#lista-cat .cat").forEach((b) => b.setAttribute("aria-pressed", b.dataset.cat === categoria));
-  document.querySelectorAll("#lista-modelli .modello").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dom === $("dominio").value));
+  document.querySelectorAll("#lista-modelli .modello").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dom === (domBase || $("dominio").value)));
   // sul telefono le righe scorrono di lato: porto in vista la voce scelta (senza muovere la pagina)
   for (const box of [$("lista-modelli"), $("lista-cat"), $("lista-param")]) {
     const b = box.querySelector('[aria-pressed="true"]');
