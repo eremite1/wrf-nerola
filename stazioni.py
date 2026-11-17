@@ -1060,6 +1060,47 @@ def calcola_pagella(oss_righe, prev_righe, snap_righe, vicine_nerola, giorni=GIO
     }
 
 
+def usa_corretto(pag, percorso):
+    """Il «WRF corretto» di Nerola diventa quello della pagella unica (meteo-mappe, motore/corretto.py): corretto su
+    tutto il territorio con circa 300 stazioni e, per la pioggia, con lo storico del radar zona per zona."""
+    z = np.load(percorso)
+    lat, lon = z["lat"], z["lon"]
+    pv = punto_vicino(NEROLA[0], NEROLA[1], lat, lon)
+    if pv is None:
+        raise RuntimeError("Nerola fuori dal dominio del WRF corretto")
+    iy, ix = pv[0], pv[1]
+    tempi = [datetime.strptime(str(t)[:16], "%Y-%m-%dT%H:%M" if "T" in str(t) else "%Y-%m-%d_%H:%M").replace(tzinfo=timezone.utc)
+             for t in z["tempi"]]
+    t2 = z["T2"][:, iy, ix] - 273.15
+    td = dewpoint(z["Q2"][:, iy, ix], z["PSFC"][:, iy, ix])
+    v = np.hypot(z["U10"][:, iy, ix], z["V10"][:, iy, ix]) * 3.6
+    cum = z["RAINC"][:, iy, ix] + z["RAINNC"][:, iy, ix]
+    pr = np.concatenate([[np.nan], np.diff(cum)])
+    serie = {ora_iso(t): {"T": round(float(t2[k]), 1), "Td": round(float(td[k]), 1), "V": round(float(v[k]), 1),
+                          "P": None if k == 0 else round(max(0.0, float(pr[k])), 2)}
+             for k, t in enumerate(tempi)}
+    ner = pag.setdefault("nerola", {})
+    t0 = min(ner.get("tempi") or [min(serie)])
+    tt = sorted(set(ner.get("tempi", [])) | {t for t in serie if t >= t0})
+    ner.setdefault("prev", {})
+    # riallineo le serie esistenti ai nuovi tempi
+    prima = ner.get("tempi", [])
+    pos = {t: i for i, t in enumerate(prima)}
+    for m, dd in list(ner.get("prev", {}).items()):
+        ner["prev"][m] = {var: [(dd.get(var) or [None] * len(prima))[pos[t]] if t in pos and pos[t] < len(dd.get(var) or []) else None
+                                for t in tt] for var in VARS}
+    ner["oss"] = {var: [(ner.get("oss", {}).get(var) or [None] * len(prima))[pos[t]] if t in pos else None for t in tt] for var in VARS}
+    ner["prev"]["wrfc"] = {var: [pulisci(serie[t][var]) if t in serie else None for t in tt] for var in VARS}
+    ner["tempi"] = tt
+    info = {}
+    j = Path(percorso).with_name("corretto.json")
+    if j.exists():
+        info = json.loads(j.read_text())
+    nome = registro_wrf().get({"wrf3km": "wrf3", "wrf1km": "wrf1"}.get(info.get("base", ""), ""), (0, 0, info.get("base", "WRF")))[2]
+    pag["wrf_corretto"] = dict(pag.get("wrf_corretto") or {}, base=info.get("base"), nome_base=f"{nome} corretto con stazioni e radar",
+                               unica=info)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--storico", required=True, help="cartella dello storico (osservazioni, previsioni, pagella.json)")
@@ -1069,6 +1110,7 @@ def main():
     ap.add_argument("--ore", type=int, default=72, help="ore di osservazioni da scaricare")
     ap.add_argument("--stazione", default="", help="cartella con nerola.csv (dati della stazione di Nerola dal sito)")
     ap.add_argument("--altri-modelli", action="store_true", help="scarica anche le previsioni degli altri modelli (Open-Meteo)")
+    ap.add_argument("--corretto", default="", help="corretto_tutto.npz: il WRF corretto della pagella unica (meteo-mappe)")
     a = ap.parse_args()
     cart = Path(a.storico)
     cart.mkdir(parents=True, exist_ok=True)
@@ -1142,6 +1184,11 @@ def main():
     print("altri WRF in pagella:", {m: len(c) for m, c in extra.items()})
     pag = calcola_pagella(oss_tutte, leggi_previsioni(cart, GIORNI_FINESTRA + 3), leggi_snapshot(cart, GIORNI_FINESTRA + 3), vicine,
                           extra_wrf=extra)
+    if a.corretto and Path(a.corretto).exists():
+        try:
+            usa_corretto(pag, a.corretto)
+        except Exception as e:  # noqa: BLE001
+            print("ATTENZIONE: WRF corretto della pagella unica non letto:", e, file=sys.stderr)
     (cart / "pagella.json").write_text(json.dumps(pag, ensure_ascii=False, separators=(",", ":"), default=pulisci))
     print("pagella scritta:", len(pag["stazioni"]), "stazioni")
     # file leggero per la previsione del sito: serie del "WRF corretto" a Nerola ed errori medi di ogni modello

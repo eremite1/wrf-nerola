@@ -57,12 +57,20 @@ jobs:
           fi
           python3 stazione_nerola.py --cartella /home/runner/stazione || echo "home non letta, uso lo storico"
 
+      - name: WRF corretto della pagella unica (meteo-mappe, corretto con stazioni e radar)
+        run: |
+          mkdir -p /home/runner/corretto
+          U=https://raw.githubusercontent.com/eremite1/meteo-mappe/pagella/corretto
+          curl -fsSL --retry 3 -o /home/runner/corretto/corretto_tutto.npz "$U/corretto_tutto.npz" \
+            && curl -fsSL --retry 3 -o /home/runner/corretto/corretto.json "$U/corretto.json" \
+            || { echo "WRF corretto non ancora disponibile"; rm -f /home/runner/corretto/*; }
+
       - name: Confronto previsione e osservazioni
         env:
           METEOHUB_USERNAME: ${{ secrets.METEOHUB_USERNAME }}
           METEOHUB_PASSWORD: ${{ secrets.METEOHUB_PASSWORD }}
         run: |
-          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA" --stazione /home/runner/stazione --altri-modelli --fisica /home/runner/fisica
+          python3 stazioni.py --storico /home/runner/storico --uscite /home/runner/vecchio --corsa "$CORSA" --stazione /home/runner/stazione --altri-modelli --fisica /home/runner/fisica --corretto /home/runner/corretto/corretto_tutto.npz
 
       - name: Aggiorno lo storico
         env:

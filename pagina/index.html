@@ -145,7 +145,6 @@
       <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
       <button role="tab" id="s-pagella" aria-selected="false">🏆 Pagelle ↗</button>
       <button role="tab" id="s-corretto" aria-selected="false">WRF corretto (sperimentale)</button>
-      <button role="tab" id="s-confronto" aria-selected="false">Confronto di tutti i WRF</button>
     </div>
     <div class="sotto" id="info">Caricamento…</div>
   </div>
@@ -230,11 +229,10 @@
     <div id="cor-grafici"></div>
     <div id="cor-tabella"></div>
     <details class="info"><summary>Come funziona</summary>
-      <p>Il modello WRF ha errori che si ripetono: ad esempio, a una certa ora del giorno scalda un po' troppo, oppure prevede più vento di quello che le stazioni misurano.
-         La correzione toglie al modello l'errore medio che aveva fatto nelle due settimane <i>prima</i> dell'inizio della corsa, nella stessa stazione e nella stessa fascia di 3 ore del giorno
-         (per il vento moltiplica per il rapporto tra osservato e previsto). Non guarda mai il futuro, quindi la sua pagella è onesta.</p>
-      <p>Il modello fisico non viene modificato e la pioggia non viene corretta. Le mappe restano quelle di WRF normale: questa scheda è solo un esperimento da confrontare con le stazioni.
-         Se col tempo risulterà davvero migliore, la correzione potrà passare anche alle mappe.</p>
+      <p>Si parte dal WRF che nella <a href="https://www.meteonerola.it/modelli-meteo/#pagelle" target="_top">pagella unica</a> ha il voto più alto negli ultimi 30 giorni e lo si corregge con gli errori che ha fatto <i>prima</i> della partenza della corsa (non guarda mai il futuro, quindi la sua pagella è onesta).</p>
+      <p><b>Temperatura, umidità e vento</b>: l'errore medio delle ultime due settimane di circa 300 stazioni del Lazio e delle regioni vicine, fascia oraria per fascia oraria, viene distribuito su tutto il territorio: ogni zona prende soprattutto la correzione delle stazioni vicine.</p>
+      <p><b>Pioggia</b>, con il radar della Protezione Civile, zona per zona: se il modello è in anticipo o in ritardo la pioggia viene spostata nel tempo; se la mette sistematicamente troppo a est, nord… la mappa viene spostata; l'intensità dei rovesci viene resa simile a quella vista dal radar (separatamente per pianura, colline e montagna); e dove sbaglia in più o in meno in una certa zona viene corretta lì, in modo diverso a seconda del tipo di tempo previsto (perturbazione estesa, temporali isolati…). Gli errori vecchi contano sempre meno: la correzione si aggiorna da sola.</p>
+      <p>Il «WRF corretto» ha il suo voto nella pagella unica, insieme a tutti gli altri modelli.</p>
     </details>
   </section>
 
@@ -448,7 +446,6 @@ async function carica() {
     else location.href = "https://www.meteonerola.it/modelli-meteo/#pagelle";
   };
   $("s-corretto").onclick = () => scheda("corretto");
-  $("s-confronto").onclick = () => scheda("confronto");
   $("cf-var").onchange = disegnaConfronto;
   $("cf-gruppo").onchange = disegnaConfronto;
   riempiParametri(true);
@@ -479,7 +476,7 @@ function aggiornaContatore() {
 
 function scheda(nome) {
   ferma();
-  for (const [id, n] of [["mappe", "vista-mappe"], ["meteo", "vista-meteo"], ["pagella", "vista-pagella"], ["corretto", "vista-corretto"], ["confronto", "vista-confronto"]]) {
+  for (const [id, n] of [["mappe", "vista-mappe"], ["meteo", "vista-meteo"], ["pagella", "vista-pagella"], ["corretto", "vista-corretto"]]) {
     $(n).classList.toggle("nascosto", id !== nome);
     $("s-" + id).setAttribute("aria-selected", id === nome);
   }
