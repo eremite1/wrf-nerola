@@ -323,7 +323,9 @@ function disegna(D, punto) {
   });
   nx.putImageData(im, 0, 0);
   x.save(); x.beginPath(); x.rect(sx, y0, pw, H_SEZ); x.clip();
+  x.filter = "blur(" + Math.max(1.5, cw * 0.35).toFixed(1) + "px)";      // nubi morbide, senza gradini tra i livelli
   x.drawImage(nubi, sx, y0, pw, H_SEZ);
+  x.filter = "none";
   x.restore();
   // precipitazione che cade dalla base delle nubi al suolo
   x.save(); x.beginPath(); x.rect(sx, y0, pw, H_SEZ); x.clip();
