@@ -169,6 +169,7 @@
           <button id="indietro" aria-label="Ora precedente">◀</button>
           <button id="gioca" aria-label="Avvia o ferma">▶</button>
           <button id="avanti" aria-label="Ora successiva">▶|</button>
+          <button id="gif" aria-label="Scarica una GIF animata" title="Scarica un tratto delle ore come GIF animata">🎞️ GIF</button>
         </div>
         <div class="cursore-box"><input type="range" id="cursore" min="0" max="0" value="0" aria-label="Scegli l'ora" style="width:100%"><div class="giorni" id="giorni"></div></div>
       </div>
@@ -265,6 +266,7 @@
   ECMWF non garantisce i dati). Confini: Natural Earth. Nomi dei paesi: GeoNames (CC BY 4.0).
 </footer>
 
+<script src="gif.js"></script>
 <script>
 "use strict";
 const GRUPPI = [
@@ -433,6 +435,34 @@ async function carica() {
   $("indietro").onclick = () => { ferma(); mostra(posizione - 1); };
   $("avanti").onclick = () => { ferma(); mostra(posizione + 1); };
   $("gioca").onclick = () => (timer ? ferma() : parti());
+  $("gif").onclick = () => {
+    if (!window.MNGif || !immagini.length) return;
+    ferma();
+    const lista = immagini.slice(), dom = indice.domini[$("dominio").value], par = dom.parametri[$("parametro").value];
+    const fmt = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const etich = lista.map((im) => fmt.format(data(im.valido_utc)));
+    const m0 = $("mappa"), rap = m0.naturalWidth ? m0.naturalHeight / m0.naturalWidth : 0.8;
+    MNGif.finestra({
+      titolo: "GIF: " + (par.titolo || "mappa WRF"),
+      etichette: etich, da: posizione, a: Math.min(lista.length - 1, posizione + 24),
+      larghezze: [480, 720, 960], ritardo: 350, nomeFile: "wrf-nerola-" + $("dominio").value + "-" + $("parametro").value,
+      misura: (w) => ({ w, h: Math.round(w * rap) + Math.round(w / 22) }),
+      disegna: (k, cv) => new Promise((ok, no) => {
+        const im = new Image(); im.crossOrigin = "anonymous";
+        im.onload = () => {
+          const c = cv.getContext("2d"), fa = Math.round(cv.width / 22), fs = Math.round(fa * 0.55);
+          c.drawImage(im, 0, 0, cv.width, cv.height - fa);
+          c.fillStyle = "#14303f"; c.fillRect(0, cv.height - fa, cv.width, fa);
+          c.fillStyle = "#fff"; c.font = "700 " + fs + "px system-ui,sans-serif"; c.textBaseline = "middle";
+          c.fillText("WRF Nerola · " + etich[k], fs * 0.6, cv.height - fa / 2);
+          const t = "meteonerola.it", tw = c.measureText(t).width; c.fillText(t, cv.width - tw - fs * 0.6, cv.height - fa / 2);
+          ok();
+        };
+        im.onerror = () => no(new Error("mappa non trovata"));
+        im.src = urlImg(lista[k].file);
+      })
+    });
+  };
   document.addEventListener("keydown", (e) => {
     if (e.target.tagName === "SELECT") return;
     if (e.key === "ArrowLeft") { ferma(); mostra(posizione - 1); }
