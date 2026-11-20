@@ -142,7 +142,7 @@
     <h1>Meteo Nerola <small>previsioni WRF ad alta risoluzione</small></h1>
     <div class="schede" role="tablist">
       <button role="tab" id="s-mappe" aria-selected="true">Mappe</button>
-      <button role="tab" id="s-meteo" aria-selected="false">Meteogramma di Nerola</button>
+      <button role="tab" id="s-meteo" aria-selected="false" hidden>Meteogramma di Nerola</button>
       <button role="tab" id="s-pagella" aria-selected="false">🏆 Pagelle ↗</button>
       <button role="tab" id="s-corretto" aria-selected="false">WRF corretto (sperimentale)</button>
     </div>
@@ -163,7 +163,7 @@
         <div><label for="parametro">Parametro</label><select id="parametro"></select></div>
       </div>
       <div class="immagine" id="contenitore"><img id="mappa" alt="Mappa meteo" decoding="async"><div class="marcatore nascosto" id="marcatore"></div></div>
-      <p class="suggerimento" id="suggerimento">Passa sulla mappa per leggere il valore; clicca (o tocca) un punto per il meteogramma di quel punto. Tasto destro sull'immagine per copiarla o salvarla.</p>
+      <p class="suggerimento" id="suggerimento">Passa sulla mappa per leggere il valore; clicca (o tocca) un punto per l'andamento del modello in quel punto (il meteogramma completo è nella sezione Previsioni). Tasto destro sull'immagine per copiarla o salvarla.</p>
       <div class="barra">
         <div class="comandi">
           <button id="indietro" aria-label="Ora precedente">◀</button>

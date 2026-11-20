@@ -106,7 +106,7 @@ jobs:
           python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo --forzante "$FORZANTE" ${{ inputs.opzioni_mappe }}
           # la pagina web si prende sempre dall'ultima versione su main (la corsa dura ore e il codice puo' essere cambiato nel frattempo)
           curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/pagina/index.html" -o /home/runner/pubblico/index.html || cp pagina/index.html /home/runner/pubblico/index.html
-          cp pagina/sondaggi.html pagina/colonna.html pagina/comune.js /home/runner/pubblico/
+          cp pagina/sondaggi.html pagina/colonna.html pagina/comune.js pagina/meteogramma.html /home/runner/pubblico/
           touch /home/runner/pubblico/.nojekyll
           cp /home/runner/controllo.txt /home/runner/pubblico/
           cp /home/runner/uscite/tempi_b*.txt /home/runner/pubblico/

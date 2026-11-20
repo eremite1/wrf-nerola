@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meteogramma</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --testo: #1b2430; --muto: #5b6775; --linea: #d8dee5; --accento: #1f6fb5; --evid: #e8f1fa;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--testo); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1400px; margin: 0 auto; padding: 14px 16px 24px; }
+  .incorporata main { padding: 0; }
+  .card { background: var(--card); border: 1px solid var(--linea); border-radius: 14px; padding: 14px; }
+  .barra { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin-bottom: 10px; }
+  .campo { display: grid; gap: 3px; min-width: 0; }
+  .campo label { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; color: var(--muto); }
+  select, input[type=search] { font: inherit; padding: 8px 10px; border: 1px solid var(--linea); border-radius: 10px; background: var(--card); color: var(--testo); min-width: 0; }
+  #luogo { min-width: 240px; }
+  .scelta { font-size: .9rem; color: var(--muto); margin: 2px 0 10px; }
+  .scelta b { color: var(--testo); }
+  .voto { display: inline-block; padding: 1px 8px; border-radius: 99px; background: #e6f4ea; color: #1d7a3a; font-weight: 700; font-size: .82rem; }
+  .tela-box { position: relative; width: 100%; }
+  canvas#mg { display: block; width: 100%; touch-action: pan-y; }
+  #fumetto { position: absolute; pointer-events: none; background: rgba(15,23,34,.92); color: #fff; border-radius: 10px; padding: 8px 10px;
+             font-size: .82rem; line-height: 1.35; min-width: 170px; box-shadow: 0 6px 18px rgba(0,0,0,.25); display: none; z-index: 5; }
+  #fumetto b { font-size: .9rem; }
+  .legenda { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .8rem; color: var(--muto); margin-top: 10px; align-items: center; }
+  .legenda i { display: inline-block; width: 18px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+  .msg { padding: 40px 10px; text-align: center; color: var(--muto); }
+  .nota { font-size: .8rem; color: var(--muto); margin: 10px 2px 0; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <div class="barra">
+      <div class="campo"><label for="luogo">Località</label><select id="luogo"></select></div>
+      <div class="campo"><label for="modello">Modello</label>
+        <select id="modello"><option value="auto">Il più affidabile (automatico)</option></select></div>
+    </div>
+    <p class="scelta" id="scelta">Carico…</p>
+    <div class="tela-box"><canvas id="mg" aria-label="Meteogramma"></canvas><div id="fumetto"></div></div>
+    <div class="legenda">
+      <span><i style="background:linear-gradient(#fff,#c9d2dc);border:1px solid #b9c3cd"></i>nubi (più scure = più spesse)</span>
+      <span><i style="background:#2f80ed"></i>pioggia</span>
+      <span><i style="background:#ffffff;border:1px solid #8aa0b8"></i>neve</span>
+      <span><i style="background:#c56bd6"></i>pioggia e neve</span>
+      <span><i style="background:#e8453c"></i>gelicidio</span>
+      <span><i style="background:none;border-top:2px dashed #12a4d9;height:0;border-radius:0"></i>quota dello zero termico</span>
+      <span>⚡ possibili temporali</span>
+    </div>
+    <p class="nota" id="nota"></p>
+  </div>
+</main>
+<script>
+"use strict";
+// METEOGRAMMA di meteonerola: per un punto, la colonna d'aria ora per ora (nubi alle varie quote, zero termico,
+// pioggia o neve che cade), poi temperatura, precipitazione e vento. Il modello e' scelto da solo: il piu' affidabile
+// secondo la pagella unica (voti degli ultimi 30 giorni contro radar e stazioni), tra quelli che coprono il punto.
+const INCORPORATA = (() => { try { return window.parent !== window; } catch (e) { return true; } })();
+if (INCORPORATA) document.documentElement.classList.add("incorporata");
+(function () { try { if (!INCORPORATA) return; const s = () => document.documentElement.style.setProperty("--vhp", (window.parent.innerHeight / 100) + "px"); s(); window.parent.addEventListener("resize", s); } catch (e) { /* niente */ } })();
+
+const $ = (id) => document.getElementById(id);
+const NEROLA = { nome: "Nerola", lat: 42.1606, lon: 12.7856 };
+const GG = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"], GGL = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
+const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+const ORE_MAX = 72;
+const QZ = Array.from({ length: 41 }, (_, i) => i * 250);         // quote della sezione: 0-10 km ogni 250 m
+const nf1 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 });
+
+// i modelli che possono fare il meteogramma: i nostri WRF (cartella e dominio) e i modelli di Open-Meteo
+const WRF = [
+  { id: "wrf1km", cat: "", dom: "1km", nome: "WRF Nerola 1 km (ECMWF)" }, { id: "wrf3km", cat: "", dom: "3km", nome: "WRF Nerola 3 km (ECMWF)" },
+  { id: "wrficon2i1km", cat: "icon2i", dom: "1km", nome: "WRF Nerola 1 km (ICON-2I)" }, { id: "wrficon2i3km", cat: "icon2i", dom: "3km", nome: "WRF Nerola 3 km (ICON-2I)" },
+  { id: "wrficoneu1km", cat: "iconeu", dom: "1km", nome: "WRF Nerola 1 km (ICON-EU)" }, { id: "wrficoneu3km", cat: "iconeu", dom: "3km", nome: "WRF Nerola 3 km (ICON-EU)" },
+  { id: "wrfgfs1km", cat: "gfs", dom: "1km", nome: "WRF Nerola 1 km (GFS)" }, { id: "wrfgfs3km", cat: "gfs", dom: "3km", nome: "WRF Nerola 3 km (GFS)" },
+];
+const OM = [
+  { id: "iconeu", api: "dwd_icon_eu", nome: "ICON-EU (7 km)" }, { id: "arome", api: "meteofrance_arome_france", nome: "AROME (1,3 km)" },
+  { id: "icon2i", api: "italia_meteo_arpae_icon_2i", nome: "ICON-2I (2,2 km)" }, { id: "ecmwf", api: "ecmwf_ifs025", nome: "ECMWF IFS" },
+  { id: "ukmo", api: "ukmo_global_deterministic_10km", nome: "UKMO (10 km)" }, { id: "gfs", api: "gfs_seamless", nome: "GFS" },
+];
+const LIV_OM = [1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 400, 300, 250, 200];
+
+// ------------------------------------------------------------------------------------------------ fisica
+const es = (t) => 6.112 * Math.exp(17.67 * t / (t + 243.5));
+const esGhiaccio = (t) => 6.112 * Math.exp(22.46 * t / (t + 272.62));
+function bulboUmido(t, rh) {            // Stull (2011), t in °C, rh in %
+  rh = Math.max(5, Math.min(100, rh));
+  return t * Math.atan(0.151977 * Math.sqrt(rh + 8.313659)) + Math.atan(t + rh) - Math.atan(rh - 1.676331) +
+    0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh) - 4.686035;
+}
+// nuvolosita' di uno strato dall'umidita' (schema tipo Sundqvist): sotto il 75% niente nube, al 100% coperto.
+// Sotto -10 °C si guarda la saturazione rispetto al ghiaccio (le nubi alte di ghiaccio si formano prima).
+function nubeDaUR(t, rh) {
+  let r = rh / 100;
+  if (t < -10) r = Math.min(1.2, r * es(t) / esGhiaccio(t));
+  const c = Math.max(0, Math.min(1, (r - 0.78) / 0.22));
+  return c * c * (3 - 2 * c);
+}
+
+// ------------------------------------------------------------------------------------------------ dati WRF
+let indiceWrf = null;
+const catene = {};
+async function json(u) { const r = await fetch(u + (u.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 300000)); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+async function caricaWrf() {
+  try { catene[""] = await json("indice.json"); } catch (e) { /* WRF non disponibile */ }
+  for (const c of ["icon2i", "iconeu", "gfs"]) {
+    try {
+      const sub = await json(c + "/indice.json");
+      const t = Date.UTC(+sub.corsa.slice(0, 4), +sub.corsa.slice(4, 6) - 1, +sub.corsa.slice(6, 8), +sub.corsa.slice(8, 10));
+      if (Date.now() - t < 60 * 3600e3) catene[c] = sub;
+    } catch (e) { /* catena non pubblicata */ }
+  }
+}
+const griglie = {};
+async function grigliaDi(cat, dom) {
+  const k = cat + "/" + dom; if (griglie[k]) return griglie[k];
+  const I = catene[cat], D = I.domini[dom], pre = cat ? cat + "/" : "";
+  const r = await fetch(pre + D.griglia + "?v=" + encodeURIComponent(I.creato));
+  const a = new Float32Array(await r.arrayBuffer()), n = D.layout.ny * D.layout.nx;
+  return (griglie[k] = { n, lat: a.subarray(0, n), lon: a.subarray(n, 2 * n), hgt: a.subarray(2 * n, 3 * n) });
+}
+async function intervallo(url, inizio, lung) {
+  const r = await fetch(url, { headers: { Range: `bytes=${inizio}-${inizio + lung - 1}` } });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  let b = await r.arrayBuffer();
+  if (r.status !== 206) b = b.slice(inizio, inizio + lung);
+  return new Int16Array(b);
+}
+async function datiWrf(m, lat, lon) {
+  const I = catene[m.cat]; if (!I || !I.domini[m.dom]) return null;
+  const D = I.domini[m.dom], pre = m.cat ? m.cat + "/" : "", ver = "?v=" + encodeURIComponent(I.creato);
+  const g = await grigliaDi(m.cat, m.dom), c = Math.cos(lat * Math.PI / 180);
+  let best = Infinity, k = -1;
+  for (let i = 0; i < g.n; i++) { const d = (g.lat[i] - lat) ** 2 + ((g.lon[i] - lon) * c) ** 2; if (d < best) { best = d; k = i; } }
+  const passo = m.dom === "1km" ? 1 : 3;
+  if (111.2 * Math.sqrt(best) > passo * 0.8) return null;              // punto fuori dal territorio del modello
+  // serie orarie al suolo
+  const S = D.serie, nf = S.campi.length, nt = S.n_t;
+  const a = await intervallo(pre + S.file + ver, k * nf * nt * 2, nf * nt * 2);
+  const campo = {};
+  S.campi.forEach((cc, j) => { campo[cc.id] = Array.from({ length: nt }, (_, t) => a[j * nt + t] === -32768 ? null : a[j * nt + t] / cc.scala); });
+  const ore = S.tempi.map((t) => new Date(t.replace("Z", ":00Z")));
+  const prec = ore.map((_, i) => i ? Math.max(0, (campo.PIOGGIA[i] || 0) - (campo.PIOGGIA[i - 1] || 0)) : 0);
+  // profili verticali (ogni 3 ore) -> nubi e temperatura sulle quote della sezione
+  const profili = {};
+  const SD = D.sondaggi;
+  if (SD) {
+    const nv = SD.n_suolo + SD.livelli.length * SD.n_livello, ns = SD.tempi.length, M = -32768;
+    const b = await intervallo(pre + SD.file + ver, k * ns * nv * 2, ns * nv * 2);
+    SD.tempi.forEach((t, it) => {
+      const o = it * nv; if (b[o] === M) return;
+      const pr = [];
+      SD.livelli.forEach((p, j) => {
+        const q = o + SD.n_suolo + j * SD.n_livello;
+        if (b[q] === M || b[q + 1] === M || b[q + 2] === M) return;
+        const tc = b[q + 1] / 10, td = b[q + 2] / 10;
+        pr.push({ z: b[q], t: tc, rh: 100 * es(td) / es(tc) });
+      });
+      if (pr.length > 3) profili[t.replace("Z", ":00Z")] = pr.sort((x, y) => x.z - y.z);
+    });
+  }
+  return { ore, t2: campo.T2, td: campo.TD, perc: campo.PERC, prec, neve: null, nuv: campo.NUV, vento: campo.VENTO, raffica: null,
+           dir: campo.DIR, cape: campo.CAPE || null, tw2: campo.TW, suolo: g.hgt[k], profili, zeroTermico: null,
+           corsa: I.corsa.slice(6, 8) + "/" + I.corsa.slice(4, 6) + " ore " + I.corsa.slice(8, 10) + " UTC" };
+}
+
+// ------------------------------------------------------------------------------------------------ dati Open-Meteo
+async function datiOm(m, lat, lon) {
+  const v = ["temperature_2m", "dew_point_2m", "apparent_temperature", "precipitation", "rain", "showers", "snowfall", "cloud_cover",
+    "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m", "cape", "freezing_level_height", "weather_code"];
+  for (const p of LIV_OM) for (const x of ["temperature", "relative_humidity", "geopotential_height", "cloud_cover"]) v.push(`${x}_${p}hPa`);
+  const u = "https://api.open-meteo.com/v1/forecast?latitude=" + lat.toFixed(4) + "&longitude=" + lon.toFixed(4) +
+    "&hourly=" + v.join(",") + "&models=" + m.api + "&timezone=GMT&forecast_days=4&past_hours=3&elevation=nan";
+  const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status);
+  const d = await r.json(), h = d.hourly;
+  if (!h || !h.time) return null;
+  const ok = (h.temperature_2m || []).filter((x) => x != null).length;
+  if (ok < 12) return null;                                           // il modello non copre il punto
+  const n = h.time.reduce((a, _, i) => (h.temperature_2m[i] != null ? i + 1 : a), 0);
+  const ore = h.time.slice(0, n).map((t) => new Date(t + ":00Z"));
+  const profili = {};
+  ore.forEach((t, i) => {
+    const pr = [];
+    for (const p of LIV_OM) {
+      const tc = (h[`temperature_${p}hPa`] || [])[i], rh = (h[`relative_humidity_${p}hPa`] || [])[i], z = (h[`geopotential_height_${p}hPa`] || [])[i];
+      if (tc == null || rh == null || z == null) continue;
+      const cc = (h[`cloud_cover_${p}hPa`] || [])[i];
+      pr.push({ z, t: tc, rh, cf: cc != null ? cc / 100 : null });
+    }
+    if (pr.length > 3) profili[t.toISOString().slice(0, 16) + "Z"] = pr.sort((x, y) => x.z - y.z);
+  });
+  const sl = (k) => (h[k] || []).slice(0, n);
+  return { ore, t2: sl("temperature_2m"), td: sl("dew_point_2m"), perc: sl("apparent_temperature"), prec: sl("precipitation").map((x) => x || 0),
+           neve: sl("snowfall"), nuv: sl("cloud_cover"), vento: sl("wind_speed_10m"), raffica: sl("wind_gusts_10m"), dir: sl("wind_direction_10m"),
+           cape: sl("cape"), tw2: null, suolo: d.elevation, profili, zeroTermico: sl("freezing_level_height"), corsa: null };
+}
+
+// ------------------------------------------------------------------------------------------------ dalla colonna ai disegni
+// sezione oraria: per ogni ora, nuvolosita' e temperatura alle quote QZ (profili interpolati nel tempo dove servono)
+function sezione(D) {
+  const chiavi = Object.keys(D.profili).sort(), tp = chiavi.map((k) => new Date(k).getTime());
+  const suQuote = (pr) => QZ.map((z) => {
+    if (z < pr[0].z) return null;
+    let j = 1; while (j < pr.length - 1 && pr[j].z < z) j++;
+    const a = pr[j - 1], b = pr[j], f = Math.max(0, Math.min(1, (z - a.z) / Math.max(1, b.z - a.z)));
+    const t = a.t + (b.t - a.t) * f, rh = a.rh + (b.rh - a.rh) * f;
+    const cfa = a.cf != null ? a.cf : nubeDaUR(a.t, a.rh), cfb = b.cf != null ? b.cf : nubeDaUR(b.t, b.rh);
+    return { t, rh, cf: cfa + (cfb - cfa) * f };
+  });
+  const pq = chiavi.map((k) => suQuote(D.profili[k]));
+  return D.ore.map((o) => {
+    const t = o.getTime(); if (!tp.length) return null;
+    let j = tp.findIndex((x) => x >= t);
+    if (j < 0) j = tp.length - 1;
+    if (j === 0 || tp[j] === t) return pq[j];
+    const f = (t - tp[j - 1]) / (tp[j] - tp[j - 1]), A = pq[j - 1], B = pq[j];
+    if (Math.abs(tp[j] - tp[j - 1]) > 4 * 3600e3) return f < 0.5 ? A : B;
+    return QZ.map((_, q) => (A[q] && B[q]) ? { t: A[q].t + (B[q].t - A[q].t) * f, rh: A[q].rh + (B[q].rh - A[q].rh) * f, cf: A[q].cf + (B[q].cf - A[q].cf) * f } : (A[q] || B[q]));
+  });
+}
+// tipo di precipitazione con il bulbo umido su tutta la colonna (criterio di meteonerola):
+// sotto 0 °C la neve resta neve, tra 0 e 2 °C tende a mantenersi, sopra 2 °C fonde; strato caldo in quota (>2 °C) e
+// suolo sotto 0 °C = gelicidio, mai neve.
+function tipoPrec(D, sez, i) {
+  if ((D.prec[i] || 0) < 0.1) return "";
+  const col = sez[i], s = D.suolo || 0;
+  let caldo = -99, tw2 = D.tw2 && D.tw2[i] != null ? D.tw2[i] : (D.t2[i] != null && D.td[i] != null ? bulboUmido(D.t2[i], 100 * es(D.td[i]) / es(D.t2[i])) : null);
+  if (col) col.forEach((c, q) => { if (c && QZ[q] > s + 150 && QZ[q] < s + 3000) caldo = Math.max(caldo, bulboUmido(c.t, c.rh)); });
+  if (D.neve && D.neve[i] != null && D.prec[i] > 0) {        // Open-Meteo divide gia' neve e pioggia
+    const nv = D.neve[i] * 0.7;                               // cm di neve -> mm d'acqua (circa)
+    if (nv >= 0.7 * D.prec[i]) return "neve";
+    if (nv > 0.15 * D.prec[i]) return "mista";
+  }
+  if (tw2 == null) return "pioggia";
+  if (caldo > 2 && tw2 < 0) return "gelicidio";
+  if (caldo <= 0.5 && tw2 <= 1.0) return "neve";
+  if (caldo < 2 && tw2 < 1.5) return "mista";
+  return "pioggia";
+}
+function zeroTermico(D, sez, i) {
+  if (D.zeroTermico && D.zeroTermico[i] != null) return D.zeroTermico[i];
+  const col = sez[i]; if (!col) return null;
+  for (let q = col.length - 1; q > 0; q--) { const a = col[q - 1], b = col[q]; if (a && b && a.t > 0 && b.t <= 0) return QZ[q - 1] + 250 * a.t / (a.t - b.t); }
+  return col[0] && col[0].t <= 0 ? 0 : null;
+}
+// altezza del sole (gradi): per colorare il cielo di giorno e di notte
+function altezzaSole(d, lat, lon) {
+  const g = 2 * Math.PI / 365 * ((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - Date.UTC(d.getUTCFullYear(), 0, 0)) / 864e5 - 1 + (d.getUTCHours() - 12) / 24);
+  const dec = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const ha = ((d.getUTCHours() * 60 + d.getUTCMinutes() + eq + 4 * lon) / 4 - 180) * Math.PI / 180, la = lat * Math.PI / 180;
+  return Math.asin(Math.sin(la) * Math.sin(dec) + Math.cos(la) * Math.cos(dec) * Math.cos(ha)) * 180 / Math.PI;
+}
+const locale = (d) => new Date(d.toLocaleString("en-US", { timeZone: "Europe/Rome" }));
+
+// ------------------------------------------------------------------------------------------------ disegno
+let ultimo = null;
+const COL_TIPO = { pioggia: "#2f80ed", neve: "#ffffff", mista: "#c56bd6", gelicidio: "#e8453c" };
+function disegna(D, punto) {
+  const cv = $("mg"), box = cv.parentElement, W = box.clientWidth, dpr = Math.min(2, window.devicePixelRatio || 1);
+  const sez = sezione(D);
+  // si parte dall'ora intera piu' vicina ad adesso
+  const adesso = Date.now() - 3600e3;
+  let i0 = D.ore.findIndex((o) => o.getTime() >= adesso); if (i0 < 0) i0 = 0;
+  const piccolo = W < 600, oreMax = piccolo ? 48 : ORE_MAX;      // sul telefono 2 giorni, sul computer 3
+  const idx = []; for (let i = i0; i < D.ore.length && idx.length < oreMax; i++) idx.push(i);
+  const n = idx.length; if (n < 3) { $("scelta").textContent = "Il modello non ha ore future per questo punto."; return; }
+  const sx = piccolo ? 34 : 46, dx = 10, H_TESTA = 34, H_SEZ = piccolo ? 230 : 290, H_T = piccolo ? 120 : 140, H_P = piccolo ? 80 : 95, H_V = 64, GAP = 26;
+  const H = H_TESTA + H_SEZ + GAP + H_T + GAP + H_P + GAP + H_V + 24;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px";
+  const x = cv.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+  const pw = W - sx - dx, cw = pw / n, X = (k) => sx + (k + 0.5) * cw;
+  x.font = "12px system-ui, sans-serif";
+  // --- testata: giorni e ore
+  let y0 = 0;
+  x.fillStyle = "#1b2430"; x.textBaseline = "middle";
+  idx.forEach((i, k) => {
+    const l = locale(D.ore[i]), h = l.getHours();
+    if (h === 0 || (k === 0 && h <= 15)) {
+      x.fillStyle = "#1b2430"; x.font = "700 12.5px system-ui, sans-serif"; x.textAlign = "left";
+      const testo = (piccolo ? GG[l.getDay()] : GGL[l.getDay()]) + " " + l.getDate() + " " + MESI[l.getMonth()];
+      if (k < n - 4) x.fillText(testo, sx + k * cw + 4, y0 + 10);
+    }
+    if (h % (piccolo ? 6 : 3) === 0) { x.fillStyle = "#5b6775"; x.font = "11px system-ui, sans-serif"; x.textAlign = "center"; x.fillText(String(h).padStart(2, "0"), X(k), y0 + 26); }
+  });
+  // righe dei giorni (verticali su tutto il grafico)
+  const righeGiorno = () => { idx.forEach((i, k) => { if (locale(D.ore[i]).getHours() === 0) { x.strokeStyle = "rgba(27,36,48,.35)"; x.lineWidth = 1; x.beginPath(); x.moveTo(sx + k * cw, H_TESTA); x.lineTo(sx + k * cw, H - 20); x.stroke(); } }); };
+  // --- 1. sezione verticale: cielo, nubi, zero termico, precipitazione che cade
+  y0 = H_TESTA;
+  // la sezione parte dal suolo del modello; piu' spazio alle quote basse (scala a radice quadrata)
+  const ZMAX = 10000, Z0 = Math.max(0, D.suolo || 0), yz = (z) => y0 + H_SEZ * (1 - Math.sqrt(Math.max(0, z - Z0) / (ZMAX - Z0)));
+  const zy = (yy) => Z0 + (ZMAX - Z0) * Math.pow(1 - (yy - y0) / H_SEZ, 2);
+  // cielo: un pixel per ora (giorno chiaro, notte scura), ingrandito e sfumato
+  const cielo = document.createElement("canvas"); cielo.width = n; cielo.height = 2;
+  const cx = cielo.getContext("2d");
+  idx.forEach((i, k) => {
+    const s = altezzaSole(D.ore[i], punto.lat, punto.lon), f = Math.max(0, Math.min(1, (s + 6) / 14));
+    cx.fillStyle = `rgb(${Math.round(18 + 52 * f)},${Math.round(30 + 110 * f)},${Math.round(62 + 170 * f)})`; cx.fillRect(k, 0, 1, 1);
+    cx.fillStyle = `rgb(${Math.round(40 + 150 * f)},${Math.round(56 + 165 * f)},${Math.round(92 + 152 * f)})`; cx.fillRect(k, 1, 1, 1);
+  });
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high";
+  x.drawImage(cielo, sx, y0, pw, H_SEZ);
+  // nubi: per ogni ora una colonna alta quanto la sezione (quota letta pixel per pixel), poi sfumata tra le ore
+  const HS = Math.round(H_SEZ), nubi = document.createElement("canvas"); nubi.width = n; nubi.height = HS;
+  const nx = nubi.getContext("2d"), im = nx.createImageData(n, HS);
+  idx.forEach((i, k) => {
+    const col = sez[i]; if (!col) return;
+    let sopra = 0;
+    for (let r = 0; r < HS; r++) {
+      const z = zy(y0 + r + 0.5), qf = z / 250, q0 = Math.floor(qf), q1 = Math.min(QZ.length - 1, q0 + 1), f = qf - q0;
+      const a = col[q0], b = col[q1]; if (!a && !b) continue;
+      const cf = Math.max(0, Math.min(1, a && b ? a.cf + (b.cf - a.cf) * f : (a || b).cf)), o = (r * n + k) * 4;
+      sopra += cf * (zy(y0 + r) - zy(y0 + r + 1)) / 1400;   // quanta nube c'e' sopra: le nubi spesse sono grigie in basso
+      const lum = Math.round(255 - Math.min(120, sopra * 85));
+      im.data[o] = lum; im.data[o + 1] = lum; im.data[o + 2] = Math.min(255, lum + 8); im.data[o + 3] = Math.round(255 * Math.pow(cf, 0.75));
+    }
+  });
+  nx.putImageData(im, 0, 0);
+  x.save(); x.beginPath(); x.rect(sx, y0, pw, H_SEZ); x.clip();
+  x.drawImage(nubi, sx, y0, pw, H_SEZ);
+  x.restore();
+  // precipitazione che cade dalla base delle nubi al suolo
+  x.save(); x.beginPath(); x.rect(sx, y0, pw, H_SEZ); x.clip();
+  idx.forEach((i, k) => {
+    const p = D.prec[i] || 0, tipo = tipoPrec(D, sez, i); if (!tipo) return;
+    const col = sez[i]; let base = 2500;
+    if (col) for (let q = 0; q < col.length; q++) if (col[q] && col[q].cf > 0.5 && QZ[q] > (D.suolo || 0)) { base = QZ[q]; break; }
+    const ya = yz(base), yb = y0 + H_SEZ - 5, nn = Math.min(9, 2 + Math.round(Math.sqrt(p) * 3));
+    for (let j = 0; j < nn; j++) {
+      const xx = sx + k * cw + (j + 0.5) / nn * cw, sfas = ((k * 7 + j * 13) % 10) / 10;
+      if (tipo === "neve") {
+        for (let yy = ya + sfas * 12; yy < yb; yy += 12) { x.fillStyle = "rgba(255,255,255,.95)"; x.beginPath(); x.arc(xx + Math.sin(yy / 9) * 1.5, yy, 1.6, 0, 7); x.fill(); }
+      } else {
+        x.strokeStyle = tipo === "pioggia" ? "rgba(120,190,255,.9)" : COL_TIPO[tipo]; x.lineWidth = 1.2;
+        for (let yy = ya + sfas * 14; yy < yb; yy += 14) { x.beginPath(); x.moveTo(xx, yy); x.lineTo(xx - 1.5, yy + 7); x.stroke(); }
+      }
+    }
+    // temporale
+    if (D.cape && (D.cape[i] || 0) > 600 && p >= 1 && locale(D.ore[i]).getHours() % 3 === 0) { x.font = "14px system-ui"; x.textAlign = "center"; x.fillText("⚡", X(k), yz(Math.min(9000, base + 3000))); }
+  });
+  x.restore();
+  // zero termico
+  x.save(); x.beginPath(); x.rect(sx, y0, pw, H_SEZ); x.clip();
+  x.strokeStyle = "#12d0ff"; x.setLineDash([6, 4]); x.lineWidth = 2; x.beginPath();
+  let primo = true;
+  idx.forEach((i, k) => { const z = zeroTermico(D, sez, i); if (z == null) { primo = true; return; } const yy = yz(z); if (primo) { x.moveTo(X(k), yy); primo = false; } else x.lineTo(X(k), yy); });
+  x.stroke(); x.setLineDash([]); x.restore();
+  // suolo (quota del modello nel punto)
+  x.fillStyle = "#6b5a43"; x.fillRect(sx, y0 + H_SEZ - 5, pw, 5);
+  // asse delle quote (metri sul livello del mare)
+  x.fillStyle = "#5b6775"; x.font = "11px system-ui, sans-serif"; x.textAlign = "right"; x.textBaseline = "middle";
+  x.fillText(Math.round(Z0) + " m", sx - 4, y0 + H_SEZ - 4);
+  for (const z of [1000, 2000, 3000, 5000, 7000, 9000]) {
+    if (z < Z0 + 350) continue;
+    const yy = yz(z); x.fillText((z / 1000).toString().replace(".", ",") + " km", sx - 4, yy);
+    x.strokeStyle = "rgba(255,255,255,.14)"; x.lineWidth = 1; x.beginPath(); x.moveTo(sx, yy); x.lineTo(sx + pw, yy); x.stroke();
+  }
+  x.textAlign = "left"; x.fillStyle = "rgba(255,255,255,.9)"; x.font = "700 11px system-ui, sans-serif";
+  x.fillText("NUBI E PRECIPITAZIONI NELLA COLONNA D'ARIA", sx + 8, y0 + 12);
+  // --- 2. temperatura
+  y0 = H_TESTA + H_SEZ + GAP;
+  const valT = idx.flatMap((i) => [D.t2[i], D.td[i], D.perc ? D.perc[i] : null]).filter((v) => v != null);
+  let tmin = Math.floor(Math.min(...valT) - 1), tmax = Math.ceil(Math.max(...valT) + 1);
+  if (tmax - tmin < 8) { const c = (tmax + tmin) / 2; tmin = Math.floor(c - 4); tmax = Math.ceil(c + 4); }
+  const yt = (v) => y0 + H_T * (1 - (v - tmin) / (tmax - tmin));
+  pannello(x, sx, y0, pw, H_T, "TEMPERATURA (°C)");
+  const passoT = tmax - tmin > 20 ? 5 : 2;
+  x.textAlign = "right"; x.fillStyle = "#5b6775"; x.font = "11px system-ui, sans-serif";
+  for (let v = Math.ceil(tmin / passoT) * passoT; v <= tmax; v += passoT) { const yy = yt(v); x.fillText(v + "°", sx - 4, yy); x.strokeStyle = v === 0 ? "#12a4d9" : "#e4e8ed"; x.lineWidth = v === 0 ? 1.4 : 1; x.beginPath(); x.moveTo(sx, yy); x.lineTo(sx + pw, yy); x.stroke(); }
+  linea(x, idx, X, (i) => D.td[i], yt, "#2e9d4a", 1.4, [4, 3]);
+  // temperatura colorata (blu sotto zero, arancio sopra)
+  const gT = x.createLinearGradient(0, yt(tmax), 0, yt(tmin)); const z0 = Math.max(0, Math.min(1, (tmax - 0) / (tmax - tmin)));
+  gT.addColorStop(0, "#e8590c"); gT.addColorStop(Math.max(0, z0 - 0.001), "#f08c00"); gT.addColorStop(Math.min(1, z0), "#1c7ed6"); gT.addColorStop(1, "#1c7ed6");
+  linea(x, idx, X, (i) => D.t2[i], yt, gT, 2.6);
+  // massime e minime del giorno
+  const perGiorno = {};
+  idx.forEach((i, k) => { const g = locale(D.ore[i]).toDateString(), v = D.t2[i]; if (v == null) return; const p = perGiorno[g] || (perGiorno[g] = { mx: [-99, 0], mn: [99, 0] }); if (v > p.mx[0]) p.mx = [v, k]; if (v < p.mn[0]) p.mn = [v, k]; });
+  x.font = "700 11.5px system-ui, sans-serif"; x.textAlign = "center";
+  Object.values(perGiorno).forEach((p) => {
+    x.fillStyle = "#c2410c"; x.fillText(nf1.format(p.mx[0]) + "°", X(p.mx[1]), yt(p.mx[0]) - 9);
+    x.fillStyle = "#1864ab"; x.fillText(nf1.format(p.mn[0]) + "°", X(p.mn[1]), yt(p.mn[0]) + 11);
+  });
+  // --- 3. precipitazione
+  y0 = H_TESTA + H_SEZ + GAP + H_T + GAP;
+  const pmax = Math.max(2, ...idx.map((i) => D.prec[i] || 0));
+  pannello(x, sx, y0, pw, H_P, "PRECIPITAZIONE (mm/h)");
+  x.textAlign = "right"; x.fillStyle = "#5b6775"; x.font = "11px system-ui, sans-serif"; x.fillText(nf1.format(pmax), sx - 4, y0 + 6); x.fillText("0", sx - 4, y0 + H_P);
+  idx.forEach((i, k) => {
+    const p = D.prec[i] || 0; if (p < 0.1) return;
+    const tipo = tipoPrec(D, sez, i) || "pioggia", h = Math.max(2, H_P * Math.sqrt(p / pmax));
+    x.fillStyle = COL_TIPO[tipo]; x.fillRect(sx + k * cw + 1, y0 + H_P - h, Math.max(1, cw - 2), h);
+    if (tipo === "neve") { x.strokeStyle = "#7d93ab"; x.lineWidth = 1; x.strokeRect(sx + k * cw + 1.5, y0 + H_P - h + 0.5, Math.max(1, cw - 3), h - 1); }
+  });
+  // totale del giorno
+  const tot = {};
+  idx.forEach((i, k) => { const g = locale(D.ore[i]).toDateString(); const t = tot[g] || (tot[g] = { mm: 0, k0: k, k1: k }); t.mm += D.prec[i] || 0; t.k1 = k; });
+  x.font = "700 11px system-ui, sans-serif"; x.textAlign = "center"; x.fillStyle = "#1f6fb5";
+  Object.values(tot).forEach((t) => { if (t.k1 - t.k0 >= 5) x.fillText(t.mm >= 0.2 ? "totale " + nf1.format(t.mm) + " mm" : "asciutto", sx + (t.k0 + t.k1 + 1) / 2 * cw, y0 + 11); });
+  // --- 4. vento
+  y0 = H_TESTA + H_SEZ + GAP + H_T + GAP + H_P + GAP;
+  const vmax = Math.max(20, ...idx.map((i) => Math.max(D.vento[i] || 0, D.raffica ? D.raffica[i] || 0 : 0)));
+  pannello(x, sx, y0, pw, H_V, "VENTO (km/h)" + (D.raffica ? " · raffiche" : ""));
+  const yv = (v) => y0 + H_V * (1 - v / vmax);
+  if (D.raffica) { x.fillStyle = "rgba(124,58,237,.12)"; x.beginPath(); x.moveTo(X(0), yv(0)); idx.forEach((i, k) => x.lineTo(X(k), yv(D.raffica[i] || 0))); x.lineTo(X(n - 1), yv(0)); x.fill(); }
+  linea(x, idx, X, (i) => D.vento[i], yv, "#7c3aed", 2);
+  x.textAlign = "right"; x.fillStyle = "#5b6775"; x.font = "11px system-ui, sans-serif"; x.fillText(Math.round(vmax), sx - 4, y0 + 6);
+  const ogni = Math.max(1, Math.round(28 / cw));
+  idx.forEach((i, k) => { if (k % ogni || D.dir[i] == null) return; freccia(x, X(k), y0 + H_V + 10, D.dir[i], Math.min(9, 4 + (D.vento[i] || 0) / 8)); });
+  righeGiorno();
+  // "adesso"
+  const ka = (Date.now() - D.ore[idx[0]].getTime()) / 3600e3;
+  if (ka >= 0 && ka < n) { x.strokeStyle = "#e8590c"; x.lineWidth = 1.5; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(sx + (ka + 0.5) * cw, H_TESTA); x.lineTo(sx + (ka + 0.5) * cw, H - 20); x.stroke(); x.setLineDash([]); }
+  // firma
+  x.font = "700 11px system-ui, sans-serif"; x.textAlign = "right"; x.fillStyle = "#8a96a3"; x.fillText("meteonerola.it", W - dx, H - 6);
+  ultimo = { D, idx, sez, sx, cw, n, H_TESTA, H };
+}
+function pannello(x, sx, y0, pw, h, titolo) {
+  x.fillStyle = "#fbfcfd"; x.fillRect(sx, y0, pw, h); x.strokeStyle = "#d8dee5"; x.lineWidth = 1; x.strokeRect(sx + 0.5, y0 + 0.5, pw - 1, h - 1);
+  x.fillStyle = "#5b6775"; x.font = "700 10.5px system-ui, sans-serif"; x.textAlign = "left"; x.textBaseline = "middle"; x.fillText(titolo, sx + 6, y0 - 8);
+}
+function linea(x, idx, X, f, y, col, w, tratt) {
+  x.strokeStyle = col; x.lineWidth = w; x.lineJoin = "round"; if (tratt) x.setLineDash(tratt); x.beginPath();
+  let su = false; idx.forEach((i, k) => { const v = f(i); if (v == null) { su = false; return; } if (!su) { x.moveTo(X(k), y(v)); su = true; } else x.lineTo(X(k), y(v)); });
+  x.stroke(); x.setLineDash([]);
+}
+function freccia(x, cx, cy, dir, r) {                 // il vento VIENE da dir: la freccia punta dove va
+  const a = (dir + 180) * Math.PI / 180;
+  x.save(); x.translate(cx, cy); x.rotate(a); x.fillStyle = "#4c5866"; x.beginPath();
+  x.moveTo(0, -r); x.lineTo(r * 0.55, r * 0.6); x.lineTo(0, r * 0.25); x.lineTo(-r * 0.55, r * 0.6); x.closePath(); x.fill(); x.restore();
+}
+// fumetto con i valori dell'ora sotto il dito o il mouse
+function fumetto(e) {
+  const f = $("fumetto"); if (!ultimo) return;
+  const r = $("mg").getBoundingClientRect(), px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+  const k = Math.floor((px - ultimo.sx) / ultimo.cw);
+  if (k < 0 || k >= ultimo.n) { f.style.display = "none"; return; }
+  const { D, idx, sez } = ultimo, i = idx[k], l = locale(D.ore[i]);
+  const tipo = tipoPrec(D, sez, i), z0 = zeroTermico(D, sez, i), col = sez[i];
+  let nubi = "sereno";
+  if (col) { const bassa = col.some((c, q) => c && c.cf > 0.5 && QZ[q] < 2500), alta = col.some((c, q) => c && c.cf > 0.5 && QZ[q] >= 5500), media = col.some((c, q) => c && c.cf > 0.5 && QZ[q] >= 2500 && QZ[q] < 5500);
+    nubi = [bassa && "basse", media && "medie", alta && "alte"].filter(Boolean).join(", "); nubi = nubi ? "nubi " + nubi : "sereno o poco nuvoloso"; }
+  f.innerHTML = "<b>" + GGL[l.getDay()] + " " + l.getDate() + " · ore " + String(l.getHours()).padStart(2, "0") + ":00</b><br>" +
+    "🌡️ " + (D.t2[i] != null ? nf1.format(D.t2[i]) + " °C" : "–") + (D.perc && D.perc[i] != null ? " (percepita " + nf1.format(D.perc[i]) + ")" : "") + "<br>" +
+    "☁️ " + nubi + (D.nuv && D.nuv[i] != null ? " · copertura " + Math.round(D.nuv[i]) + "%" : "") + "<br>" +
+    (tipo ? "🌧️ " + tipo + " " + nf1.format(D.prec[i]) + " mm<br>" : "") +
+    "💨 " + (D.vento[i] != null ? Math.round(D.vento[i]) + " km/h" : "–") + (D.raffica && D.raffica[i] != null ? ", raffiche " + Math.round(D.raffica[i]) : "") + "<br>" +
+    (z0 != null ? "❄️ zero termico " + Math.round(z0 / 50) * 50 + " m" : "");
+  f.style.display = "block";
+  const fw = f.offsetWidth; let fx = px + 14; if (fx + fw > r.width) fx = px - fw - 14;
+  f.style.left = Math.max(0, fx) + "px"; f.style.top = (ultimo.H_TESTA + 10) + "px";
+}
+$("mg").addEventListener("mousemove", fumetto); $("mg").addEventListener("touchstart", fumetto, { passive: true }); $("mg").addEventListener("touchmove", fumetto, { passive: true });
+$("mg").addEventListener("mouseleave", () => { $("fumetto").style.display = "none"; });
+
+// ------------------------------------------------------------------------------------------------ scelta del modello
+let pagella = {};
+async function caricaPagella() {
+  for (const u of ["../mappe/pagella/unica.json", "https://raw.githubusercontent.com/eremite1/meteo-mappe/pagella/unica.json"]) {
+    try { const d = await json(u); (d.periodi["30"] || []).forEach((r) => { pagella[r.modello] = r.voto; }); return; } catch (e) { /* provo l'altro */ }
+  }
+}
+const tuttiModelli = () => [...WRF.map((m) => ({ ...m, tipo: "wrf" })), ...OM.map((m) => ({ ...m, tipo: "om" }))]
+  .filter((m) => m.tipo === "om" || (catene[m.cat] && catene[m.cat].domini[m.dom]))
+  .sort((a, b) => (pagella[b.id] || 0) - (pagella[a.id] || 0));
+let generazione = 0;
+async function aggiorna() {
+  const gen = ++generazione, punto = JSON.parse($("luogo").value), scelto = $("modello").value;
+  $("scelta").textContent = "Carico il meteogramma…";
+  const elenco = scelto === "auto" ? tuttiModelli() : tuttiModelli().filter((m) => m.id === scelto);
+  for (const m of elenco) {
+    try {
+      const D = m.tipo === "wrf" ? await datiWrf(m, punto.lat, punto.lon) : await datiOm(m, punto.lat, punto.lon);
+      if (gen !== generazione) return;
+      if (!D || !Object.keys(D.profili).length) continue;
+      disegna(D, punto);
+      const voto = pagella[m.id];
+      $("scelta").innerHTML = "<b>" + punto.nome + "</b> · " + (scelto === "auto" ? "modello più affidabile in questo periodo: " : "modello: ") + "<b>" + m.nome + "</b>" +
+        (voto ? " <span class='voto' title='Voto della pagella unica, ultimi 30 giorni'>voto " + nf1.format(voto) + "/100</span>" : "") +
+        (D.corsa ? " · corsa del " + D.corsa : "");
+      $("nota").textContent = "Le nubi alle varie quote vengono dall'umidità e dalla temperatura del modello" + (m.tipo === "wrf" ? " (profili ogni 3 ore, raccordati ora per ora)" : "") +
+        ". Il tipo di precipitazione usa la temperatura di bulbo umido su tutta la colonna d'aria. Il modello automatico è il primo della pagella unica (radar e stazioni, ultimi 30 giorni) tra quelli che coprono il punto scelto.";
+      try { history.replaceState(null, "", "#" + encodeURIComponent(punto.nome) + (scelto !== "auto" ? "/" + scelto : "")); } catch (e) { /* niente */ }
+      return;
+    } catch (e) { /* passo al modello successivo */ }
+  }
+  if (gen === generazione) $("scelta").textContent = "Nessun modello disponibile per questo punto in questo momento.";
+}
+
+// ------------------------------------------------------------------------------------------------ avvio
+(async function () {
+  await Promise.all([caricaWrf(), caricaPagella()]);
+  // localita': i comuni del Lazio (divisi per provincia) dall'indice del WRF
+  const D3 = catene[""] && (catene[""].domini["3km"] || Object.values(catene[""].domini)[0]);
+  const luoghi = D3 && D3.luoghi ? [...D3.luoghi] : [NEROLA];
+  const PROV = [["RM", "Provincia di Roma"], ["VT", "Provincia di Viterbo"], ["RI", "Provincia di Rieti"], ["LT", "Provincia di Latina"], ["FR", "Provincia di Frosinone"], ["", "Altre località"]];
+  const sel = $("luogo"), voluto = decodeURIComponent((location.hash.slice(1).split("/")[0]) || "Nerola");
+  luoghi.sort((a, b) => a.nome.localeCompare(b.nome, "it"));
+  const scelta = luoghi.find((l) => l.nome === voluto) || luoghi.find((l) => l.nome === "Nerola") || luoghi[0];
+  const opt = (l) => { const o = new Option(l.nome, JSON.stringify({ nome: l.nome, lat: l.lat, lon: l.lon })); if (l === scelta) o.selected = true; return o; };
+  const og0 = document.createElement("optgroup"); og0.label = "In evidenza"; og0.appendChild(opt(luoghi.find((l) => l.nome === "Nerola") || NEROLA)); sel.appendChild(og0);
+  for (const [sig, titolo] of PROV) {
+    const g = luoghi.filter((l) => (l.prov || "") === sig && l.nome !== "Nerola"); if (!g.length) continue;
+    const og = document.createElement("optgroup"); og.label = titolo; g.forEach((l) => og.appendChild(opt(l))); sel.appendChild(og);
+  }
+  if (scelta && scelta.nome !== "Nerola") sel.value = JSON.stringify({ nome: scelta.nome, lat: scelta.lat, lon: scelta.lon });
+  const ms = $("modello");
+  tuttiModelli().forEach((m) => ms.add(new Option(m.nome + (pagella[m.id] ? " · voto " + nf1.format(pagella[m.id]) : ""), m.id)));
+  const mh = location.hash.split("/")[1]; if (mh && [...ms.options].some((o) => o.value === mh)) ms.value = mh;
+  sel.onchange = aggiorna; ms.onchange = aggiorna;
+  let rt = null; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (ultimo) disegna(ultimo.D, JSON.parse($("luogo").value)); }, 150); });
+  aggiorna();
+})();
+</script>
+</body>
+</html>
