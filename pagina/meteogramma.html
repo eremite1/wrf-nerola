@@ -44,10 +44,10 @@
     <p class="scelta" id="scelta">Carico…</p>
     <div class="tela-box"><canvas id="mg" aria-label="Meteogramma"></canvas><div id="fumetto"></div></div>
     <div class="legenda">
-      <span><i style="background:linear-gradient(#fff,#c9d2dc);border:1px solid #b9c3cd"></i>nubi (più scure = più spesse)</span>
+      <span><i style="background:linear-gradient(#fafafa,#8a96a3);border:1px solid #6b7785"></i>nubi (più grigie = più spesse)</span>
       <span><i style="background:#2f80ed"></i>pioggia</span>
-      <span><i style="background:#ffffff;border:1px solid #8aa0b8"></i>neve</span>
-      <span><i style="background:#c56bd6"></i>pioggia e neve</span>
+      <span><i style="background:#9fd8ff;border:1px solid #3f78a8"></i>❄️ neve</span>
+      <span><i style="background:#c56bd6"></i>🌨️ pioggia e neve</span>
       <span><i style="background:#e8453c"></i>gelicidio</span>
       <span><i style="background:none;border-top:2px dashed #12a4d9;height:0;border-radius:0"></i>quota dello zero termico</span>
       <span>⚡ possibili temporali</span>
@@ -224,24 +224,51 @@ function sezione(D) {
     return QZ.map((_, q) => (A[q] && B[q]) ? { t: A[q].t + (B[q].t - A[q].t) * f, rh: A[q].rh + (B[q].rh - A[q].rh) * f, cf: A[q].cf + (B[q].cf - A[q].cf) * f } : (A[q] || B[q]));
   });
 }
-// tipo di precipitazione con il bulbo umido su tutta la colonna (criterio di meteonerola):
-// sotto 0 °C la neve resta neve, tra 0 e 2 °C tende a mantenersi, sopra 2 °C fonde; strato caldo in quota (>2 °C) e
-// suolo sotto 0 °C = gelicidio, mai neve.
+// Tipo di precipitazione lungo la colonna d'aria: metodo di Bourgouin (2000) con la temperatura di bulbo umido.
+// Il fiocco parte neve dalla base delle nubi e scendendo accumula "energia di fusione" negli strati con bulbo umido
+// sopra 0 °C (E = g * Tw / T * spessore, J/kg): sotto 5,6 resta neve, tra 5,6 e 13,2 e' mista, sopra 13,2 e' pioggia.
+// Se la goccia gia' fusa trova al suolo il bulbo umido sotto 0 °C diventa gelicidio.
+const E_NEVE = 5.6, E_PIOGGIA = 13.2;
+function baseNubi(D, sez, i) {
+  const col = sez[i]; let base = 2500;
+  if (col) for (let q = 0; q < col.length; q++) if (col[q] && col[q].cf > 0.5 && QZ[q] > (D.suolo || 0)) { base = QZ[q]; break; }
+  return base;
+}
+// da dove si disegna la precipitazione: dentro la nube, fino a ~1200 m sopra lo zero termico (per vedere dove e' neve)
+function inizioPrec(D, sez, i) {
+  const col = sez[i], base = baseNubi(D, sez, i);
+  let cima = base;
+  if (col) for (let q = col.length - 1; q >= 0; q--) if (col[q] && col[q].cf > 0.5) { cima = QZ[q]; break; }
+  const z0 = zeroTermico(D, sez, i);
+  return Math.max(base, Math.min(cima, (z0 == null ? base : z0) + 1200, 7000));
+}
+function tw2Di(D, i) {
+  if (D.tw2 && D.tw2[i] != null) return D.tw2[i];
+  return D.t2[i] != null && D.td[i] != null ? bulboUmido(D.t2[i], 100 * es(D.td[i]) / es(D.t2[i])) : null;
+}
+// fase della precipitazione a ogni quota QZ (dalla base delle nubi in giu'): "neve" | "mista" | "pioggia" | null
+function fasiColonna(D, sez, i) {
+  if (D._fasi && D._fasi[i]) return D._fasi[i];
+  const col = sez[i], s = D.suolo || 0, base = inizioPrec(D, sez, i), out = QZ.map(() => null);
+  let E = 0;
+  for (let q = QZ.length - 1; q >= 0; q--) {
+    if (QZ[q] > base || QZ[q] < s - 250) continue;
+    const c = col && col[q];
+    if (c) { const tw = bulboUmido(c.t, c.rh); E += 9.81 * Math.max(0, tw) / (273.15 + c.t) * 250; }
+    out[q] = E < E_NEVE ? "neve" : E < E_PIOGGIA ? "mista" : "pioggia";
+  }
+  (D._fasi || (D._fasi = {}))[i] = { fasi: out, E };
+  return D._fasi[i];
+}
 function tipoPrec(D, sez, i) {
   if ((D.prec[i] || 0) < 0.1) return "";
-  const col = sez[i], s = D.suolo || 0;
-  let caldo = -99, tw2 = D.tw2 && D.tw2[i] != null ? D.tw2[i] : (D.t2[i] != null && D.td[i] != null ? bulboUmido(D.t2[i], 100 * es(D.td[i]) / es(D.t2[i])) : null);
-  if (col) col.forEach((c, q) => { if (c && QZ[q] > s + 150 && QZ[q] < s + 3000) caldo = Math.max(caldo, bulboUmido(c.t, c.rh)); });
-  if (D.neve && D.neve[i] != null && D.prec[i] > 0) {        // Open-Meteo divide gia' neve e pioggia
-    const nv = D.neve[i] * 0.7;                               // cm di neve -> mm d'acqua (circa)
-    if (nv >= 0.7 * D.prec[i]) return "neve";
-    if (nv > 0.15 * D.prec[i]) return "mista";
-  }
-  if (tw2 == null) return "pioggia";
-  if (caldo > 2 && tw2 < 0) return "gelicidio";
-  if (caldo <= 0.5 && tw2 <= 1.0) return "neve";
-  if (caldo < 2 && tw2 < 1.5) return "mista";
-  return "pioggia";
+  const tw2 = tw2Di(D, i), col = sez[i];
+  if (!col) return tw2 == null ? "pioggia" : tw2 <= 0.5 ? "neve" : tw2 < 1.5 ? "mista" : "pioggia";
+  let { E } = fasiColonna(D, sez, i);
+  // ultimo tratto fino al suolo, con il bulbo umido a 2 m (piu' preciso dei livelli del modello)
+  if (tw2 != null) E += 9.81 * Math.max(0, tw2) / 275 * 120;
+  if (E >= E_PIOGGIA && tw2 != null && tw2 < -0.5) return "gelicidio";
+  return E < E_NEVE ? "neve" : E < E_PIOGGIA ? "mista" : "pioggia";
 }
 function zeroTermico(D, sez, i) {
   if (D.zeroTermico && D.zeroTermico[i] != null) return D.zeroTermico[i];
@@ -261,7 +288,7 @@ const locale = (d) => new Date(d.toLocaleString("en-US", { timeZone: "Europe/Rom
 
 // ------------------------------------------------------------------------------------------------ disegno
 let ultimo = null;
-const COL_TIPO = { pioggia: "#2f80ed", neve: "#ffffff", mista: "#c56bd6", gelicidio: "#e8453c" };
+const COL_TIPO = { pioggia: "#2f80ed", neve: "#9fd8ff", mista: "#c56bd6", gelicidio: "#e8453c" };
 function disegna(D, punto) {
   const cv = $("mg"), box = cv.parentElement, W = box.clientWidth, dpr = Math.min(2, window.devicePixelRatio || 1);
   const sez = sezione(D);
@@ -301,8 +328,8 @@ function disegna(D, punto) {
   const cx = cielo.getContext("2d");
   idx.forEach((i, k) => {
     const s = altezzaSole(D.ore[i], punto.lat, punto.lon), f = Math.max(0, Math.min(1, (s + 6) / 14));
-    cx.fillStyle = `rgb(${Math.round(18 + 52 * f)},${Math.round(30 + 110 * f)},${Math.round(62 + 170 * f)})`; cx.fillRect(k, 0, 1, 1);
-    cx.fillStyle = `rgb(${Math.round(40 + 150 * f)},${Math.round(56 + 165 * f)},${Math.round(92 + 152 * f)})`; cx.fillRect(k, 1, 1, 1);
+    cx.fillStyle = `rgb(${Math.round(12 + 18 * f)},${Math.round(22 + 70 * f)},${Math.round(48 + 130 * f)})`; cx.fillRect(k, 0, 1, 1);
+    cx.fillStyle = `rgb(${Math.round(26 + 74 * f)},${Math.round(40 + 120 * f)},${Math.round(76 + 150 * f)})`; cx.fillRect(k, 1, 1, 1);
   });
   x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high";
   x.drawImage(cielo, sx, y0, pw, H_SEZ);
@@ -317,30 +344,48 @@ function disegna(D, punto) {
       const a = col[q0], b = col[q1]; if (!a && !b) continue;
       const cf = Math.max(0, Math.min(1, a && b ? a.cf + (b.cf - a.cf) * f : (a || b).cf)), o = (r * n + k) * 4;
       sopra += cf * (zy(y0 + r) - zy(y0 + r + 1)) / 1400;   // quanta nube c'e' sopra: le nubi spesse sono grigie in basso
-      const lum = Math.round(255 - Math.min(120, sopra * 85));
-      im.data[o] = lum; im.data[o + 1] = lum; im.data[o + 2] = Math.min(255, lum + 8); im.data[o + 3] = Math.round(255 * Math.pow(cf, 0.75));
+      const lum = Math.round(250 - Math.min(150, sopra * 110));
+      im.data[o] = lum; im.data[o + 1] = lum; im.data[o + 2] = Math.min(255, lum + 6); im.data[o + 3] = cf < 0.08 ? 0 : Math.round(255 * Math.min(1, 0.25 + 0.85 * Math.pow(cf, 0.6)));
     }
   });
   nx.putImageData(im, 0, 0);
   x.save(); x.beginPath(); x.rect(sx, y0, pw, H_SEZ); x.clip();
-  x.filter = "blur(" + Math.max(1.5, cw * 0.35).toFixed(1) + "px)";      // nubi morbide, senza gradini tra i livelli
+  x.filter = "blur(" + Math.max(1.2, cw * 0.25).toFixed(1) + "px)";      // nubi morbide, senza gradini tra i livelli
   x.drawImage(nubi, sx, y0, pw, H_SEZ);
   x.filter = "none";
   x.restore();
-  // precipitazione che cade dalla base delle nubi al suolo
+  // precipitazione che cade dalla base delle nubi al suolo: fiocchi dove e' neve, misti dove fonde, gocce sotto
+  const fiocco = (cx_, cy_, r) => {
+    x.lineCap = "round";
+    for (const [col_, lw] of [["rgba(16,32,60,.85)", 3], ["#ffffff", 1.4]]) {
+      x.strokeStyle = col_; x.lineWidth = lw; x.beginPath();
+      for (let a = 0; a < 3; a++) { const an = a * Math.PI / 3 + Math.PI / 2, dx_ = Math.cos(an) * r, dy_ = Math.sin(an) * r; x.moveTo(cx_ - dx_, cy_ - dy_); x.lineTo(cx_ + dx_, cy_ + dy_); }
+      x.stroke();
+    }
+  };
+  const goccia = (cx_, cy_, col_) => {
+    x.lineCap = "round";
+    x.strokeStyle = "rgba(255,255,255,.75)"; x.lineWidth = 3.2; x.beginPath(); x.moveTo(cx_, cy_); x.lineTo(cx_ - 1.5, cy_ + 7); x.stroke();
+    x.strokeStyle = col_; x.lineWidth = 1.7; x.beginPath(); x.moveTo(cx_, cy_); x.lineTo(cx_ - 1.5, cy_ + 7); x.stroke();
+  };
   x.save(); x.beginPath(); x.rect(sx, y0, pw, H_SEZ); x.clip();
   idx.forEach((i, k) => {
     const p = D.prec[i] || 0, tipo = tipoPrec(D, sez, i); if (!tipo) return;
-    const col = sez[i]; let base = 2500;
-    if (col) for (let q = 0; q < col.length; q++) if (col[q] && col[q].cf > 0.5 && QZ[q] > (D.suolo || 0)) { base = QZ[q]; break; }
-    const ya = yz(base), yb = y0 + H_SEZ - 5, nn = Math.min(9, 2 + Math.round(Math.sqrt(p) * 3));
+    const base = baseNubi(D, sez, i), fasi = sez[i] ? fasiColonna(D, sez, i).fasi : null;
+    const ya = yz(inizioPrec(D, sez, i)), yb = y0 + H_SEZ - 5, nn = Math.min(4, 1 + Math.round(Math.sqrt(p) * 1.5)), passo = 19;
+    const faseA = (yy) => {
+      if (yy > yb - 10) return tipo;                                        // al suolo: il tipo finale
+      if (!fasi) return tipo;
+      const q = Math.max(0, Math.min(QZ.length - 1, Math.round(zy(yy) / 250)));
+      return fasi[q] || tipo;
+    };
     for (let j = 0; j < nn; j++) {
       const xx = sx + k * cw + (j + 0.5) / nn * cw, sfas = ((k * 7 + j * 13) % 10) / 10;
-      if (tipo === "neve") {
-        for (let yy = ya + sfas * 12; yy < yb; yy += 12) { x.fillStyle = "rgba(255,255,255,.95)"; x.beginPath(); x.arc(xx + Math.sin(yy / 9) * 1.5, yy, 1.6, 0, 7); x.fill(); }
-      } else {
-        x.strokeStyle = tipo === "pioggia" ? "rgba(120,190,255,.9)" : COL_TIPO[tipo]; x.lineWidth = 1.2;
-        for (let yy = ya + sfas * 14; yy < yb; yy += 14) { x.beginPath(); x.moveTo(xx, yy); x.lineTo(xx - 1.5, yy + 7); x.stroke(); }
+      for (let yy = ya + sfas * passo; yy < yb; yy += passo) {
+        const f_ = faseA(yy);
+        if (f_ === "neve") fiocco(xx + Math.sin(yy / 9) * 1.5, yy + 3, piccolo ? 3.2 : 3.8);
+        else if (f_ === "mista") { if (((yy / passo) | 0) % 2) fiocco(xx, yy + 3, piccolo ? 2.8 : 3.3); else goccia(xx, yy, COL_TIPO.mista); }
+        else goccia(xx, yy, f_ === "gelicidio" ? COL_TIPO.gelicidio : "#1d74e0");
       }
     }
     // temporale
@@ -397,7 +442,12 @@ function disegna(D, punto) {
     const p = D.prec[i] || 0; if (p < 0.1) return;
     const tipo = tipoPrec(D, sez, i) || "pioggia", h = Math.max(2, H_P * Math.sqrt(p / pmax));
     x.fillStyle = COL_TIPO[tipo]; x.fillRect(sx + k * cw + 1, y0 + H_P - h, Math.max(1, cw - 2), h);
-    if (tipo === "neve") { x.strokeStyle = "#7d93ab"; x.lineWidth = 1; x.strokeRect(sx + k * cw + 1.5, y0 + H_P - h + 0.5, Math.max(1, cw - 3), h - 1); }
+    if (tipo === "neve") { x.strokeStyle = "#3f78a8"; x.lineWidth = 1; x.strokeRect(sx + k * cw + 1.5, y0 + H_P - h + 0.5, Math.max(1, cw - 3), h - 1); }
+    // simbolo sopra la barra quando cambia il tipo (o ogni 3 ore), per capire a colpo d'occhio
+    if (tipo !== "pioggia" && (k === 0 || (tipoPrec(D, sez, idx[k - 1]) || "") !== tipo || locale(D.ore[i]).getHours() % 3 === 0)) {
+      x.font = (piccolo ? "11px" : "13px") + " system-ui"; x.textAlign = "center"; x.textBaseline = "bottom";
+      x.fillText(tipo === "neve" ? "❄️" : tipo === "mista" ? "🌨️" : "🧊", X(k), y0 + H_P - h - 1); x.textBaseline = "middle";
+    }
   });
   // totale del giorno
   const tot = {};
@@ -486,7 +536,7 @@ async function aggiorna() {
         (voto ? " <span class='voto' title='Voto della pagella unica, ultimi 30 giorni'>voto " + nf1.format(voto) + "/100</span>" : "") +
         (D.corsa ? " · corsa del " + D.corsa : "");
       $("nota").textContent = "Le nubi alle varie quote vengono dall'umidità e dalla temperatura del modello" + (m.tipo === "wrf" ? " (profili ogni 3 ore, raccordati ora per ora)" : "") +
-        ". Il tipo di precipitazione usa la temperatura di bulbo umido su tutta la colonna d'aria. Il modello automatico è il primo della pagella unica (radar e stazioni, ultimi 30 giorni) tra quelli che coprono il punto scelto.";
+        ". Il tipo di precipitazione (fiocchi, misto o gocce, quota per quota) è calcolato con il metodo di Bourgouin: l'energia di fusione che il fiocco accumula scendendo negli strati con bulbo umido sopra 0 °C. Il modello automatico è il primo della pagella unica (radar e stazioni, ultimi 30 giorni) tra quelli che coprono il punto scelto.";
       try { history.replaceState(null, "", "#" + encodeURIComponent(punto.nome) + (scelto !== "auto" ? "/" + scelto : "")); } catch (e) { /* niente */ }
       return;
     } catch (e) { /* passo al modello successivo */ }
