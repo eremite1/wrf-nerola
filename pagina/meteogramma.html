@@ -260,6 +260,17 @@ function fasiColonna(D, sez, i) {
   (D._fasi || (D._fasi = {}))[i] = { fasi: out, E };
   return D._fasi[i];
 }
+// quota neve: la quota piu' bassa dove il fiocco e' ancora neve (prima che diventi mista), metodo di Bourgouin
+function quotaNeve(D, sez, i) {
+  if (!sez[i]) return null;
+  const { fasi } = fasiColonna(D, sez, i), s = D.suolo || 0;
+  let ultima = null;
+  for (let q = QZ.length - 1; q >= 0; q--) { if (fasi[q] === "neve") ultima = QZ[q]; else if (fasi[q]) break; }
+  if (ultima == null) return null;
+  if (ultima <= s + 250 && tipoPrecForzato(D, sez, i) === "neve") return s;   // neve fino al suolo
+  return Math.max(s, ultima);
+}
+function tipoPrecForzato(D, sez, i) { const p = D.prec[i]; D.prec[i] = Math.max(p || 0, 0.1); const t = tipoPrec(D, sez, i); D.prec[i] = p; return t; }
 function tipoPrec(D, sez, i) {
   if ((D.prec[i] || 0) < 0.1) return "";
   const tw2 = tw2Di(D, i), col = sez[i];
@@ -494,7 +505,7 @@ function fumetto(e) {
   if (k < 0 || k >= ultimo.n) { f.style.display = "none"; return; }
   const { D, idx, sez } = ultimo, i = idx[k], l = locale(D.ore[i]);
   const tipo = tipoPrec(D, sez, i), z0 = zeroTermico(D, sez, i), col = sez[i];
-  let nubi = "sereno";
+  let qn, nubi = "sereno";
   if (col) { const bassa = col.some((c, q) => c && c.cf > 0.5 && QZ[q] < 2500), alta = col.some((c, q) => c && c.cf > 0.5 && QZ[q] >= 5500), media = col.some((c, q) => c && c.cf > 0.5 && QZ[q] >= 2500 && QZ[q] < 5500);
     nubi = [bassa && "basse", media && "medie", alta && "alte"].filter(Boolean).join(", "); nubi = nubi ? "nubi " + nubi : "sereno o poco nuvoloso"; }
   f.innerHTML = "<b>" + GGL[l.getDay()] + " " + l.getDate() + " · ore " + String(l.getHours()).padStart(2, "0") + ":00</b><br>" +
@@ -502,7 +513,8 @@ function fumetto(e) {
     "☁️ " + nubi + (D.nuv && D.nuv[i] != null ? " · copertura " + Math.round(D.nuv[i]) + "%" : "") + "<br>" +
     (tipo ? "🌧️ " + tipo + " " + nf1.format(D.prec[i]) + " mm<br>" : "") +
     "💨 " + (D.vento[i] != null ? Math.round(D.vento[i]) + " km/h" : "–") + (D.raffica && D.raffica[i] != null ? ", raffiche " + Math.round(D.raffica[i]) : "") + "<br>" +
-    (z0 != null ? "❄️ zero termico " + Math.round(z0 / 50) * 50 + " m" : "");
+    (z0 != null ? "🌡️ zero termico " + Math.round(z0 / 50) * 50 + " m<br>" : "") +
+    ((qn = quotaNeve(D, sez, i)) != null ? "❄️ quota neve " + (qn <= (D.suolo || 0) + 1 ? "fino al suolo (" + Math.round(qn) + " m)" : Math.round(qn / 50) * 50 + " m") : "");
   f.style.display = "block";
   const fw = f.offsetWidth; let fx = px + 14; if (fx + fw > r.width) fx = px - fw - 14;
   f.style.left = Math.max(0, fx) + "px"; f.style.top = (ultimo.H_TESTA + 10) + "px";
@@ -521,6 +533,27 @@ const tuttiModelli = () => [...WRF.map((m) => ({ ...m, tipo: "wrf" })), ...OM.ma
   .filter((m) => m.tipo === "om" || (catene[m.cat] && catene[m.cat].domini[m.dom]))
   .sort((a, b) => (pagella[b.id] || 0) - (pagella[a.id] || 0));
 let generazione = 0;
+// Quota vera del punto (modello del terreno Copernicus a 90 m, servizio gratuito Open-Meteo): i modelli vedono un
+// terreno "lisciato" (a Nerola anche 100 m piu' basso). Il meteogramma parte dalla quota vera e le grandezze al
+// suolo si correggono con la differenza di quota: temperatura -6,5 °C/km, punto di rugiada -2 °C/km.
+const quote = {};
+async function quotaVera(lat, lon) {
+  const k = lat.toFixed(4) + "," + lon.toFixed(4);
+  if (!(k in quote)) {
+    quote[k] = null;
+    try { const j = await json(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`); if (j.elevation && isFinite(j.elevation[0])) quote[k] = j.elevation[0]; } catch (e) { /* resta quella del modello */ }
+  }
+  return quote[k];
+}
+function correggiQuota(D, zr) {
+  if (zr == null || D.suolo == null || Math.abs(zr - D.suolo) < 15) return;
+  const dz = (zr - D.suolo) / 1000, dt = -6.5 * dz, dd = -2 * dz;
+  const piu = (a, d) => a ? a.map((v) => v == null ? v : v + d) : a;
+  D.t2 = piu(D.t2, dt); D.perc = piu(D.perc, dt);
+  D.td = D.td ? D.td.map((v, i) => v == null ? v : Math.min(v + dd, D.t2[i])) : D.td;
+  D.tw2 = null;                                       // si ricalcola dalla temperatura e dal punto di rugiada corretti
+  D.suoloModello = D.suolo; D.suolo = zr;
+}
 async function aggiorna() {
   const gen = ++generazione, punto = JSON.parse($("luogo").value), scelto = $("modello").value;
   $("scelta").textContent = "Carico il meteogramma…";
@@ -530,13 +563,15 @@ async function aggiorna() {
       const D = m.tipo === "wrf" ? await datiWrf(m, punto.lat, punto.lon) : await datiOm(m, punto.lat, punto.lon);
       if (gen !== generazione) return;
       if (!D || !Object.keys(D.profili).length) continue;
+      correggiQuota(D, await quotaVera(punto.lat, punto.lon));
+      if (gen !== generazione) return;
       disegna(D, punto);
       const voto = pagella[m.id];
       $("scelta").innerHTML = "<b>" + punto.nome + "</b> · " + (scelto === "auto" ? "modello più affidabile in questo periodo: " : "modello: ") + "<b>" + m.nome + "</b>" +
         (voto ? " <span class='voto' title='Voto della pagella unica, ultimi 30 giorni'>voto " + nf1.format(voto) + "/100</span>" : "") +
         (D.corsa ? " · corsa del " + D.corsa : "");
       $("nota").textContent = "Le nubi alle varie quote vengono dall'umidità e dalla temperatura del modello" + (m.tipo === "wrf" ? " (profili ogni 3 ore, raccordati ora per ora)" : "") +
-        ". Il tipo di precipitazione (fiocchi, misto o gocce, quota per quota) è calcolato con il metodo di Bourgouin: l'energia di fusione che il fiocco accumula scendendo negli strati con bulbo umido sopra 0 °C. Il modello automatico è il primo della pagella unica (radar e stazioni, ultimi 30 giorni) tra quelli che coprono il punto scelto.";
+        ". Il tipo di precipitazione (fiocchi, misto o gocce, quota per quota) è calcolato con il metodo di Bourgouin: l'energia di fusione che il fiocco accumula scendendo negli strati con bulbo umido sopra 0 °C. " + (D.suoloModello != null ? " Il grafico parte dalla quota vera del punto (" + Math.round(D.suolo) + " m; il modello vede il terreno a " + Math.round(D.suoloModello) + " m) e le temperature al suolo sono corrette per questa differenza." : "") + " Il modello automatico è il primo della pagella unica (radar e stazioni, ultimi 30 giorni) tra quelli che coprono il punto scelto.";
       try { history.replaceState(null, "", "#" + encodeURIComponent(punto.nome) + (scelto !== "auto" ? "/" + scelto : "")); } catch (e) { /* niente */ }
       return;
     } catch (e) { /* passo al modello successivo */ }
