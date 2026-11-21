@@ -1,0 +1,15 @@
+ok     d01: istanti 49 (attesi 49), da 2026-11-21_00:00:00 a 2026-11-23_00:00:00
+ok     d01: temperatura a 2 m tra -4.1 e 21.3 C (accettati -35..48)
+ok     d01: vento a 10 m massimo 25.3 m/s (accettato < 70)
+ok     d01: pressione al suolo tra 753 e 1021 hPa (accettati 500..1100)
+ok     d01: pioggia oraria massima 20.1 mm, totale massimo 71 mm (accettati < 150 e < 800)
+ok     d01: radiazione solare tra 0 e 517 W/m2 (accettati 0..1200)
+ok     d01: massimo salto di temperatura in un'ora 7.6 C (accettato < 15)
+ok     d02: istanti 49 (attesi 49), da 2026-11-21_00:00:00 a 2026-11-23_00:00:00
+ok     d02: temperatura a 2 m tra 0.4 e 20.9 C (accettati -35..48)
+ok     d02: vento a 10 m massimo 21.9 m/s (accettato < 70)
+ok     d02: pressione al suolo tra 814 e 1018 hPa (accettati 500..1100)
+ok     d02: pioggia oraria massima 20.5 mm, totale massimo 52 mm (accettati < 150 e < 800)
+ok     d02: radiazione solare tra 0 e 502 W/m2 (accettati 0..1200)
+ok     d02: massimo salto di temperatura in un'ora 8.0 C (accettato < 15)
+RISULTATO: plausibile

@@ -1,0 +1,22 @@
+ok     d01: istanti 25 (attesi 25), da 2026-11-20_18:00:00 a 2026-11-21_18:00:00
+ok     d01: temperatura a 2 m tra -2.9 e 20.6 C (accettati -35..48)
+ok     d01: vento a 10 m massimo 20.9 m/s (accettato < 70)
+ok     d01: pressione al suolo tra 760 e 1021 hPa (accettati 500..1100)
+ok     d01: pioggia oraria massima 1.8 mm, totale massimo 5 mm (accettati < 150 e < 800)
+ok     d01: radiazione solare tra 0 e 520 W/m2 (accettati 0..1200)
+ok     d01: massimo salto di temperatura in un'ora 8.6 C (accettato < 15)
+ok     d02: istanti 25 (attesi 25), da 2026-11-20_18:00:00 a 2026-11-21_18:00:00
+ok     d02: temperatura a 2 m tra 1.3 e 20.6 C (accettati -35..48)
+ok     d02: vento a 10 m massimo 12.6 m/s (accettato < 70)
+ok     d02: pressione al suolo tra 822 e 1018 hPa (accettati 500..1100)
+ok     d02: pioggia oraria massima 2.0 mm, totale massimo 4 mm (accettati < 150 e < 800)
+ok     d02: radiazione solare tra 0 e 513 W/m2 (accettati 0..1200)
+ok     d02: massimo salto di temperatura in un'ora 7.2 C (accettato < 15)
+ok     d03: istanti 25 (attesi 25), da 2026-11-20_18:00:00 a 2026-11-21_18:00:00
+ok     d03: temperatura a 2 m tra 3.6 e 20.1 C (accettati -35..48)
+ok     d03: vento a 10 m massimo 8.5 m/s (accettato < 70)
+ok     d03: pressione al suolo tra 868 e 1015 hPa (accettati 500..1100)
+ok     d03: pioggia oraria massima 1.4 mm, totale massimo 2 mm (accettati < 150 e < 800)
+ok     d03: radiazione solare tra 0 e 504 W/m2 (accettati 0..1200)
+ok     d03: massimo salto di temperatura in un'ora 7.7 C (accettato < 15)
+RISULTATO: plausibile
