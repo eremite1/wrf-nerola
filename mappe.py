@@ -49,7 +49,8 @@ NEROLA = (42.1606, 12.7856)   # centro del paese (prima era 3,5 km troppo a sud)
 FORZANTI = {"ECMWF": "WRF su dati ECMWF IFS 0,1° (CC BY 4.0, dati modificati)",
             "GFS": "WRF su dati NOAA GFS 0,25° (pubblico dominio, dati modificati)",
             "ICONEU": "WRF su dati DWD ICON-EU via Open-Meteo (CC BY 4.0, dati modificati)",
-            "ICON2I": "WRF su dati ItaliaMeteo ICON-2I e DWD ICON-EU via Open-Meteo (CC BY 4.0, dati modificati)"}
+            "ICON2I": "WRF su dati ItaliaMeteo ICON-2I e DWD ICON-EU via Open-Meteo (CC BY 4.0, dati modificati)",
+            "CORRETTO": "WRF corretto con stazioni e radar (meteo-mappe), sul WRF col voto migliore della pagella"}
 NOME_FORZANTE = "ECMWF"
 FONTE = FORZANTI[NOME_FORZANTE]
 # parametri della catena a 333 m: solo quelli che hanno senso a quella risoluzione
@@ -1151,29 +1152,36 @@ def quantizza(z, scala=10, clip=None):
 
 
 def campi_serie(d):
-    """Campi orari per il meteogramma di un punto qualsiasi: (id, titolo, unita, scala, array [t, y, x])."""
+    """Campi orari per il meteogramma di un punto qualsiasi: (id, titolo, unita, scala, array [t, y, x]).
+    Un campo che chiede dati assenti (es. nel WRF corretto, che ha solo i campi principali) si salta."""
     pr = uscite.pioggia(d)
-    elenco = [("T2", "Temperatura a 2 m", "°C", 10, d["T2"] - 273.15),
-              ("UMID", "Umidità relativa a 2 m", "%", 10, rh2(d)),
-              ("VENTO", "Vento a 10 m", "km/h", 10, np.hypot(d["U10"], d["V10"]) * 3.6),
-              ("PIOGGIA", "Pioggia dall'inizio", "mm", 10, pr - pr[0]),
-              ("PRESS", "Pressione al livello del mare", "hPa", 10, pressione_mare(d)),
-              ("TW", "Temperatura di bulbo umido", "°C", 10, gelo(d)[1]),
-              ("TPRATO", "Temperatura della superficie del suolo", "°C", 10, gelo(d)[2])]
-    elenco += [("TD", "Punto di rugiada", "°C", 10, punto_rugiada(d)),
-               ("PERC", "Temperatura percepita", "°C", 10, temperatura_percepita(d)),
-               ("NUV", "Nuvolosità", "%", 1, nuvolosita(d)),
-               ("RAD", "Radiazione solare", "W/m²", 1, d["SWDOWN"]),
-               ("DIR", "Direzione del vento (da)", "°", 1, (270.0 - np.degrees(np.arctan2(d["V10"], d["U10"]))) % 360.0),
-               ("GELO", "Classe di gelo oraria", "", 1, gelo(d)[3])]
+    voci = [("T2", "Temperatura a 2 m", "°C", 10, lambda: d["T2"] - 273.15),
+            ("UMID", "Umidità relativa a 2 m", "%", 10, lambda: rh2(d)),
+            ("VENTO", "Vento a 10 m", "km/h", 10, lambda: np.hypot(d["U10"], d["V10"]) * 3.6),
+            ("PIOGGIA", "Pioggia dall'inizio", "mm", 10, lambda: pr - pr[0]),
+            ("PRESS", "Pressione al livello del mare", "hPa", 10, lambda: pressione_mare(d)),
+            ("TW", "Temperatura di bulbo umido", "°C", 10, lambda: gelo(d)[1]),
+            ("TPRATO", "Temperatura della superficie del suolo", "°C", 10, lambda: gelo(d)[2]),
+            ("TD", "Punto di rugiada", "°C", 10, lambda: punto_rugiada(d)),
+            ("PERC", "Temperatura percepita", "°C", 10, lambda: temperatura_percepita(d)),
+            ("NUV", "Nuvolosità", "%", 1, lambda: d["NUVT"] if "GLW" not in d and "NUVT" in d else nuvolosita(d)),
+            ("RAD", "Radiazione solare", "W/m²", 1, lambda: d["SWDOWN"]),
+            ("DIR", "Direzione del vento (da)", "°", 1, lambda: (270.0 - np.degrees(np.arctan2(d["V10"], d["U10"]))) % 360.0),
+            ("GELO", "Classe di gelo oraria", "", 1, lambda: gelo(d)[3])]
     if "PBLH" in d:
-        elenco.append(("PBL", "Altezza strato limite", "m", 1, d["PBLH"]))
+        voci.append(("PBL", "Altezza strato limite", "m", 1, lambda: d["PBLH"]))
     if "CAPE" in d:
-        elenco.append(("CAPE", "CAPE", "J/kg", 1, d["CAPE"]))
+        voci.append(("CAPE", "CAPE", "J/kg", 1, lambda: d["CAPE"]))
     if "TSLB" in d:
-        elenco.append(("TSUOLO", "Temperatura del suolo 0-10 cm", "°C", 10, d["TSLB"][:, 0] - 273.15))
+        voci.append(("TSUOLO", "Temperatura del suolo 0-10 cm", "°C", 10, lambda: d["TSLB"][:, 0] - 273.15))
     if "SMOIS" in d:
-        elenco.append(("UMSUOLO", "Umidità del suolo 0-10 cm", "% vol", 10, d["SMOIS"][:, 0] * 100))
+        voci.append(("UMSUOLO", "Umidità del suolo 0-10 cm", "% vol", 10, lambda: d["SMOIS"][:, 0] * 100))
+    elenco = []
+    for cid, tit, un, sc, f in voci:
+        try:
+            elenco.append((cid, tit, un, sc, f()))
+        except (KeyError, IndexError):
+            print("serie del meteogramma saltata (mancano i dati):", cid)
     return elenco
 
 
@@ -1299,8 +1307,17 @@ def main():
         parametri = [p for p in PARAMETRI if p.get("serve") is None or p["serve"] in d]
         frames = {p["id"]: [i for i in range(p["inizio"], n, p["passo"])] for p in parametri}
         parametri = [p for p in parametri if frames[p["id"]]]
+        # un parametro che chiede campi assenti (es. nel WRF corretto, che ha solo i campi principali) si salta
+        buoni = []
+        for p in parametri:
+            try:
+                p["calcola"](d, frames[p["id"]][-1])
+                buoni.append(p)
+            except (KeyError, IndexError):
+                print("parametro saltato (mancano i dati):", p["id"])
+        parametri = buoni
         lim = limiti_automatici(d, parametri, frames)
-        piccolo = etichetta != "3 km"
+        piccolo = not etichetta.startswith("3 km")
         cand = candidati(sf, d["lat"], d["lon"], vicini=True)     # elenco completo (serve alla pagina per dire "x km da ...")
         imposta_geometria(d["lon"], d["lat"])
         scelti = cand if piccolo else candidati_capoluoghi(d["lat"], d["lon"])
@@ -1356,7 +1373,10 @@ def main():
         salva = {k: v for k, v in d.items() if k != "tempi"}
         np.savez_compressed(out / f"{dom}_tutto.npz", **salva, tempi=np.array(d["tempi"]))
         if dom == DOMINI[0][0]:
-            meteogramma(d, a.corsa, str(out / "meteogramma_nerola.png"))
+            try:
+                meteogramma(d, a.corsa, str(out / "meteogramma_nerola.png"))
+            except KeyError as e:
+                print("meteogramma fisso non disegnato (mancano i dati):", e)
     (out / "indice.json").write_text(json.dumps(indice, ensure_ascii=False, indent=1))
 
 

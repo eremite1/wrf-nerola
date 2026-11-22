@@ -1,0 +1,101 @@
+# WRF CORRETTO: disegna le mappe del WRF corretto con stazioni e radar (calcolato nella pagella di meteo-mappe,
+# motore/corretto.py) e le pubblica nel ramo "risultati", sottocartella "corretto", come le altre catene.
+# Gira ogni ora poco dopo la pagella; se la versione corretta non e' cambiata non fa nulla.
+name: "WRF corretto: mappe"
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: wrf-corretto
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  mappe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: C'e' una versione nuova?
+        id: nuovo
+        run: |
+          P=https://raw.githubusercontent.com/eremite1/meteo-mappe/pagella/corretto
+          curl -fsSL --retry 4 -o /tmp/corretto.json "$P/corretto.json" || { echo "WRF corretto non disponibile"; echo "fai=no" >> "$GITHUB_OUTPUT"; exit 0; }
+          NUOVO=$(python3 -c "import json;j=json.load(open('/tmp/corretto.json'));print(j['base']+' '+j['corsa']+' '+j['creato'])")
+          VECCHIO=$(curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/risultati/corretto/indice.json" 2>/dev/null \
+                    | python3 -c "import json,sys;j=json.load(sys.stdin);print(j.get('versione_corretto',''))" 2>/dev/null || true)
+          echo "nuova: $NUOVO · pubblicata: $VECCHIO"
+          if [ "$NUOVO" = "$VECCHIO" ] && [ "${{ github.event_name }}" != workflow_dispatch ]; then echo "fai=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+          curl -fsSL --retry 4 -o /tmp/corretto_tutto.npz "$P/corretto_tutto.npz"
+          echo "fai=si" >> "$GITHUB_OUTPUT"
+
+      - name: Programmi necessari
+        if: steps.nuovo.outputs.fai == 'si'
+        run: |
+          for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; sleep 45; done
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=5 python3-numpy python3-matplotlib
+
+      - name: Recupero confini e nomi dei paesi (dalla cache)
+        if: steps.nuovo.outputs.fai == 'si'
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/sfondo
+          key: sfondo-v4
+
+      - name: Mappe
+        if: steps.nuovo.outputs.fai == 'si'
+        run: |
+          read BASE CORSA DOM ETI <<< $(python3 - <<'EOF'
+          import json
+          j = json.load(open("/tmp/corretto.json"))
+          b, c = j["base"], j["corsa"]
+          dom, eti = ("d03", "333m:333_m_corretto") if b.endswith("333m") else ("d02", "1km:1_km_corretto") if b.endswith("1km") else ("d01", "3km:3_km_corretto")
+          print(b, c[0:4] + c[5:7] + c[8:10] + c[11:13], dom, eti)
+          EOF
+          )
+          echo "base $BASE, corsa $CORSA, dominio $DOM"
+          mkdir -p /home/runner/uscite
+          cp /tmp/corretto_tutto.npz /home/runner/uscite/${DOM}_b1.npz
+          python3 mappe.py --uscite /home/runner/uscite --corsa "$CORSA" --out /home/runner/pubblico --sfondo /home/runner/sfondo \
+                           --forzante CORRETTO --domini "$DOM:$ETI"
+          python3 - "$BASE" <<'EOF'
+          import json, sys
+          p = "/home/runner/pubblico/indice.json"
+          i = json.load(open(p))
+          j = json.load(open("/tmp/corretto.json"))
+          i["base"] = sys.argv[1]
+          i["versione_corretto"] = j["base"] + " " + j["corsa"] + " " + j["creato"]
+          i["correzioni"] = {k: j[k] for k in ("correzione_media_T", "fattore_medio_vento", "radar", "fattore_globale_radar", "voto_base") if k in j}
+          json.dump(i, open(p, "w"), ensure_ascii=False)
+          EOF
+          ls /home/runner/pubblico | head
+
+      - name: Pubblico nel ramo "risultati" (sottocartella corretto)
+        if: steps.nuovo.outputs.fai == 'si'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REMOTO="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          RAMO=/home/runner/ramo
+          for prova in 1 2 3; do
+            rm -rf "$RAMO" && mkdir -p "$RAMO"
+            ( cd "$RAMO" && git init -q && git fetch -q --depth 1 "$REMOTO" risultati && git archive FETCH_HEAD | tar -x )
+            rm -rf "$RAMO/.git" "$RAMO/corretto" && mkdir -p "$RAMO/corretto"
+            cp -a /home/runner/pubblico/. "$RAMO/corretto/"
+            rm -f "$RAMO/corretto/index.html"
+            cp pagina/index.html "$RAMO/index.html"      # pagina aggiornata (elenco delle catene con il WRF corretto)
+            ( cd "$RAMO"
+            git init -q -b risultati
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -q -m "WRF corretto: mappe"
+            git push -q -f "$REMOTO" risultati ) && break
+            sleep 20
+          done

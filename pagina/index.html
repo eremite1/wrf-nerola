@@ -365,6 +365,7 @@ const CATENE = [
   { cartella: "gfs", nome: "GFS", descr: null },
   { cartella: "iconeu", nome: "ICON-EU", descr: null },
   { cartella: "icon2i", nome: "ICON-2I", descr: null },
+  { cartella: "corretto", nome: "corretto con stazioni e radar", descr: null },
 ];
 const versioni = {};
 function verDi(f) {
@@ -392,6 +393,7 @@ async function caricaCatene() {
         voce.etichetta = c.cartella === "fine" ? v.etichetta : v.etichetta + " · " + c.nome;
         voce.descr = c.descr || (k === "1km" ? "zona di Nerola, circa 73 km" : "area più ampia, circa 240 km");
         voce.corsa = sub.corsa; voce.forzante = sub.forzante || (c.cartella === "fine" ? "ECMWF" : c.nome);
+        if (c.cartella === "corretto" && sub.base) voce.forzante = "WRF " + sub.base + " corretto";
         voce.elaborato = sub.elaborato || sub.creato;
         indice.domini[c.cartella + "-" + k] = voce;
       }
