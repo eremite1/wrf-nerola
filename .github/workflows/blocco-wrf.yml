@@ -116,7 +116,7 @@ jobs:
           echo "wrf.exe riuscito"
           ls wrfout_d0* | wc -l
           FINE=$(date -u -d "${C:0:8} ${C:8:2}:00 UTC + ${A} hours" +%Y-%m-%d_%H:%M:%S)
-          for d in $(seq 1 $NDOM); do
+          for d in $(seq 1 $((NDOM + 1))); do      # +1: dominio esterno a 9 km
             test -s "wrfrst_d0${d}_${FINE}" || { echo "ERRORE: manca il file di ripresa del dominio ${d} alle ${FINE}"; ls wrfrst_* 2>/dev/null || true; exit 1; }
           done
           echo "$FINE" > fine.txt
@@ -127,7 +127,7 @@ jobs:
           FINE=$(cat fine.txt)
           mkdir -p /home/runner/stato_out
           FILE_STATO="wrfbdy_d01 corsa.txt"
-          for d in $(seq 1 $NDOM); do FILE_STATO="$FILE_STATO wrfinput_d0${d} wrfrst_d0${d}_${FINE}"; done
+          for d in $(seq 1 $((NDOM + 1))); do FILE_STATO="$FILE_STATO wrfinput_d0${d} wrfrst_d0${d}_${FINE}"; done
           tar -czf /home/runner/stato_out/stato.tgz $FILE_STATO
           ls -lh /home/runner/stato_out
 

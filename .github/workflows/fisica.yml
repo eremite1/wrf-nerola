@@ -116,8 +116,8 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: /home/runner/geo_em
-          key: geo-em-cerca
-          restore-keys: geo-em-
+          key: geo9-cerca
+          restore-keys: geo9-
           fail-on-cache-miss: true
       - uses: actions/download-artifact@v4
         with:
@@ -127,7 +127,7 @@ jobs:
         run: |
           CORSA=$(cat /home/runner/finali/corsa.txt); echo "CORSA=$CORSA" >> "$GITHUB_ENV"
           mkdir -p /home/runner/WPS && cp -a /home/runner/wrf-install/WPS/. /home/runner/WPS/
-          cp /home/runner/geo_em/geo_em.d01.nc /home/runner/WPS/
+          cp /home/runner/geo_em/geo_em.d01.nc /home/runner/geo_em/geo_em.d02.nc /home/runner/WPS/   # 9 km esterno + 3 km
           cp /home/runner/geo_em/namelist.wps /home/runner/WPS/namelist.wps
           case "$FORZANTE" in
             GFS) cp /home/runner/WPS/ungrib/Variable_Tables/Vtable.GFS /home/runner/WPS/Vtable;;
@@ -136,7 +136,7 @@ jobs:
           cd /home/runner/WPS
           EPOCH=$(date -u -d "${CORSA:0:8} ${CORSA:8:2}:00 UTC" +%s)
           START=$(date -u -d @$EPOCH +%Y-%m-%d_%H:%M:%S); END=$(date -u -d @$((EPOCH + ORE*3600)) +%Y-%m-%d_%H:%M:%S)
-          sed -i "s/^ *max_dom.*/ max_dom = 1,/; s/^ *start_date.*/ start_date = '$START',/; s/^ *end_date.*/ end_date   = '$END',/" namelist.wps
+          sed -i "s/^ *max_dom.*/ max_dom = 2,/; s/^ *start_date.*/ start_date = '$START','$START',/; s/^ *end_date.*/ end_date   = '$END','$END',/" namelist.wps
           rm -f GRIBFILE.* FILE:*
           case "$FORZANTE" in
             ICON*) for f in /home/runner/finali/ICON_*; do cp "$f" "FILE:${f##*/ICON_}"; done;;
@@ -146,14 +146,14 @@ jobs:
           esac
           ./metgrid.exe > metgrid.log 2>&1 || true
           grep -q "Successful completion" metgrid.log || { tail -n 30 metgrid.log; exit 1; }
-          echo "met_em: $(ls met_em.d01.* | wc -l)"
+          echo "met_em: $(ls met_em.d01.* | wc -l) + $(ls met_em.d02.* | wc -l)"
           rm -rf /home/runner/finali FILE:*
       - name: real.exe e wrf.exe
         run: |
           mkdir -p /home/runner/run && cd /home/runner/run
           cp -aL /home/runner/wrf-install/WRF/run/. .
           cp -L /home/runner/wrf-install/WRF/real.exe /home/runner/wrf-install/WRF/wrf.exe .
-          ln -sf /home/runner/WPS/met_em.d01* .
+          ln -sf /home/runner/WPS/met_em.d0* .
           NLEV=$(python3 -c "from netCDF4 import Dataset;import glob;n=Dataset(sorted(glob.glob('met_em.d01.*'))[0]);print(len(n.dimensions['num_metgrid_levels']))")
           NSOIL=$(python3 -c "from netCDF4 import Dataset;import glob;n=Dataset(sorted(glob.glob('met_em.d01.*'))[0]);print(int(n.getncattr('NUM_METGRID_SOIL_LEVELS')))")
           ulimit -s unlimited || true

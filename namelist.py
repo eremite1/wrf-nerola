@@ -48,8 +48,8 @@ MODELLO = """&time_control
  time_step_fract_num = 0,
  time_step_fract_den = 1,
 @ADATTIVO@ max_dom = 2,
- e_we = 81, 73,
- e_sn = 81, 73,
+ e_we = 85, 73,
+ e_sn = 85, 73,
  e_vert = 45, 45,
  p_top_requested = 5000,
  num_metgrid_levels = @NLEV@,
@@ -58,8 +58,8 @@ MODELLO = """&time_control
  dy = 3000, 1000,
  grid_id = 1, 2,
  parent_id = 0, 1,
- i_parent_start = 1, 29,
- j_parent_start = 1, 29,
+ i_parent_start = 1, 31,
+ j_parent_start = 1, 31,
  parent_grid_ratio = 1, 3,
  parent_time_step_ratio = 1, 3,
  feedback = 1,
@@ -128,14 +128,14 @@ def tre_domini(t):
     out = []
     for riga in t.splitlines():
         m = re.match(r"^( *)(\w+)( *= *)(.+?),\s*$", riga)
-        if m and m.group(4).count(",") == 1:
+        if m and m.group(4).count(",") == 2:
             chiave = m.group(2)
-            v2 = m.group(4).split(",")[1].strip()
+            v2 = m.group(4).split(",")[2].strip()
             riga = f"{riga.rstrip().rstrip(',')}, {TERZO.get(chiave, v2)},"
         out.append(riga)
     t = "\n".join(out) + "\n"
-    t = t.replace(" max_dom = 2,", " max_dom = 3,").replace(" feedback = 1,", " feedback = 0,")
-    t = t.replace(" adaptation_domain = 2,", " adaptation_domain = 3,")
+    t = t.replace(" max_dom = 3,", " max_dom = 4,").replace(" feedback = 1,", " feedback = 0,")
+    t = t.replace(" adaptation_domain = 3,", " adaptation_domain = 4,")
     return t
 
 
@@ -150,15 +150,53 @@ FISICHE = {
 
 
 def un_dominio(t):
-    """Solo il dominio a 3 km: ogni riga con un valore per dominio tiene il primo."""
+    """Solo il dominio a 3 km (con il suo dominio esterno a 9 km): ogni riga per dominio tiene i primi due valori."""
+    out = []
+    for riga in t.splitlines():
+        m = re.match(r"^( *)(\w+)( *= *)(.+?),\s*$", riga)
+        if m and m.group(4).count(",") == 2:
+            v = [x.strip() for x in m.group(4).split(",")]
+            riga = f"{m.group(1)}{m.group(2)}{m.group(3)}{v[0]}, {v[1]},"
+        out.append(riga)
+    t = "\n".join(out) + "\n"
+    return t.replace(" max_dom = 3,", " max_dom = 2,").replace(" adaptation_domain = 3,", " adaptation_domain = 2,")
+
+
+# DOMINIO ESTERNO a 9 km (novembre 2026). Il dominio a 3 km era un quadrato di 240 km che riceveva dai bordi, ogni
+# 3 ore, solo vento, temperatura e umidita': l'aria entrava senza nubi ne' pioggia e non faceva in tempo a "caricarsi"
+# prima di arrivare su Nerola. Risultato: il WRF prevedeva meno di meta' della pioggia caduta. Ora il 3 km e' annidato
+# in un dominio a 9 km di 666 km di lato (Italia centrale e mari vicini) che gli passa ai bordi, a ogni passo di tempo,
+# anche nubi, pioggia e neve gia' formate. A 9 km i temporali non si vedono da soli: c'e' lo schema di Grell-Freitas,
+# che "sa" la propria risoluzione. Il dominio esterno non viene pubblicato: lavora solo dietro le quinte.
+ESTERNO = {"e_we": "75", "e_sn": "75", "dx": "9000", "dy": "9000", "i_parent_start": "1", "j_parent_start": "1",
+           "parent_grid_ratio": "1", "parent_time_step_ratio": "1", "history_interval": "180", "radt": "9",
+           "cu_physics": "3", "cudt": "0", "specified": ".true.", "nested": ".false.",
+           "starting_time_step": "54", "max_time_step": "108", "min_time_step": "27", "max_step_increase_pct": "5"}
+# come cambia il dominio a 3 km, che da principale diventa annidato nel 9 km (centrato: (85-1)/3 = 28 celle da 9 km)
+NIDO = {"i_parent_start": "25", "j_parent_start": "25", "parent_grid_ratio": "3", "parent_time_step_ratio": "3",
+        "specified": ".false.", "nested": ".true.", "max_step_increase_pct": "51"}
+
+
+def con_esterno(t):
+    """Mette il dominio a 9 km davanti a tutti (diventa d01; il 3 km diventa d02, l'1 km d03)."""
     out = []
     for riga in t.splitlines():
         m = re.match(r"^( *)(\w+)( *= *)(.+?),\s*$", riga)
         if m and m.group(4).count(",") == 1:
-            riga = f"{m.group(1)}{m.group(2)}{m.group(3)}{m.group(4).split(',')[0].strip()},"
+            chiave = m.group(2)
+            v = [x.strip() for x in m.group(4).split(",")]
+            riga = f"{m.group(1)}{chiave}{m.group(3)}{ESTERNO.get(chiave, v[0])}, {NIDO.get(chiave, v[0])}, {v[1]},"
         out.append(riga)
     t = "\n".join(out) + "\n"
-    return t.replace(" max_dom = 2,", " max_dom = 1,").replace(" adaptation_domain = 2,", " adaptation_domain = 1,")
+    t = t.replace(" time_step = 18,", " time_step = 54,").replace(" max_dom = 2,", " max_dom = 3,")
+    return t.replace(" adaptation_domain = 2,", " adaptation_domain = 3,")
+
+
+def numera(t):
+    """grid_id e parent_id in fila: 1, 2, 3... e 0, 1, 2... (ogni dominio e' annidato nel precedente)."""
+    n = int(re.search(r"max_dom = (\d+)", t).group(1))
+    t = re.sub(r"^ grid_id = .*$", " grid_id = " + ", ".join(str(i + 1) for i in range(n)) + ",", t, flags=re.M)
+    return re.sub(r"^ parent_id = .*$", " parent_id = " + ", ".join(str(i) for i in range(n)) + ",", t, flags=re.M)
 
 
 def con_fisica(t, codice):
@@ -177,7 +215,7 @@ def main():
     ap.add_argument("--nsoil", type=int, default=4)
     ap.add_argument("--fisso", action="store_true",
                     help="passo di tempo fisso (18 s e 6 s) invece di quello adattivo: si usa se l'adattivo fallisce")
-    ap.add_argument("--domini", type=int, default=2, choices=(1, 2, 3), help="1 = solo 3 km; 3 = aggiunge il dominio a 333 m su Nerola")
+    ap.add_argument("--domini", type=int, default=2, choices=(1, 2, 3), help="domini pubblicati: 1 = solo 3 km; 3 = aggiunge il dominio a 333 m su Nerola. In piu' c'e' sempre il dominio esterno a 9 km")
     ap.add_argument("--fisica", default="F1", choices=sorted(FISICHE), help="metodo di calcolo (varianti di confronto)")
     a = ap.parse_args()
     if a.a <= a.da:
@@ -210,11 +248,13 @@ def main():
     t = MODELLO
     for k, v in sost.items():
         t = t.replace("@" + k + "@", str(v))
+    t = con_esterno(t)
     if a.domini == 3:
         t = tre_domini(t)
     elif a.domini == 1:
         t = un_dominio(t)
     t = con_fisica(t, a.fisica)
+    t = numera(t)
     if "@" in t:
         sys.exit("segnaposto non sostituito: " + t[t.index("@"):t.index("@") + 20])
     sys.stdout.write(t)

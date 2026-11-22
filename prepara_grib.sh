@@ -10,7 +10,7 @@ passo() {
   local s=$1 T k p D1 D2
   T=$(mktemp -d)
   for t in sfc pl; do
-    cdo -s -f grb2 invertlat -sellonlatbox,9.5,16,39.5,44.5 "$RAW/${t}_$s.grib2" "$T/${t}.grib2" 2>&1 | tail -3
+    cdo -s -f grb2 invertlat -sellonlatbox,7,19,37,47 "$RAW/${t}_$s.grib2" "$T/${t}.grib2" 2>&1 | tail -3
   done
   cp "$T/pl.grib2" "$FIN/pl_$s.grib2"
   grib_copy -w shortName!=sot,shortName!=vsw "$T/sfc.grib2" "$T/nosoil.grib2"

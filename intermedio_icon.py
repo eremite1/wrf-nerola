@@ -28,7 +28,7 @@ import numpy as np
 sys.path.insert(0, os.environ.get("MOTORE_MAPPE", "/home/runner/meteo-mappe"))
 from motore import fonti  # noqa: E402
 
-RIQUADRO = (9.0, 17.0, 39.0, 45.5)            # lon0, lon1, lat0, lat1 (il dominio a 3 km e' circa 11-14,7 E, 41-43,3 N)
+RIQUADRO = (7.0, 19.0, 37.0, 47.0)            # lon0, lon1, lat0, lat1: copre il dominio esterno a 9 km (circa 8,7-16,9 E, 39-45,2 N)
 EU = "dwd_icon_eu"
 I2I = "italia_meteo_arpae_icon_2i"
 LIV_EU = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50]

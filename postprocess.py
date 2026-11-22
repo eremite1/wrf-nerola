@@ -60,10 +60,20 @@ def main():
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    for dom in [f"d0{k}" for k in range(1, a.domini + 1)]:
-        files = sorted(glob.glob(f"{a.run}/wrfout_{dom}_*"))
+    # dominio esterno a 9 km (vedi namelist.py): lavora dietro le quinte e non si pubblica. Se c'e', il dominio
+    # a 3 km e' wrfout_d02 ma resta "d01" nei file pubblicati (e l'1 km resta "d02"), come prima.
+    primi = sorted(glob.glob(f"{a.run}/wrfout_d01_*"))
+    salto = 0
+    if primi:
+        with Dataset(primi[0]) as nc:
+            if float(getattr(nc, "DX", 0)) > 6000:
+                salto = 1
+                print("dominio esterno a 9 km trovato: non viene pubblicato")
+    for k in range(1, a.domini + 1):
+        dom, dom_wrf = f"d0{k}", f"d0{k + salto}"
+        files = sorted(glob.glob(f"{a.run}/wrfout_{dom_wrf}_*"))
         if not files:
-            sys.exit(f"nessun file wrfout_{dom}_* in {a.run}")
+            sys.exit(f"nessun file wrfout_{dom_wrf}_* in {a.run}")
         tempi, dati, stat = [], {}, {}
         tempi_sond, sond = [], {}          # radiosondaggi virtuali: solo ogni 3 ore (file a parte, vedi colonna.py)
         for f in files:

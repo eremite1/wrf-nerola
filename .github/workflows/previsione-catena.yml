@@ -163,8 +163,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/geo_em
-          key: geo-em-cerca
-          restore-keys: geo-em-
+          key: geo9-cerca
+          restore-keys: geo9-
           fail-on-cache-miss: true
 
       - name: Recupero i file del dominio (3 km, 1 km e 333 m)
@@ -172,8 +172,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/geo_em
-          key: dominio3-cerca
-          restore-keys: dominio3-
+          key: geo9fine-cerca
+          restore-keys: geo9fine-
           fail-on-cache-miss: true
 
       - name: Recupero i dati pronti
@@ -194,7 +194,7 @@ jobs:
           START=$(date -u -d @$EPOCH +%Y-%m-%d_%H:%M:%S)
           END=$(date -u -d @$((EPOCH + ORE*3600)) +%Y-%m-%d_%H:%M:%S)
           echo "Periodo: $START -> $END"
-          S=""; E=""; for d in $(seq 1 $NDOM); do S="$S'$START',"; E="$E'$END',"; done
+          S=""; E=""; for d in $(seq 0 $NDOM); do S="$S'$START',"; E="$E'$END',"; done   # +1: dominio esterno a 9 km
           sed -i "s/^ *start_date.*/ start_date = $S/; s/^ *end_date.*/ end_date   = $E/" namelist.wps
           rm -f GRIBFILE.* FILE:*
           if [ "${FORZANTE#ICON}" != "$FORZANTE" ]; then
@@ -211,7 +211,7 @@ jobs:
           test "$(ls FILE:* | wc -l)" -eq "$ATTESI" || { echo "ERRORE: numero di istanti sbagliato"; exit 1; }
           ./metgrid.exe > metgrid.log 2>&1 || true
           grep -q "Successful completion" metgrid.log || { echo "ERRORE: metgrid non e' riuscito. Ultime righe:"; tail -n 40 metgrid.log; exit 1; }
-          for d in $(seq -f "d%02g" 1 $NDOM); do
+          for d in $(seq -f "d%02g" 1 $((NDOM + 1))); do
             N=$(ls met_em.$d.* | wc -l)
             echo "met_em $d: $N (attesi $ATTESI)"
             test "$N" -eq "$ATTESI" || { echo "ERRORE: met_em $d incompleti"; exit 1; }

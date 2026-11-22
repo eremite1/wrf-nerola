@@ -133,8 +133,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/geo_em
-          key: geo-em-cerca
-          restore-keys: geo-em-
+          key: geo9-cerca
+          restore-keys: geo9-
           fail-on-cache-miss: true
 
       - name: Recupero i dati pronti
@@ -155,7 +155,8 @@ jobs:
           START=$(date -u -d @$EPOCH +%Y-%m-%d_%H:%M:%S)
           END=$(date -u -d @$((EPOCH + ORE*3600)) +%Y-%m-%d_%H:%M:%S)
           echo "Periodo: $START -> $END"
-          sed -i "s/^ *start_date.*/ start_date = '$START','$START',/; s/^ *end_date.*/ end_date   = '$END','$END',/" namelist.wps
+          NW=$(sed -n 's/^ *max_dom *= *\([0-9]*\).*/\1/p' namelist.wps); S=""; E=""; for d in $(seq 1 $NW); do S="$S'$START',"; E="$E'$END',"; done
+          sed -i "s/^ *start_date.*/ start_date = $S/; s/^ *end_date.*/ end_date   = $E/" namelist.wps
           rm -f GRIBFILE.* FILE:*
           ./link_grib.csh /home/runner/finali/*.grib2
           ./ungrib.exe > ungrib.log 2>&1 || true
@@ -165,7 +166,7 @@ jobs:
           test "$(ls FILE:* | wc -l)" -eq "$ATTESI" || { echo "ERRORE: numero di istanti sbagliato"; exit 1; }
           ./metgrid.exe > metgrid.log 2>&1 || true
           grep -q "Successful completion" metgrid.log || { echo "ERRORE: metgrid non e' riuscito. Ultime righe:"; tail -n 40 metgrid.log; exit 1; }
-          for d in d01 d02; do
+          for d in d01 d02 d03; do
             N=$(ls met_em.$d.* | wc -l)
             echo "met_em $d: $N (attesi $ATTESI)"
             test "$N" -eq "$ATTESI" || { echo "ERRORE: met_em $d incompleti"; exit 1; }
@@ -201,7 +202,7 @@ jobs:
           fi
           ls -lh wrfinput_d0* wrfbdy_d01
           mkdir -p /home/runner/stato
-          tar -czf /home/runner/stato/stato.tgz wrfinput_d01 wrfinput_d02 wrfbdy_d01 corsa.txt
+          tar -czf /home/runner/stato/stato.tgz wrfinput_d0* wrfbdy_d01 corsa.txt
           ls -lh /home/runner/stato
 
       - name: Salvo lo stato iniziale

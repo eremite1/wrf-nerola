@@ -52,22 +52,22 @@ jobs:
           cat > namelist.wps <<EOF
           &share
            wrf_core = 'ARW',
-           max_dom = 3,
-           start_date = '2026-10-22_00:00:00','2026-10-22_00:00:00','2026-10-22_00:00:00',
-           end_date   = '2026-10-22_00:00:00','2026-10-22_00:00:00','2026-10-22_00:00:00',
+           max_dom = 4,
+           start_date = '2026-10-22_00:00:00','2026-10-22_00:00:00','2026-10-22_00:00:00','2026-10-22_00:00:00',
+           end_date   = '2026-10-22_00:00:00','2026-10-22_00:00:00','2026-10-22_00:00:00','2026-10-22_00:00:00',
            interval_seconds = 10800,
            io_form_geogrid = 2,
           /
           &geogrid
-           parent_id         = 1, 1, 2,
-           parent_grid_ratio = 1, 3, 3,
-           i_parent_start    = 1, 29, 27,
-           j_parent_start    = 1, 29, 27,
-           e_we              = 81, 73, 61,
-           e_sn              = 81, 73, 61,
-           geog_data_res     = 'default','default','default',
-           dx = 3000,
-           dy = 3000,
+           parent_id         = 1, 1, 2, 3,
+           parent_grid_ratio = 1, 3, 3, 3,
+           i_parent_start    = 1, 25, 31, 27,
+           j_parent_start    = 1, 25, 31, 27,
+           e_we              = 75, 85, 73, 61,
+           e_sn              = 75, 85, 73, 61,
+           geog_data_res     = 'default','default','default','default',
+           dx = 9000,
+           dy = 9000,
            map_proj  = 'lambert',
            ref_lat   = 42.13,
            ref_lon   = 12.77,
@@ -99,7 +99,7 @@ jobs:
         run: |
           sudo apt-get install -y -qq -o Acquire::Retries=5 python3-pil python3-requests
           cd /home/runner/WPS
-          PYTHONPATH="$GITHUB_WORKSPACE" python3 "$GITHUB_WORKSPACE/rilievo_fine.py" geo_em.d03.nc
+          PYTHONPATH="$GITHUB_WORKSPACE" python3 "$GITHUB_WORKSPACE/rilievo_fine.py" geo_em.d04.nc
 
       - name: Disegna la mappa del dominio
         run: |
@@ -113,7 +113,7 @@ jobs:
           import matplotlib.pyplot as plt
           fig, ax = plt.subplots(figsize=(9, 8))
           im = None
-          for d in ("d01", "d02", "d03"):
+          for d in ("d02", "d03", "d04"):
               nc = netCDF4.Dataset("geo_em." + d + ".nc")
               lon = nc["XLONG_M"][0]
               lat = nc["XLAT_M"][0]
@@ -121,7 +121,7 @@ jobs:
               im = ax.pcolormesh(lon, lat, h, cmap="terrain", vmin=0, vmax=2500, shading="auto")
               bx = [lon[0, 0], lon[0, -1], lon[-1, -1], lon[-1, 0], lon[0, 0]]
               by = [lat[0, 0], lat[0, -1], lat[-1, -1], lat[-1, 0], lat[0, 0]]
-              ax.plot(bx, by, color={"d02": "red", "d03": "blue"}.get(d, "black"), linewidth=1.5)
+              ax.plot(bx, by, color={"d03": "red", "d04": "blue"}.get(d, "black"), linewidth=1.5)
               print(d, "punti:", h.shape, "quota min/max (m):", float(h.min()), float(h.max()))
           ax.plot([12.77], [42.13], "k*", markersize=14)
           ax.annotate("Nerola", (12.77, 42.13), textcoords="offset points", xytext=(8, 8))
@@ -138,7 +138,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /home/runner/geo_em
-          key: dominio3-${{ github.run_id }}
+          key: geo9fine-${{ github.run_id }}
 
       - name: Salva mappa e file scaricabili
         uses: actions/upload-artifact@v4
