@@ -1,31 +1,35 @@
 name: Prepara dominio
+# Domini della catena principale: 9 km esterno (solo dietro le quinte), 3 km e 1 km. Cache 'geo9-...'.
+# (la catena a 333 m ha i suoi domini: prepara-dominio-fine.yml, cache 'geo9fine-...')
 
 on:
   workflow_dispatch:
 
 jobs:
   dominio:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     steps:
+      - uses: actions/checkout@v4
+
       - name: Installa i programmi necessari
         run: |
           for i in 1 2 3 4; do sudo apt-get update -qq --error-on=any -o Acquire::Retries=5 && break; echo "server dei programmi non raggiungibile, riprovo"; sleep 45; done
           sudo apt-get install -y -o Acquire::Retries=5 libnetcdf-dev libnetcdff-dev libpng-dev zlib1g-dev \
             python3-numpy python3-matplotlib python3-netcdf4
 
-      - name: Recupera WPS compilato
+      - name: Recupera WPS compilato (ARM, lo stesso della previsione)
         uses: actions/cache/restore@v4
         with:
-          path: /home/runner/pacchetto
-          key: wrf-compilato-cerca
-          restore-keys: wrf-compilato-
+          path: /home/runner/wrf-install
+          key: wrf-arm-v1-cerca
+          restore-keys: wrf-arm-v1-
+          fail-on-cache-miss: true
 
-      - name: Estrai WPS
+      - name: Prepara WPS
         run: |
-          ls -lh /home/runner/pacchetto
-          test -e /home/runner/pacchetto/wps.tar.gz || { echo "ERRORE: pacchetto WPS non trovato"; exit 1; }
-          tar -xzf /home/runner/pacchetto/wps.tar.gz -C /home/runner
+          mkdir -p /home/runner/WPS
+          cp -a /home/runner/wrf-install/WPS/. /home/runner/WPS/
           ls -l /home/runner/WPS/*.exe
 
       - name: Scarica i dati geografici (grandi, può richiedere molto tempo)
@@ -111,7 +115,7 @@ jobs:
               im = ax.pcolormesh(lon, lat, h, cmap="terrain", vmin=0, vmax=2500, shading="auto")
               bx = [lon[0, 0], lon[0, -1], lon[-1, -1], lon[-1, 0], lon[0, 0]]
               by = [lat[0, 0], lat[0, -1], lat[-1, -1], lat[-1, 0], lat[0, 0]]
-              ax.plot(bx, by, color={"d01": "gray", "d02": "black", "d03": "red"}[d], linewidth=1.5)
+              ax.plot(bx, by, color={"d01": "gray", "d03": "red"}.get(d, "black"), linewidth=1.5)
               print(d, "punti:", h.shape, "quota min/max (m):", float(h.min()), float(h.max()))
           ax.plot([12.77], [42.13], "k*", markersize=14)
           ax.annotate("Nerola", (12.77, 42.13), textcoords="offset points", xytext=(8, 8))

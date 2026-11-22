@@ -1,6 +1,6 @@
 name: Prepara dominio a 333 m
 # Come prepara-dominio.yml ma con il terzo dominio (333 m, circa 20 km intorno a Nerola) per la catena fine.
-# Salva nella cache 'dominio3-...' (diversa da quella della catena principale).
+# Salva nella cache 'geo9fine-...' (diversa da quella della catena principale). In piu' c'e' il dominio esterno a 9 km.
 
 on:
   workflow_dispatch:
@@ -128,7 +128,7 @@ jobs:
           ax.set_aspect(1.0 / np.cos(np.radians(42.1)))
           ax.set_xlabel("Longitudine")
           ax.set_ylabel("Latitudine")
-          ax.set_title("Domini WRF: 3 km (nero), 1 km (rosso) e 333 m (blu), centrati su Nerola")
+          ax.set_title("Domini WRF: 3 km (nero), 1 km (rosso) e 333 m (blu), centrati su Nerola (piu' il 9 km esterno)")
           fig.colorbar(im, label="Quota (m)")
           fig.savefig("mappa_domini.png", dpi=110, bbox_inches="tight")
           EOF
