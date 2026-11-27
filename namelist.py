@@ -143,7 +143,7 @@ def tre_domini(t):
 # Pagella di fine novembre 2026: F1 e' la migliore sulla pioggia con tutti i modelli di partenza, F3 la peggiore sulla
 # pioggia ma la migliore sul vento, F4 la migliore sulla temperatura, F2 non e' mai la migliore in niente di importante
 # (sospesa; i suoi voti passati restano in pagella). Nuove prove:
-#   F5 = F1 + schema dei cumuli Grell-Freitas anche a 3 km (non solo a 9 km) + convezione "bassa" (shallow):
+#   F5 = F1 + schema dei cumuli Grell-Freitas anche a 3 km (non solo a 9 km):
 #        contro la pioggia che manca (tutti i WRF ne fanno meno del radar, soprattutto nelle piogge deboli e diffuse)
 #   F6 = microfisica di F1 (la migliore sulla pioggia) + strato limite ACM2 di F3 (il migliore sul vento): serve a
 #        capire se il vento migliore di F3 viene dall'ACM2 senza perdere la pioggia di F1
@@ -154,7 +154,9 @@ FISICHE = {
     "F3": {"mp_physics": "10", "bl_pbl_physics": "7", "sf_sfclay_physics": "1",
            "sf_surface_physics": "4"},                                                # Morrison, ACM2, Noah-MP
     "F4": {"mp_physics": "8", "bl_pbl_physics": "2", "sf_sfclay_physics": "2"},       # Thompson, MYJ
-    "F5": {"cu_physics": "3", "ishallow": "1"},                                       # F1 + Grell-Freitas a 3 km + shallow
+    "F5": {"cu_physics": "3"},                                                        # F1 + Grell-Freitas a 3 km
+    # (la convezione bassa "shallow" a parte non serve: lo strato limite MYNN con EDMF la calcola gia' da solo,
+    #  e WRF si rifiuta di partire se si attivano tutte e due)
     "F6": {"bl_pbl_physics": "7", "sf_sfclay_physics": "1"},                          # WSM6 + ACM2 + Noah
     "G1": {},                                                                         # F1, dominio esterno grande
 }

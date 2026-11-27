@@ -9,7 +9,7 @@ run-name: "Varianti di fisica ${{ inputs.giorno }}"
 #   F2  Thompson + YSU + Noah     SOSPESA a fine novembre 2026: non era la migliore in niente di importante
 #   F3  Morrison + ACM2 + Noah-MP (la peggiore sulla pioggia, la migliore sul vento)
 #   F4  Thompson + MYJ + Noah     (la migliore sulla temperatura)
-#   F5  F1 + cumuli Grell-Freitas anche a 3 km + convezione bassa (shallow): prova contro la pioggia che manca
+#   F5  F1 + cumuli Grell-Freitas anche a 3 km: prova contro la pioggia che manca
 #   F6  WSM6 + ACM2 + Noah: microfisica della pioggia di F1 + strato limite del vento di F3
 #   G1  F1 con dominio esterno a 9 km grande (999 km invece di 666): solo ECMWF e ICON-EU (cache geo9g)
 on:
