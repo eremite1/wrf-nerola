@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ritaglia i dati ECMWF sull'Italia centrale (latitudini da sud a nord, come vuole WPS) e rimette le etichette
+# Ritaglia i dati ECMWF sull'Italia (4-22 E, 35-49 N: basta anche per il dominio esterno grande della variante G1) (latitudini da sud a nord, come vuole WPS) e rimette le etichette
 # giuste agli strati di suolo (WPS le riconosce per profondita' in cm).
 #   prepara_grib.sh CARTELLA_GREZZI CARTELLA_FINALE ORE
 # Legge sfc_<ora>.grib2 e pl_<ora>.grib2, scrive gli stessi nomi nella cartella finale.
@@ -10,7 +10,7 @@ passo() {
   local s=$1 T k p D1 D2
   T=$(mktemp -d)
   for t in sfc pl; do
-    cdo -s -f grb2 invertlat -sellonlatbox,7,19,37,47 "$RAW/${t}_$s.grib2" "$T/${t}.grib2" 2>&1 | tail -3
+    cdo -s -f grb2 invertlat -sellonlatbox,4,22,35,49 "$RAW/${t}_$s.grib2" "$T/${t}.grib2" 2>&1 | tail -3
   done
   cp "$T/pl.grib2" "$FIN/pl_$s.grib2"
   grib_copy -w shortName!=sot,shortName!=vsw "$T/sfc.grib2" "$T/nosoil.grib2"

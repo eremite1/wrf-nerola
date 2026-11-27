@@ -140,13 +140,28 @@ def tre_domini(t):
 
 
 # metodi di calcolo ("fisica") per il confronto delle varianti: F1 e' quella della catena principale
+# Pagella di fine novembre 2026: F1 e' la migliore sulla pioggia con tutti i modelli di partenza, F3 la peggiore sulla
+# pioggia ma la migliore sul vento, F4 la migliore sulla temperatura, F2 non e' mai la migliore in niente di importante
+# (sospesa; i suoi voti passati restano in pagella). Nuove prove:
+#   F5 = F1 + schema dei cumuli Grell-Freitas anche a 3 km (non solo a 9 km) + convezione "bassa" (shallow):
+#        contro la pioggia che manca (tutti i WRF ne fanno meno del radar, soprattutto nelle piogge deboli e diffuse)
+#   F6 = microfisica di F1 (la migliore sulla pioggia) + strato limite ACM2 di F3 (il migliore sul vento): serve a
+#        capire se il vento migliore di F3 viene dall'ACM2 senza perdere la pioggia di F1
+#   G1 = F1 con il dominio esterno a 9 km grande (999 km invece di 666): le perturbazioni entrano gia' "cariche"
 FISICHE = {
     "F1": {},                                                                         # WSM6, MYNN, Noah
-    "F2": {"mp_physics": "8", "bl_pbl_physics": "1", "sf_sfclay_physics": "1"},       # Thompson, YSU
+    "F2": {"mp_physics": "8", "bl_pbl_physics": "1", "sf_sfclay_physics": "1"},       # Thompson, YSU (sospesa)
     "F3": {"mp_physics": "10", "bl_pbl_physics": "7", "sf_sfclay_physics": "1",
            "sf_surface_physics": "4"},                                                # Morrison, ACM2, Noah-MP
     "F4": {"mp_physics": "8", "bl_pbl_physics": "2", "sf_sfclay_physics": "2"},       # Thompson, MYJ
+    "F5": {"cu_physics": "3", "ishallow": "1"},                                       # F1 + Grell-Freitas a 3 km + shallow
+    "F6": {"bl_pbl_physics": "7", "sf_sfclay_physics": "1"},                          # WSM6 + ACM2 + Noah
+    "G1": {},                                                                         # F1, dominio esterno grande
 }
+GRANDE = {"G1"}                       # varianti con il dominio esterno a 9 km di 999 km (cache geo9g)
+ESTERNO_GRANDE = {"e_we": "111", "e_sn": "111"}
+NIDO_GRANDE = {"i_parent_start": "42", "j_parent_start": "42"}     # (111 - 28) / 2 + 1: il 3 km resta al centro
+SINGOLI = {"ishallow"}                # chiavi con un valore solo (non uno per dominio)
 
 
 def un_dominio(t):
@@ -201,6 +216,10 @@ def numera(t):
 
 def con_fisica(t, codice):
     for chiave, valore in FISICHE[codice].items():
+        if chiave in SINGOLI:                          # chiave nuova a valore unico: si aggiunge in fondo a &physics
+            t = re.sub(r"^ *" + chiave + r" *=.*\n", "", t, flags=re.M)
+            t = t.replace("&physics\n", f"&physics\n {chiave} = {valore},\n", 1)
+            continue
         t = re.sub(rf"^( *{chiave} *= *)([^\n]*)$", lambda m: m.group(1) + ", ".join([valore] * m.group(2).count(",")) + ",",
                    t, flags=re.M)
     return t
@@ -248,6 +267,9 @@ def main():
     t = MODELLO
     for k, v in sost.items():
         t = t.replace("@" + k + "@", str(v))
+    if a.fisica in GRANDE:
+        ESTERNO.update(ESTERNO_GRANDE)
+        NIDO.update(NIDO_GRANDE)
     t = con_esterno(t)
     if a.domini == 3:
         t = tre_domini(t)

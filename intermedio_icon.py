@@ -29,6 +29,8 @@ sys.path.insert(0, os.environ.get("MOTORE_MAPPE", "/home/runner/meteo-mappe"))
 from motore import fonti  # noqa: E402
 
 RIQUADRO = (7.0, 19.0, 37.0, 47.0)            # lon0, lon1, lat0, lat1: copre il dominio esterno a 9 km (circa 8,7-16,9 E, 39-45,2 N)
+# ICON-EU copre tutta l'Europa: si ritaglia piu' largo, cosi' basta anche per il dominio esterno grande (999 km, variante G1)
+RIQUADRO_LARGO = (4.0, 22.0, 35.0, 49.0)
 EU = "dwd_icon_eu"
 I2I = "italia_meteo_arpae_icon_2i"
 LIV_EU = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50]
@@ -74,10 +76,11 @@ def scrivi_campo(f, hdate, campo, unita, descr, livello, lat, lon, valori):
 class Lettore:
     def __init__(self, dataset, info, valido):
         self.f = fonti.FileOM(dataset, info, valido)
+        self.riquadro = RIQUADRO_LARGO if dataset == EU else RIQUADRO
         self.lat = self.lon = None
 
     def __call__(self, nome):
-        la, lo, v = self.f.leggi(nome, RIQUADRO)
+        la, lo, v = self.f.leggi(nome, self.riquadro)
         v = np.asarray(v, dtype="float64")
         if la[0] > la[-1]:
             la, v = la[::-1], v[::-1]
