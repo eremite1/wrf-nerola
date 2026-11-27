@@ -1,0 +1,37 @@
+{
+ "aggiornato": "2026-11-27T14:43Z",
+ "corse": {
+  "ecmwf": "2026112618",
+  "gfs": "2026112700",
+  "iconeu": "2026112700",
+  "icon2i": "2026112700"
+ },
+ "varianti": {
+  "f1": "WSM6 + MYNN + Noah (come la catena principale)",
+  "f3": "Morrison + ACM2 + Noah-MP",
+  "f4": "Thompson + MYJ + Noah",
+  "f5": "WSM6 + MYNN + Noah + cumuli a 3 km e shallow",
+  "f6": "WSM6 + ACM2 + Noah",
+  "g1": "WSM6 + MYNN + Noah, dominio esterno grande"
+ },
+ "file": [
+  "ecmwf_f1.npz",
+  "ecmwf_f3.npz",
+  "ecmwf_f4.npz",
+  "ecmwf_f6.npz",
+  "ecmwf_g1.npz",
+  "gfs_f1.npz",
+  "gfs_f3.npz",
+  "gfs_f4.npz",
+  "gfs_f6.npz",
+  "icon2i_f1.npz",
+  "icon2i_f3.npz",
+  "icon2i_f4.npz",
+  "icon2i_f6.npz",
+  "iconeu_f1.npz",
+  "iconeu_f3.npz",
+  "iconeu_f4.npz",
+  "iconeu_f6.npz",
+  "iconeu_g1.npz"
+ ]
+}
